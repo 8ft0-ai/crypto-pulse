@@ -36,6 +36,12 @@ REPORT_FILE_RE = re.compile(
     r"(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$"
 )
 
+# ChatGPT/web citations are useful inside a chat response, but they are not
+# meaningful in a static GitHub Pages render. Preserve them in the archived raw
+# Markdown, but remove them from the generated public HTML.
+CHATGPT_CITATION_RE = re.compile(r"[^]*")
+LEADING_H1_RE = re.compile(r"^\s*#\s+(.+?)\s*(?:\n+|$)", re.DOTALL)
+
 TZ_OFFSETS = {
     "AEST": "+10:00",
     "AEDT": "+11:00",
@@ -74,6 +80,28 @@ def split_front_matter(text: str) -> tuple[dict[str, Any], str]:
     return {}, text.strip()
 
 
+def clean_markdown_for_site(body: str) -> str:
+    """Clean render-only artefacts without mutating the archived report."""
+    body = CHATGPT_CITATION_RE.sub("", body)
+    # Remove spaces before punctuation left behind by stripped citations.
+    body = re.sub(r"\s+([.,;:])", r"\1", body)
+    # Collapse excessive blank lines introduced by stripping render-only tokens.
+    body = re.sub(r"\n{4,}", "\n\n\n", body)
+    return body.strip()
+
+
+def extract_leading_h1(body: str) -> str | None:
+    match = LEADING_H1_RE.match(body)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def remove_leading_h1(body: str) -> str:
+    """Avoid duplicating the report title below the branded page hero."""
+    return LEADING_H1_RE.sub("", body, count=1).strip()
+
+
 def derive_timestamp_from_path(path: Path) -> str:
     """Return a readable timestamp from the archive path when metadata is absent."""
     try:
@@ -103,9 +131,12 @@ def make_sort_key(path: Path, timestamp: str) -> str:
     return timestamp
 
 
-def title_from(metadata: dict[str, Any], timestamp: str) -> str:
+def title_from(metadata: dict[str, Any], timestamp: str, body: str) -> str:
     if metadata.get("title"):
         return str(metadata["title"])
+    leading_h1 = extract_leading_h1(body)
+    if leading_h1:
+        return leading_h1
     if timestamp:
         return f"CryptoPulse Intelligence Briefing — {timestamp}"
     return "CryptoPulse Intelligence Briefing"
@@ -311,10 +342,11 @@ def collect_reports() -> list[Report]:
     for source_path in sorted(REPORTS_DIR.glob("**/*.md")):
         raw = source_path.read_text(encoding="utf-8")
         metadata, body = split_front_matter(raw)
+        render_body = clean_markdown_for_site(body)
         timestamp = str(metadata.get("timestamp") or derive_timestamp_from_path(source_path))
-        title = title_from(metadata, timestamp)
-        headline = str(metadata.get("headline") or extract_headline(body))
-        body_html = render_markdown(body)
+        title = title_from(metadata, timestamp, render_body)
+        headline = str(metadata.get("headline") or extract_headline(render_body))
+        body_html = render_markdown(remove_leading_h1(render_body))
         output_path = output_path_for(source_path)
         reports.append(
             Report(
