@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Build CryptoPulse Pages and add the client-side archive search page.
+"""Build CryptoPulse Pages and add search and dashboard enhancements.
 
 This wrapper keeps the existing site generator as the source of the base static
-site, then adds a reader-facing search experience over search-index.json.
+site, then adds reader-facing enhancements over the generated output.
 """
 
 from __future__ import annotations
 
+import re
 import shutil
 from html import escape
 from pathlib import Path
@@ -15,6 +16,11 @@ import build_pages_site as base
 
 
 SEARCH_SCRIPT_NAME = "cryptopulse-search.js"
+HEADING_RE = re.compile(r"^(#{2,4})\s+(?:\d+\.\s*)?(?P<title>.+?)\s*$", re.IGNORECASE | re.MULTILINE)
+ASSET_SYMBOLS = (
+    "BTC", "ETH", "SOL", "XRP", "BNB", "ADA", "DOGE", "LINK", "SUI", "ONDO",
+    "ZEC", "XMR", "TON", "TAO", "ATOM", "HYPE", "TRX", "DOT", "UNI", "HBAR",
+)
 
 
 def relative_prefix(page_path: Path) -> str:
@@ -36,6 +42,187 @@ def nav_with_search(asset_prefix: str = "") -> str:
         <a href="{escape(base.GITHUB_URL)}">GitHub</a>
       </nav>
     """
+
+
+def normalise_heading(title: str) -> str:
+    title = base.strip_chatgpt_citations(title)
+    title = re.sub(r"^\d+\.\s*", "", title)
+    return re.sub(r"\s+", " ", title.strip().lower())
+
+
+def markdown_section(markdown_text: str, title: str) -> str:
+    """Return a Markdown section by heading title, stopping at same-or-higher heading."""
+    wanted = normalise_heading(title)
+    matches = list(HEADING_RE.finditer(markdown_text))
+    for index, match in enumerate(matches):
+        if normalise_heading(match.group("title")) != wanted:
+            continue
+        level = len(match.group(1))
+        end = len(markdown_text)
+        for next_match in matches[index + 1:]:
+            if len(next_match.group(1)) <= level:
+                end = next_match.start()
+                break
+        return markdown_text[match.end():end].strip()
+    return ""
+
+
+def clean_line(line: str) -> str:
+    line = base.strip_chatgpt_citations(line)
+    line = re.sub(r"^[-*+]\s+", "", line.strip())
+    line = re.sub(r"^\d+[.)]\s+", "", line)
+    line = re.sub(r"[*_`]+", "", line)
+    return line.strip(" .")
+
+
+def first_text_line(block: str) -> str:
+    for raw_line in block.splitlines():
+        line = clean_line(raw_line)
+        if not line or line.startswith("#") or line.startswith("|") or line == "---":
+            continue
+        return line
+    return ""
+
+
+def extract_data_quality(body: str, metadata: dict[str, object]) -> str:
+    match = re.search(r"Data quality:\s*(?P<items>(?:\n\s*-\s+.+)+)", body, re.IGNORECASE)
+    if match:
+        items: list[str] = []
+        for raw_line in match.group("items").splitlines():
+            item = clean_line(raw_line)
+            if item:
+                items.append(item)
+        if items:
+            return "; ".join(items[:5])
+
+    live_status = metadata.get("live_data_status")
+    if live_status:
+        return f"Live data status: {live_status}"
+    return "Detailed data-quality status was not specified in the archived report."
+
+
+def extract_trend_confidence(body: str) -> str:
+    match = re.search(r"Trend confidence:\s*(?P<value>[^\n]+)", body, re.IGNORECASE)
+    if not match:
+        return "Not specified"
+    value = clean_line(match.group("value"))
+    sentence = value.split(".", 1)[0].strip()
+    return sentence or value
+
+
+def extract_leaders(body: str) -> str:
+    gainers = markdown_section(body, "Top gainers among major liquid assets")
+    leaders: list[str] = []
+    for line in gainers.splitlines():
+        cells = [clean_line(cell) for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            candidate = clean_line(line).split(" ", 1)[0]
+        else:
+            candidate = cells[0]
+        symbol_match = re.search(r"\b[A-Z][A-Z0-9_]{1,12}\b", candidate)
+        if symbol_match:
+            symbol = symbol_match.group(0)
+            if symbol not in {"ASSET", "RANK"} and symbol not in leaders:
+                leaders.append(symbol)
+        if len(leaders) >= 5:
+            break
+
+    if leaders:
+        return ", ".join(leaders)
+
+    upper_body = base.strip_chatgpt_citations(body).upper()
+    fallback = [symbol for symbol in ASSET_SYMBOLS if symbol in upper_body]
+    return ", ".join(fallback[:5]) if fallback else "Open latest report for asset detail"
+
+
+def extract_main_risk(body: str) -> str:
+    cleaned = re.sub(r"\s+", " ", base.strip_chatgpt_citations(body))
+    risk_match = re.search(
+        r"(?:main|principal|key)\s+(?:near-term\s+)?risk(?: over the next few hours)?(?: remains| is)?\s*[:\-]?\s*(?P<risk>[^.]+)",
+        cleaned,
+        re.IGNORECASE,
+    )
+    if risk_match:
+        return clean_line(risk_match.group("risk"))
+
+    invalidate = markdown_section(body, "What would invalidate the trend")
+    return first_text_line(invalidate) or "Open latest report for risk detail"
+
+
+def latest_market_read_panel(report: base.Report) -> str:
+    raw = report.source_path.read_text(encoding="utf-8")
+    metadata, body = base.split_front_matter(raw)
+    body = base.strip_chatgpt_citations(body)
+
+    rolling = markdown_section(body, "Rolling trend analysis")
+    emerging = first_text_line(markdown_section(rolling, "Emerging trend")) if rolling else ""
+    analyst_read = first_text_line(markdown_section(rolling, "Analyst read")) if rolling else ""
+
+    if not emerging:
+        emerging = "Market regime was not explicitly extracted; open the latest report for the full archived read."
+    if not analyst_read:
+        analyst_read = report.headline
+
+    trend_confidence = extract_trend_confidence(body)
+    leaders = extract_leaders(body)
+    main_risk = extract_main_risk(body)
+    data_quality = extract_data_quality(body, metadata)
+
+    return f"""
+        <section class="latest-market-read" aria-label="Latest market read">
+          <div class="latest-market-read-header">
+            <div>
+              <div class="eyebrow">Latest market read</div>
+              <h2>Archived report regime summary</h2>
+              <p class="muted">Extracted from the latest archived AI-generated demo report, timestamped {escape(report.timestamp)}. This is not live verified market data.</p>
+            </div>
+            <a class="button" href="{escape(report.url)}">Open source report</a>
+          </div>
+          <div class="market-read-grid">
+            <article class="market-read-card market-read-card-wide">
+              <span>Fact from latest report</span>
+              <strong>{escape(emerging)}</strong>
+            </article>
+            <article class="market-read-card">
+              <span>Trend confidence</span>
+              <strong>{escape(trend_confidence)}</strong>
+            </article>
+            <article class="market-read-card">
+              <span>Leading assets</span>
+              <strong>{escape(leaders)}</strong>
+            </article>
+            <article class="market-read-card market-read-card-wide">
+              <span>Analyst interpretation</span>
+              <strong>{escape(analyst_read)}</strong>
+            </article>
+            <article class="market-read-card">
+              <span>Main risk</span>
+              <strong>{escape(main_risk)}</strong>
+            </article>
+            <article class="market-read-card">
+              <span>Data limitation</span>
+              <strong>{escape(data_quality)}</strong>
+            </article>
+          </div>
+        </section>
+    """
+
+
+def add_latest_market_read_to_homepage() -> None:
+    reports = base.collect_reports()
+    if not reports:
+        return
+    index_path = base.OUT / "index.html"
+    html = index_path.read_text(encoding="utf-8")
+    if "latest-market-read" in html:
+        return
+    panel = latest_market_read_panel(reports[0])
+    html = html.replace(
+        '        <div class="explainer-grid">',
+        f'{panel}\n        <div class="explainer-grid">',
+        1,
+    )
+    index_path.write_text(html, encoding="utf-8")
 
 
 def search_page() -> str:
@@ -124,8 +311,9 @@ def build() -> None:
     base.build()
     copy_search_asset()
     (base.OUT / "search.html").write_text(search_page(), encoding="utf-8")
+    add_latest_market_read_to_homepage()
     add_search_link_to_existing_pages()
-    print("Added CryptoPulse archive search page.")
+    print("Added CryptoPulse archive search page and latest market read panel.")
 
 
 if __name__ == "__main__":
