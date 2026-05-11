@@ -28,6 +28,37 @@ Use an issue-to-branch-to-PR workflow.
 
 Avoid asking the user to manually apply patch files unless direct GitHub writes are unavailable.
 
+## Working from GitHub issues
+
+When asked to work on an issue:
+
+1. Fetch and read the issue body before editing.
+2. Treat the issue acceptance criteria as the source of truth.
+3. Keep the implementation scoped to the issue unless the user explicitly broadens scope.
+4. Create a branch from the current `main` head.
+5. Prefer branch names that reference the issue number.
+6. Preserve all demo/disclaimer requirements.
+7. Do not edit generated `_site/` output directly.
+8. Open a PR against `main`.
+9. Include:
+
+```text
+Closes #<issue-number>
+```
+
+in the PR body.
+10. Convert issue acceptance criteria into the PR checklist where practical.
+11. State verification performed and any limitations.
+12. Do not manually close the issue; allow GitHub to close it automatically when the PR merges.
+
+Suggested branch naming examples:
+
+```text
+issue-6-landing-page-ux
+issue-7-report-reading-ux
+issue-8-archive-search-foundations
+```
+
 ## Branch naming
 
 Use concise branch names such as:
@@ -62,6 +93,30 @@ If the PR implements an issue, include:
 
 ```text
 Closes #<issue-number>
+```
+
+Suggested PR structure:
+
+```markdown
+## Summary
+
+Closes #<issue-number>
+
+## Changes
+
+- ...
+
+## Acceptance criteria covered
+
+- [x] ...
+
+## Verification
+
+- ...
+
+## Notes / limitations
+
+- ...
 ```
 
 ## GitHub Pages architecture
