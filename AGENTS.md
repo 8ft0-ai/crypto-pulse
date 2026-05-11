@@ -28,6 +28,32 @@ Use an issue-to-branch-to-PR workflow.
 
 Avoid asking the user to manually apply patch files unless direct GitHub writes are unavailable.
 
+## Preferred GitHub write strategy
+
+For multi-file implementation work, prefer one atomic Git commit rather than one commit per file.
+
+Where the GitHub connector exposes lower-level Git object operations, use this sequence:
+
+1. Fetch the current `main` commit and tree.
+2. Create a branch from the current `main` commit.
+3. Prepare all changed file contents before writing anything.
+4. Create blobs for every changed file.
+5. Create a tree using the current `main` tree as the base and all changed paths as entries.
+6. Create one commit with that tree and the current `main` commit as parent.
+7. Update the branch ref once to point at the new commit.
+8. Open one PR against `main`.
+
+This should produce:
+
+- one branch;
+- one implementation commit;
+- one PR;
+- one review/merge decision.
+
+Avoid using per-file `update_file` calls for multi-file implementation work unless lower-level Git object operations are unavailable or unsuitable. If forced to use per-file updates, say so in the PR body under `Notes / limitations`.
+
+For single-file documentation-only changes, a normal single-file commit is acceptable.
+
 ## Working from GitHub issues
 
 When asked to work on an issue:
