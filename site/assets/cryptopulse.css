@@ -329,6 +329,43 @@ body {
   padding: 22px;
 }
 
+.report-meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+
+.report-meta-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid #dbe4f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 5px 9px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.report-meta-chip span {
+  color: #64748b;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.report-meta-chip strong {
+  color: #0f172a;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.report-meta-chip-market { background: #ecfeff; border-color: #bae6fd; }
+.report-meta-chip-interpretation { background: #f0fdfa; border-color: #99f6e4; }
+.report-meta-chip-data { background: #fffbeb; border-color: #fde68a; }
+
 .latest-market-read {
   margin: 0 0 28px;
   border: 1px solid rgba(14, 116, 144, 0.25);

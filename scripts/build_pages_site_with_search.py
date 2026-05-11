@@ -21,6 +21,11 @@ ASSET_SYMBOLS = (
     "BTC", "ETH", "SOL", "XRP", "BNB", "ADA", "DOGE", "LINK", "SUI", "ONDO",
     "ZEC", "XMR", "TON", "TAO", "ATOM", "HYPE", "TRX", "DOT", "UNI", "HBAR",
 )
+ASSET_ALIASES = {
+    "BTC": {"BTC", "BITCOIN"},
+    "ETH": {"ETH", "ETHEREUM"},
+    "SOL": {"SOL", "SOLANA"},
+}
 
 
 def relative_prefix(page_path: Path) -> str:
@@ -101,6 +106,11 @@ def extract_data_quality(body: str, metadata: dict[str, object]) -> str:
     return "Detailed data-quality status was not specified in the archived report."
 
 
+def compact_data_status(metadata: dict[str, object]) -> str:
+    status = str(metadata.get("live_data_status") or "").strip()
+    return status if status else "not specified"
+
+
 def extract_trend_confidence(body: str) -> str:
     match = re.search(r"Trend confidence:\s*(?P<value>[^\n]+)", body, re.IGNORECASE)
     if not match:
@@ -108,6 +118,14 @@ def extract_trend_confidence(body: str) -> str:
     value = clean_line(match.group("value"))
     sentence = value.split(".", 1)[0].strip()
     return sentence or value
+
+
+def compact_trend_confidence(body: str) -> str:
+    value = extract_trend_confidence(body)
+    match = re.search(r"\b(High|Medium|Low)\b(?:[- ]?\w+)?", value, re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(0).replace("-", " ").title()
 
 
 def extract_leaders(body: str) -> str:
@@ -147,6 +165,134 @@ def extract_main_risk(body: str) -> str:
 
     invalidate = markdown_section(body, "What would invalidate the trend")
     return first_text_line(invalidate) or "Open latest report for risk detail"
+
+
+def table_cells(line: str) -> list[str]:
+    return [clean_line(cell) for cell in line.strip().strip("|").split("|")]
+
+
+def looks_like_separator(cells: list[str]) -> bool:
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells)
+
+
+def asset_matches(cell: str, symbol: str) -> bool:
+    aliases = ASSET_ALIASES.get(symbol, {symbol})
+    normalised = re.sub(r"[^A-Z0-9_]+", " ", cell.upper()).split()
+    return any(alias in normalised for alias in aliases)
+
+
+def extract_asset_changes(body: str, symbol: str) -> dict[str, str]:
+    for line in body.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = table_cells(line)
+        if looks_like_separator(cells) or len(cells) < 5:
+            continue
+        asset_index = None
+        for index, cell in enumerate(cells[:3]):
+            if asset_matches(cell, symbol):
+                asset_index = index
+                break
+        if asset_index is None:
+            continue
+        if asset_index == 0:
+            one_hour_index, day_index = 2, 3
+        else:
+            one_hour_index, day_index = asset_index + 2, asset_index + 3
+        result: dict[str, str] = {}
+        if one_hour_index < len(cells) and re.search(r"[-+]?\d", cells[one_hour_index]):
+            result["1h"] = cells[one_hour_index]
+        if day_index < len(cells) and re.search(r"[-+]?\d", cells[day_index]):
+            result["24h"] = cells[day_index]
+        if result:
+            return result
+    return {}
+
+
+def extract_table_metric(body: str, labels: tuple[str, ...]) -> str:
+    lowered_labels = tuple(label.lower() for label in labels)
+    for line in body.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = table_cells(line)
+        if looks_like_separator(cells) or len(cells) < 2:
+            continue
+        first = cells[0].lower()
+        if any(label in first for label in lowered_labels):
+            for cell in cells[1:]:
+                if cell and cell.lower() not in {"unavailable", "n/a", "—", "-"}:
+                    return cell
+    return ""
+
+
+def short_regime(body: str) -> str:
+    rolling = markdown_section(body, "Rolling trend analysis")
+    emerging = first_text_line(markdown_section(rolling, "Emerging trend")) if rolling else ""
+    if not emerging:
+        return ""
+    emerging = re.sub(r"^The strongest emerging pattern (?:is|remains)\s+", "", emerging, flags=re.IGNORECASE)
+    emerging = re.sub(r"^The strongest visible pattern (?:is|remains)\s+", "", emerging, flags=re.IGNORECASE)
+    emerging = emerging.strip()
+    return emerging[:82] + "…" if len(emerging) > 85 else emerging
+
+
+def report_metadata_chips(report: base.Report) -> str:
+    raw = report.source_path.read_text(encoding="utf-8")
+    metadata, body = base.split_front_matter(raw)
+    body = base.strip_chatgpt_citations(body)
+
+    chips: list[tuple[str, str, str]] = []
+    for symbol in ("BTC", "ETH"):
+        changes = extract_asset_changes(body, symbol)
+        if changes.get("24h"):
+            chips.append((f"{symbol} 24h", changes["24h"], "market"))
+        elif changes.get("1h"):
+            chips.append((f"{symbol} 1h", changes["1h"], "market"))
+
+    btc_dominance = extract_table_metric(body, ("btc dominance", "bitcoin dominance"))
+    if btc_dominance:
+        chips.append(("BTC dom", btc_dominance, "market"))
+
+    trend_confidence = compact_trend_confidence(body)
+    if trend_confidence:
+        chips.append(("Trend", trend_confidence, "interpretation"))
+
+    regime = short_regime(body)
+    if regime:
+        chips.append(("Regime", regime, "interpretation"))
+
+    data_status = compact_data_status(metadata)
+    if data_status:
+        chips.append(("Data", data_status, "data"))
+
+    if not chips:
+        return ""
+
+    chip_html = "".join(
+        f'<span class="report-meta-chip report-meta-chip-{escape(kind)}"><span>{escape(label)}</span><strong>{escape(value)}</strong></span>'
+        for label, value, kind in chips[:6]
+    )
+    return f'<div class="report-meta-chips" aria-label="Archived report metadata">{chip_html}</div>'
+
+
+def add_metadata_chips_to_report_cards() -> None:
+    reports = base.collect_reports()
+    targets = [
+        (base.OUT / "index.html", ""),
+        (base.OUT / "archive" / "index.html", "../"),
+    ]
+    for html_path, prefix in targets:
+        if not html_path.exists():
+            continue
+        html = html_path.read_text(encoding="utf-8")
+        for report in reports:
+            chips = report_metadata_chips(report)
+            if not chips:
+                continue
+            marker = f'<a class="text-link" href="{prefix}{escape(report.url)}">Open report →</a>'
+            replacement = f'{chips}\n                        {marker}'
+            html = html.replace(marker, replacement, 1)
+        html_path.write_text(html, encoding="utf-8")
 
 
 def latest_market_read_panel(report: base.Report) -> str:
@@ -312,8 +458,9 @@ def build() -> None:
     copy_search_asset()
     (base.OUT / "search.html").write_text(search_page(), encoding="utf-8")
     add_latest_market_read_to_homepage()
+    add_metadata_chips_to_report_cards()
     add_search_link_to_existing_pages()
-    print("Added CryptoPulse archive search page and latest market read panel.")
+    print("Added CryptoPulse archive search page, latest market read panel, and report metadata chips.")
 
 
 if __name__ == "__main__":
