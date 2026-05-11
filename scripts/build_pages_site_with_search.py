@@ -16,6 +16,7 @@ import build_pages_site as base
 
 
 SEARCH_SCRIPT_NAME = "cryptopulse-search.js"
+DATA_QUALITY_STYLE_NAME = "cryptopulse-data-quality.css"
 HEADING_RE = re.compile(r"^(#{2,4})\s+(?:\d+\.\s*)?(?P<title>.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 ASSET_SYMBOLS = (
     "BTC", "ETH", "SOL", "XRP", "BNB", "ADA", "DOGE", "LINK", "SUI", "ONDO",
@@ -275,6 +276,104 @@ def report_metadata_chips(report: base.Report) -> str:
     return f'<div class="report-meta-chips" aria-label="Archived report metadata">{chip_html}</div>'
 
 
+def quality_kind(value: str) -> str:
+    text = value.lower()
+    if any(token in text for token in ("unavailable", "missing", "not specified", "not available", "failed")):
+        return "unavailable"
+    if any(token in text for token in ("partial", "delayed", "incomplete", "limited", "low", "mixed")):
+        return "partial"
+    if any(token in text for token in ("full", "available", "current", "high")):
+        return "available"
+    return "unknown"
+
+
+def quality_label(label: str) -> str:
+    cleaned = clean_line(label).replace("-", " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:1].upper() + cleaned[1:] if cleaned else "Data quality"
+
+
+def data_quality_items(report: base.Report) -> list[tuple[str, str, str]]:
+    raw = report.source_path.read_text(encoding="utf-8")
+    metadata, body = base.split_front_matter(raw)
+    body = base.strip_chatgpt_citations(body)
+
+    items: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+
+    live_status = compact_data_status(metadata)
+    if live_status:
+        items.append(("Live data", live_status, quality_kind(live_status)))
+        seen.add("live data")
+
+    match = re.search(r"Data quality:\s*(?P<items>(?:\n\s*-\s+.+)+)", body, re.IGNORECASE)
+    if match:
+        for raw_line in match.group("items").splitlines():
+            item = clean_line(raw_line)
+            if not item:
+                continue
+            if ":" in item:
+                label, value = item.split(":", 1)
+            else:
+                label, value = "Data quality", item
+            label = quality_label(label)
+            value = clean_line(value)
+            key = label.lower()
+            if not value or key in seen:
+                continue
+            items.append((label, value, quality_kind(value)))
+            seen.add(key)
+            if len(items) >= 7:
+                break
+
+    trend = compact_trend_confidence(body)
+    if trend and "trend confidence" not in seen:
+        items.append(("Trend confidence", trend, quality_kind(trend)))
+
+    if not items:
+        items.append(("Data quality", "not specified in archived report", "unavailable"))
+    return items
+
+
+def report_data_quality_panel(report: base.Report) -> str:
+    badges = "".join(
+        f'<span class="data-quality-badge data-quality-{escape(kind)}"><span>{escape(label)}</span><strong>{escape(value)}</strong></span>'
+        for label, value, kind in data_quality_items(report)
+    )
+    return f"""
+      <section class="report-data-quality-panel" aria-label="Report data quality">
+        <div class="report-data-quality-copy">
+          <div class="eyebrow">Data quality</div>
+          <h2>Verification and data limitations</h2>
+          <p>Extracted from this archived AI-generated report. These badges summarise stated data availability and confidence; they are not live checks.</p>
+        </div>
+        <div class="data-quality-badges">{badges}</div>
+      </section>
+    """
+
+
+def add_data_quality_panels_to_report_pages() -> None:
+    reports = base.collect_reports()
+    targets: list[tuple[Path, base.Report]] = [(report.output_path, report) for report in reports]
+    if reports:
+        targets.append((base.OUT / "latest.html", reports[0]))
+
+    for html_path, report in targets:
+        if not html_path.exists():
+            continue
+        html = html_path.read_text(encoding="utf-8")
+        if "report-data-quality-panel" in html:
+            continue
+        marker = '      <section class="metadata-panel source-panel"'
+        panel = report_data_quality_panel(report)
+        if marker in html:
+            html = html.replace(marker, f"{panel}\n{marker}", 1)
+        else:
+            warning_marker = '      <section class="headline">'
+            html = html.replace(warning_marker, f"{panel}\n{warning_marker}", 1)
+        html_path.write_text(html, encoding="utf-8")
+
+
 def add_metadata_chips_to_report_cards() -> None:
     reports = base.collect_reports()
     targets = [
@@ -428,13 +527,30 @@ def search_page() -> str:
 """
 
 
-def copy_search_asset() -> None:
-    source = base.SITE_SRC / "assets" / SEARCH_SCRIPT_NAME
-    destination = base.OUT / "assets" / SEARCH_SCRIPT_NAME
+def copy_asset(filename: str) -> None:
+    source = base.SITE_SRC / "assets" / filename
+    destination = base.OUT / "assets" / filename
     if not source.exists():
-        raise FileNotFoundError(f"Missing search script: {source}")
+        raise FileNotFoundError(f"Missing asset: {source}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(source, destination)
+
+
+def copy_enhancement_assets() -> None:
+    copy_asset(SEARCH_SCRIPT_NAME)
+    copy_asset(DATA_QUALITY_STYLE_NAME)
+
+
+def add_enhancement_stylesheet_links() -> None:
+    for html_file in base.OUT.glob("**/*.html"):
+        html = html_file.read_text(encoding="utf-8")
+        if DATA_QUALITY_STYLE_NAME in html:
+            continue
+        prefix = relative_prefix(html_file)
+        base_link = f'<link rel="stylesheet" href="{prefix}assets/cryptopulse.css">'
+        extra_link = f'{base_link}\n  <link rel="stylesheet" href="{prefix}assets/{DATA_QUALITY_STYLE_NAME}">'
+        html = html.replace(base_link, extra_link, 1)
+        html_file.write_text(html, encoding="utf-8")
 
 
 def add_search_link_to_existing_pages() -> None:
@@ -455,12 +571,14 @@ def add_search_link_to_existing_pages() -> None:
 
 def build() -> None:
     base.build()
-    copy_search_asset()
+    copy_enhancement_assets()
     (base.OUT / "search.html").write_text(search_page(), encoding="utf-8")
     add_latest_market_read_to_homepage()
     add_metadata_chips_to_report_cards()
+    add_data_quality_panels_to_report_pages()
     add_search_link_to_existing_pages()
-    print("Added CryptoPulse archive search page, latest market read panel, and report metadata chips.")
+    add_enhancement_stylesheet_links()
+    print("Added CryptoPulse archive search page, latest market read panel, report metadata chips, and data-quality panels.")
 
 
 if __name__ == "__main__":
