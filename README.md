@@ -1,8 +1,8 @@
 # CryptoPulse
 
-CryptoPulse is a generated crypto market intelligence archive.
+CryptoPulse is an AI-generated crypto market report demo and archive.
 
-The repository stores raw generated market intelligence reports as Markdown and publishes them as a static GitHub Pages site.
+The repository stores raw generated market report examples as Markdown and publishes them as a static GitHub Pages site. The reports are demonstration content only. They are AI-created, may contain errors or stale information, and must not be treated as financial advice, investment research, recommendations, or trading signals.
 
 ## Report archive
 
@@ -37,10 +37,10 @@ _site/
 The deployed site contains:
 
 ```text
-index.html              # Home page and latest report card
-latest.html             # Copy of the latest report
+index.html              # Home page and latest demo report card
+latest.html             # Copy of the latest demo report
 archive/index.html      # Full report archive
-archive/**/*.html       # Rendered reports
+archive/**/*.html       # Rendered demo reports
 manifest.json           # Machine-readable latest/report index
 feed.xml                # RSS feed
 assets/cryptopulse.css  # Site styling
@@ -79,8 +79,6 @@ Once enabled, the expected site URL is:
 https://8ft0-ai.github.io/crypto-pulse/
 ```
 
-Note: this repository is currently private. Check the repository plan/settings if the Pages deployment is not publicly accessible.
-
 ## Local build
 
 To test locally:
@@ -103,3 +101,5 @@ http://localhost:8000
 ## Design principle
 
 Raw Markdown reports are the source of truth. The GitHub Pages site is generated output and should be treated as disposable.
+
+The user should understand that CryptoPulse is AI-generated demo content before they read any market claim.
