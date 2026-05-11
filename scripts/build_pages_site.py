@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import format_datetime
@@ -60,6 +61,11 @@ class Report:
     metadata: dict[str, Any]
     source_rel: str
     toc_html: str
+    year: str
+    month: str
+    day: str
+    time_label: str
+    tz: str
 
 def clean_output_dir() -> None:
     if OUT.exists():
@@ -115,7 +121,7 @@ def add_heading_ids_and_toc(body: str) -> tuple[str, str]:
     toc_html = "<nav class=\"toc-card\" aria-label=\"Report table of contents\"><div class=\"eyebrow\">In this report</div><ul>" + "".join(toc_items) + "</ul></nav>"
     return rendered_body, toc_html
 
-def derive_timestamp_from_path(path: Path) -> str:
+def path_parts(path: Path) -> tuple[str, str, str, str, str]:
     try:
         rel = path.relative_to(REPORTS_DIR)
         year, month, day = rel.parts[0], rel.parts[1], rel.parts[2]
@@ -123,20 +129,21 @@ def derive_timestamp_from_path(path: Path) -> str:
         if match:
             hhmm = match.group("hhmm")
             tz = match.group("tz")
-            return f"{year}-{month}-{day} {hhmm[:2]}:{hhmm[2:]} {tz}"
-        return f"{year}-{month}-{day}"
+            return year, month, day, f"{hhmm[:2]}:{hhmm[2:]}", tz
+        return year, month, day, "", ""
     except Exception:
-        return path.stem.replace("_", " ")
+        return "", "", "", "", ""
+
+def derive_timestamp_from_path(path: Path) -> str:
+    year, month, day, time_label, tz = path_parts(path)
+    if year and month and day:
+        return f"{year}-{month}-{day} {time_label} {tz}".strip()
+    return path.stem.replace("_", " ")
 
 def make_sort_key(path: Path, timestamp: str) -> str:
-    try:
-        rel = path.relative_to(REPORTS_DIR)
-        year, month, day = rel.parts[0], rel.parts[1], rel.parts[2]
-        match = REPORT_FILE_RE.match(path.name)
-        if match:
-            return f"{year}{month}{day}{match.group('hhmm')}"
-    except Exception:
-        pass
+    year, month, day, time_label, _tz = path_parts(path)
+    if year and month and day:
+        return f"{year}{month}{day}{time_label.replace(':', '')}"
     return timestamp
 
 def title_from(metadata: dict[str, Any], timestamp: str, body: str) -> str:
@@ -200,6 +207,7 @@ def nav(asset_prefix: str = "") -> str:
         <a href=\"{asset_prefix}archive/index.html\">Archive</a>
         <a href=\"{asset_prefix}feed.xml\">RSS</a>
         <a href=\"{asset_prefix}manifest.json\">Manifest</a>
+        <a href=\"{asset_prefix}search-index.json\">Search index</a>
         <a href=\"{escape(GITHUB_URL)}\">GitHub</a>
       </nav>
     """
@@ -218,13 +226,18 @@ def archive_range(reports: list[Report]) -> str:
     oldest = reports[-1].timestamp
     return newest if newest == oldest else f"{oldest} → {newest}"
 
+def reporting_cadence(reports: list[Report]) -> str:
+    if len(reports) <= 1:
+        return "Single report" if reports else "No reports yet"
+    return "Hourly archive cadence"
+
 def dashboard_cards(reports: list[Report]) -> str:
     latest = reports[0] if reports else None
     cards = [
         ("Latest report", latest.timestamp if latest else "No reports yet"),
         ("Archived reports", str(len(reports))),
         ("Archive range", archive_range(reports)),
-        ("Feed", "RSS + manifest available"),
+        ("Feed", "RSS + manifest + search index"),
     ]
     if latest:
         cards.insert(2, ("Latest headline", latest.headline))
@@ -364,7 +377,7 @@ def index_page(reports: list[Report]) -> str:
             <article><strong>1. Generate</strong><p>A scheduled prompt creates a crypto market report example.</p></article>
             <article><strong>2. Archive</strong><p>The report is stored as Markdown, preserving the generated body.</p></article>
             <article><strong>3. Build</strong><p>GitHub Actions renders the archive into a static Pages site.</p></article>
-            <article><strong>4. Publish</strong><p>The latest report, archive, RSS feed, and manifest are published automatically.</p></article>
+            <article><strong>4. Publish</strong><p>The latest report, archive, RSS feed, manifest, and search index are published automatically.</p></article>
           </div>
         </section>
         {latest_block}
@@ -388,8 +401,82 @@ def index_page(reports: list[Report]) -> str:
 </html>
 """
 
+def archive_stats_cards(reports: list[Report]) -> str:
+    cards = [
+        ("Total reports", str(len(reports))),
+        ("Newest report", reports[0].timestamp if reports else "No reports yet"),
+        ("Oldest report", reports[-1].timestamp if reports else "No reports yet"),
+        ("Date range", archive_range(reports)),
+        ("Cadence", reporting_cadence(reports)),
+        ("Search index", "search-index.json"),
+    ]
+    return "\n".join(f"""
+          <article class=\"archive-stat-card\">
+            <div class=\"eyebrow\">{escape(label)}</div>
+            <p>{escape(value)}</p>
+          </article>""" for label, value in cards)
+
+def month_name(month: str) -> str:
+    try:
+        return datetime.strptime(month, "%m").strftime("%B")
+    except ValueError:
+        return month
+
+def archive_jump_links(reports: list[Report]) -> str:
+    months: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for report in reports:
+        if not report.year or not report.month:
+            continue
+        key = f"{report.year}-{report.month}"
+        if key not in seen:
+            seen.add(key)
+            months.append((key, report.year, month_name(report.month)))
+    if not months:
+        return ""
+    links = "\n".join(f'<a href="#{escape(key)}">{escape(label)} {escape(year)}</a>' for key, year, label in months)
+    return f"""
+        <nav class=\"archive-jumps\" aria-label=\"Archive month navigation\">
+          <div class=\"eyebrow\">Jump to month</div>
+          <div>{links}</div>
+        </nav>
+    """
+
+def grouped_archive(reports: list[Report]) -> str:
+    if not reports:
+        return "<p>No reports found.</p>"
+    grouped: dict[str, dict[str, dict[str, list[Report]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for report in reports:
+        grouped[report.year or "Unknown year"][report.month or "Unknown month"][report.day or "Unknown day"].append(report)
+
+    parts: list[str] = []
+    for year in sorted(grouped.keys(), reverse=True):
+        parts.append(f'<section class="archive-year" data-year="{escape(year)}"><h2>{escape(year)}</h2>')
+        for month in sorted(grouped[year].keys(), reverse=True):
+            month_label = month_name(month)
+            month_anchor = f"{year}-{month}"
+            month_reports = sum(len(day_reports) for day_reports in grouped[year][month].values())
+            parts.append(f'<section class="archive-month" id="{escape(month_anchor)}" data-year="{escape(year)}" data-month="{escape(month)}"><h3>{escape(month_label)} <span>{month_reports} reports</span></h3>')
+            for day in sorted(grouped[year][month].keys(), reverse=True):
+                day_reports = grouped[year][month][day]
+                day_label = f"{int(day)} {month_label}" if day.isdigit() else day
+                parts.append(f'<section class="archive-day" data-day="{escape(day)}"><h4>{escape(day_label)}</h4><div class="archive-card-grid">')
+                for report in day_reports:
+                    keywords = " ".join([report.title, report.headline, report.timestamp]).lower()
+                    parts.append(f"""
+                      <article class=\"archive-card\" data-year=\"{escape(report.year)}\" data-month=\"{escape(report.month)}\" data-day=\"{escape(report.day)}\" data-keywords=\"{escape(keywords)}\">
+                        <div class=\"eyebrow\">{escape(report.time_label)} {escape(report.tz)}</div>
+                        <h5><a href=\"../{escape(report.url)}\">{escape(report.title)}</a></h5>
+                        <p>{escape(report.headline)}</p>
+                        <a class=\"text-link\" href=\"../{escape(report.url)}\">Open report →</a>
+                      </article>
+                    """)
+                parts.append('</div></section>')
+            parts.append('<p class="return-top"><a href="#top">Return to top ↑</a></p></section>')
+        parts.append('</section>')
+    return "\n".join(parts)
+
 def archive_index_page(reports: list[Report]) -> str:
-    items = "\n".join(f"<li><a href=\"../{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>" for report in reports)
     return f"""<!doctype html>
 <html lang=\"en-AU\">
 <head>
@@ -399,19 +486,31 @@ def archive_index_page(reports: list[Report]) -> str:
   <link rel=\"stylesheet\" href=\"../assets/cryptopulse.css\">
 </head>
 <body>
-  <main class=\"page\">
+  <main class=\"page\" id=\"top\">
     <article class=\"brief\">
       {demo_banner()}
       {nav("../")}
       <header class=\"hero\">
         <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
         <h1>Archive</h1>
-        <p>All AI-generated CryptoPulse demo reports.</p>
+        <p>Grouped archive of AI-generated CryptoPulse demo reports.</p>
         {badges()}
       </header>
-      <section class=\"content\">
-        <p><a href=\"../index.html\">← Home</a></p>
-        <ul class=\"report-list\">{items or '<li>No reports found.</li>'}</ul>
+      <section class=\"content archive-content\">
+        <div class=\"section-heading\">
+          <div>
+            <div class=\"eyebrow\">Archive browser</div>
+            <h2>Browse generated demo reports</h2>
+          </div>
+          <a class=\"text-link\" href=\"../search-index.json\">Open search index JSON →</a>
+        </div>
+        <section class=\"archive-stats-grid\" aria-label=\"Archive statistics\">
+          {archive_stats_cards(reports)}
+        </section>
+        {archive_jump_links(reports)}
+        <section class=\"archive-groups\">
+          {grouped_archive(reports)}
+        </section>
       </section>
       {footer()}
     </article>
@@ -444,6 +543,23 @@ def rss_feed(reports: list[Report]) -> str:
 </rss>
 """
 
+def search_index(reports: list[Report]) -> list[dict[str, Any]]:
+    return [
+        {
+            "title": report.title,
+            "timestamp": report.timestamp,
+            "headline": report.headline,
+            "url": report.url,
+            "path": report.source_rel,
+            "year": report.year,
+            "month": report.month,
+            "day": report.day,
+            "content_type": CONTENT_TYPE,
+            "disclaimer": MANIFEST_DISCLAIMER,
+        }
+        for report in reports
+    ]
+
 def copy_assets() -> None:
     assets_out = OUT / "assets"
     assets_out.mkdir(parents=True, exist_ok=True)
@@ -468,7 +584,8 @@ def collect_reports() -> list[Report]:
         body_html = render_markdown(body_with_ids)
         output_path = output_path_for(source_path)
         source_rel = source_path.relative_to(ROOT).as_posix()
-        reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata, source_rel, toc_html))
+        year, month, day, time_label, tz = path_parts(source_path)
+        reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata, source_rel, toc_html, year, month, day, time_label, tz))
     reports.sort(key=lambda report: report.sort_key, reverse=True)
     return reports
 
@@ -498,6 +615,7 @@ def write_site_indexes(reports: list[Report]) -> None:
     }
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (OUT / "feed.xml").write_text(rss_feed(reports), encoding="utf-8")
+    (OUT / "search-index.json").write_text(json.dumps(search_index(reports), indent=2), encoding="utf-8")
 
 def report_to_manifest(report: Report) -> dict[str, Any]:
     return {"title": report.title, "timestamp": report.timestamp, "headline": report.headline, "url": report.url, "source": report.source_rel, "content_type": CONTENT_TYPE, "disclaimer": MANIFEST_DISCLAIMER, "metadata": report.metadata}
