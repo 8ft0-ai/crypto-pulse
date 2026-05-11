@@ -39,6 +39,7 @@ DEMO_NOTICE_BODY = "CryptoPulse is a prototype demonstration. Reports on this si
 REPORT_NOTICE = "This report is AI-generated demo content. It has not been independently verified and should not be used for trading, investing, or risk decisions."
 FOOTER_DISCLAIMER = "CryptoPulse is an experimental demonstration site. All reports are AI-generated examples for product and workflow illustration only. They may contain errors, omissions, hallucinations, stale data, or unsupported claims. Nothing on this site is financial advice, investment research, a recommendation, or a trading signal."
 MANIFEST_DISCLAIMER = "Reports are AI-created examples for demonstration purposes only and must not be used for trading or investment decisions."
+GITHUB_URL = "https://github.com/8ft0-ai/crypto-pulse"
 
 REPORT_FILE_RE = re.compile(r"(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$")
 CHATGPT_CITATION_RE = re.compile(r"[^]*")
@@ -163,12 +164,58 @@ def badges() -> str:
         </div>
     """
 
+def nav(asset_prefix: str = "") -> str:
+    return f"""
+      <nav class=\"site-nav\" aria-label=\"Primary navigation\">
+        <a href=\"{asset_prefix}index.html\">Home</a>
+        <a href=\"{asset_prefix}latest.html\">Latest</a>
+        <a href=\"{asset_prefix}archive/index.html\">Archive</a>
+        <a href=\"{asset_prefix}feed.xml\">RSS</a>
+        <a href=\"{asset_prefix}manifest.json\">Manifest</a>
+        <a href=\"{escape(GITHUB_URL)}\">GitHub</a>
+      </nav>
+    """
+
 def footer() -> str:
     return f"""
       <footer class=\"footer\">
         <strong>Demo disclaimer:</strong> {escape(FOOTER_DISCLAIMER)}
       </footer>
     """
+
+def archive_range(reports: list[Report]) -> str:
+    if not reports:
+        return "No reports yet"
+    newest = reports[0].timestamp
+    oldest = reports[-1].timestamp
+    return newest if newest == oldest else f"{oldest} → {newest}"
+
+def dashboard_cards(reports: list[Report]) -> str:
+    latest = reports[0] if reports else None
+    cards = [
+        ("Latest report", latest.timestamp if latest else "No reports yet"),
+        ("Archived reports", str(len(reports))),
+        ("Archive range", archive_range(reports)),
+        ("Feed", "RSS + manifest available"),
+    ]
+    if latest:
+        cards.insert(2, ("Latest headline", latest.headline))
+    return "\n".join(f"""
+          <article class=\"stat-card\">
+            <div class=\"eyebrow\">{escape(label)}</div>
+            <p>{escape(value)}</p>
+          </article>""" for label, value in cards)
+
+def recent_report_cards(reports: list[Report]) -> str:
+    if not reports:
+        return "<p>No reports found.</p>"
+    return "\n".join(f"""
+          <article class=\"report-card\">
+            <div class=\"eyebrow\">{escape(report.timestamp)}</div>
+            <h3><a href=\"{escape(report.url)}\">{escape(report.title)}</a></h3>
+            <p>{escape(report.headline)}</p>
+            <a class=\"text-link\" href=\"{escape(report.url)}\">Open report →</a>
+          </article>""" for report in reports[:12])
 
 def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_prefix: str) -> str:
     return f"""<!doctype html>
@@ -183,6 +230,7 @@ def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_p
   <main class=\"page\">
     <article class=\"brief\">
       {demo_banner()}
+      {nav(asset_prefix)}
       <header class=\"hero\">
         <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
         <h1>{escape(title)}</h1>
@@ -209,17 +257,17 @@ def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_p
 
 def index_page(reports: list[Report]) -> str:
     latest = reports[0] if reports else None
-    recent = reports[:40]
     latest_block = f"""
-        <div class=\"latest-card\">
-          <div class=\"eyebrow\">Latest demo report</div>
-          <h2><a href=\"{escape(latest.url)}\">{escape(latest.title)}</a></h2>
-          <p class=\"muted\">{escape(latest.timestamp)}</p>
-          <p>{escape(latest.headline)}</p>
+        <section class=\"latest-feature\">
+          <div>
+            <div class=\"eyebrow\">Latest demo report</div>
+            <h2><a href=\"{escape(latest.url)}\">{escape(latest.title)}</a></h2>
+            <p class=\"muted\">{escape(latest.timestamp)}</p>
+            <p>{escape(latest.headline)}</p>
+            <p class=\"demo-note\">AI-generated demo content. Not financial advice, investment research, a recommendation, or a trading signal.</p>
+          </div>
           <p><a class=\"button\" href=\"{escape(latest.url)}\">Open latest demo report</a></p>
-        </div>
-        """ if latest else "<p>No reports have been archived yet.</p>"
-    recent_items = "\n".join(f"<li><a href=\"{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>" for report in recent)
+        </section>""" if latest else "<p>No reports have been archived yet.</p>"
     return f"""<!doctype html>
 <html lang=\"en-AU\">
 <head>
@@ -232,13 +280,17 @@ def index_page(reports: list[Report]) -> str:
   <main class=\"page\">
     <article class=\"brief\">
       {demo_banner()}
-      <header class=\"hero\">
+      {nav()}
+      <header class=\"hero landing-hero\">
         <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
-        <h1>{escape(SITE_NAME)}</h1>
+        <h1>AI-generated crypto market report publishing prototype</h1>
         <p>An experimental GitHub Pages site showing how AI-generated crypto market reports might be archived, rendered, and published automatically.</p>
         {badges()}
       </header>
-      <section class=\"content\">
+      <section class=\"content landing-content\">
+        <section class=\"stats-grid\" aria-label=\"Archive summary\">
+          {dashboard_cards(reports)}
+        </section>
         <div class=\"explainer-grid\">
           <section class=\"explainer-card\">
             <h2>What this is</h2>
@@ -249,9 +301,29 @@ def index_page(reports: list[Report]) -> str:
             <p>This is not an investment research service, trading system, signal provider, market data product, or financial advice. The reports are generated examples and should not be relied on for accuracy, timeliness, or completeness.</p>
           </section>
         </div>
+        <section class=\"workflow-section\">
+          <div class=\"eyebrow\">How this demo works</div>
+          <h2>Prompt → AI Report → Markdown Archive → Static Site → RSS / Manifest</h2>
+          <div class=\"workflow-grid\">
+            <article><strong>1. Generate</strong><p>A scheduled prompt creates a crypto market report example.</p></article>
+            <article><strong>2. Archive</strong><p>The report is stored as Markdown, preserving the generated body.</p></article>
+            <article><strong>3. Build</strong><p>GitHub Actions renders the archive into a static Pages site.</p></article>
+            <article><strong>4. Publish</strong><p>The latest report, archive, RSS feed, and manifest are published automatically.</p></article>
+          </div>
+        </section>
         {latest_block}
-        <h2>Recent demo reports</h2>
-        <ul class=\"report-list\">{recent_items or '<li>No reports found.</li>'}</ul>
+        <section>
+          <div class=\"section-heading\">
+            <div>
+              <div class=\"eyebrow\">Archive preview</div>
+              <h2>Recent demo reports</h2>
+            </div>
+            <a class=\"text-link\" href=\"archive/index.html\">View full archive →</a>
+          </div>
+          <div class=\"report-card-grid\">
+            {recent_report_cards(reports)}
+          </div>
+        </section>
       </section>
       {footer()}
     </article>
@@ -274,6 +346,7 @@ def archive_index_page(reports: list[Report]) -> str:
   <main class=\"page\">
     <article class=\"brief\">
       {demo_banner()}
+      {nav("../")}
       <header class=\"hero\">
         <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
         <h1>Archive</h1>
