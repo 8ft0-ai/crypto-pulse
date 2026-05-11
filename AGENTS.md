@@ -32,7 +32,57 @@ Avoid asking the user to manually apply patch files unless direct GitHub writes 
 
 For multi-file implementation work, prefer one atomic Git commit rather than one commit per file.
 
-Where the GitHub connector exposes lower-level Git object operations, use this sequence:
+Where available, prefer the repository workflow:
+
+```text
+.github/workflows/apply-ai-patch.yml
+```
+
+This workflow exists specifically to support:
+
+- one branch;
+- one implementation commit;
+- one PR;
+- one review/merge decision.
+
+The workflow accepts:
+
+- branch name;
+- commit message;
+- PR title;
+- PR body;
+- base64-encoded unified git patch.
+
+Preferred sequence:
+
+1. Prepare all changes locally or in-memory.
+2. Generate a unified git patch.
+3. Base64 encode the patch.
+4. Run `Apply AI Patch` from the GitHub Actions tab.
+5. Provide workflow inputs.
+6. Allow the workflow to:
+   - create/reset the feature branch;
+   - apply the patch;
+   - reject `_site/` modifications;
+   - create one commit;
+   - push the branch;
+   - open or update the PR.
+
+Only fall back to per-file `update_file` operations when:
+
+1. the patch workflow is unavailable;
+2. the environment cannot trigger workflows; or
+3. the change is a simple single-file edit.
+
+If forced to use per-file updates for multi-file work, state that explicitly in the PR body under:
+
+```text
+Notes / limitations
+```
+
+## Legacy low-level Git strategy
+
+If direct lower-level Git object operations become fully available again, the following strategy remains acceptable:
 
 1. Fetch the current `main` commit and tree.
 2. Create a branch from the current `main` commit.
@@ -43,14 +93,7 @@ Where the GitHub connector exposes lower-level Git object operations, use this s
 7. Update the branch ref once to point at the new commit.
 8. Open one PR against `main`.
 
-This should produce:
-
-- one branch;
-- one implementation commit;
-- one PR;
-- one review/merge decision.
-
-Avoid using per-file `update_file` calls for multi-file implementation work unless lower-level Git object operations are unavailable or unsuitable. If forced to use per-file updates, say so in the PR body under `Notes / limitations`.
+Avoid using per-file `update_file` calls for multi-file implementation work unless the preferred patch workflow and lower-level Git object operations are both unavailable or unsuitable.
 
 For single-file documentation-only changes, a normal single-file commit is acceptable.
 
@@ -83,6 +126,7 @@ Suggested branch naming examples:
 issue-6-landing-page-ux
 issue-7-report-reading-ux
 issue-8-archive-search-foundations
+issue-11-ai-patch-workflow
 ```
 
 ## Branch naming
@@ -169,7 +213,13 @@ The deploy workflow is:
 .github/workflows/pages.yml
 ```
 
-The workflow builds `_site/`, uploads it as a GitHub Pages artefact, and deploys via GitHub Actions.
+The AI patch workflow is:
+
+```text
+.github/workflows/apply-ai-patch.yml
+```
+
+The Pages workflow builds `_site/`, uploads it as a GitHub Pages artefact, and deploys via GitHub Actions.
 
 ## Files and responsibilities
 
@@ -178,6 +228,7 @@ The workflow builds `_site/`, uploads it as a GitHub Pages artefact, and deploys
 - `site/assets/cryptopulse.css`: site styling; update this for visual changes.
 - `_site/`: generated output; do not commit or edit as source.
 - `.github/workflows/pages.yml`: Pages build/deploy workflow.
+- `.github/workflows/apply-ai-patch.yml`: AI multi-file patch application workflow.
 - `README.md`: public repository description and local build instructions.
 - `AGENTS.md`: agent operating guidance.
 
