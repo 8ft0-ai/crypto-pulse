@@ -1,0 +1,62 @@
+name: Validate CryptoPulse PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "reports/crypto/hourly/**/*.md"
+      - "site/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "docs/**"
+      - "README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cryptopulse-pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build site and check generated output
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml markdown
+
+      - name: Reject committed generated site output
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^_site/'; then
+            echo "Generated _site/ output must not be committed. Build output is disposable and produced by GitHub Actions." >&2
+            exit 1
+          fi
+
+      - name: Build static site
+        run: |
+          python scripts/build_pages_site_mobile_ux.py
+
+      - name: Verify expected build artefacts exist
+        run: |
+          test -f _site/index.html
+          test -f _site/latest.html
+          test -f _site/archive/index.html
+          test -f _site/search-index.json
+          test -f _site/assets/cryptopulse.css
+          test -f _site/assets/cryptopulse-report-ux.css
+          test -f _site/assets/cryptopulse-report-ux.js
