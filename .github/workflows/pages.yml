@@ -8,6 +8,7 @@ on:
       - "reports/crypto/hourly/**/*.md"
       - "site/**"
       - "scripts/build_pages_site.py"
+      - "scripts/build_pages_site_with_search.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -40,7 +41,7 @@ jobs:
 
       - name: Build static site
         run: |
-          python scripts/build_pages_site.py
+          python scripts/build_pages_site_with_search.py
 
       - name: Upload GitHub Pages artefact
         uses: actions/upload-pages-artifact@v4
