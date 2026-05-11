@@ -44,6 +44,7 @@ GITHUB_URL = "https://github.com/8ft0-ai/crypto-pulse"
 REPORT_FILE_RE = re.compile(r"(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$")
 CHATGPT_CITATION_RE = re.compile(r"[^]*")
 LEADING_H1_RE = re.compile(r"^\s*#\s+(.+?)\s*(?:\n+|$)", re.DOTALL)
+HEADING_RE = re.compile(r"^(#{2,4})\s+(.+?)\s*$", re.MULTILINE)
 TZ_OFFSETS = {"AEST": "+10:00", "AEDT": "+11:00", "UTC": "+00:00"}
 
 @dataclass
@@ -57,6 +58,8 @@ class Report:
     headline: str
     body_html: str
     metadata: dict[str, Any]
+    source_rel: str
+    toc_html: str
 
 def clean_output_dir() -> None:
     if OUT.exists():
@@ -86,6 +89,31 @@ def extract_leading_h1(body: str) -> str | None:
 
 def remove_leading_h1(body: str) -> str:
     return LEADING_H1_RE.sub("", body, count=1).strip()
+
+def slugify_heading(text: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9\s-]", "", text).strip().lower()
+    slug = re.sub(r"[\s-]+", "-", slug)
+    return slug or "section"
+
+def add_heading_ids_and_toc(body: str) -> tuple[str, str]:
+    seen: dict[str, int] = {}
+    toc_items: list[str] = []
+
+    def replace(match: re.Match[str]) -> str:
+        hashes, heading = match.group(1), match.group(2).strip()
+        base_slug = slugify_heading(heading)
+        count = seen.get(base_slug, 0)
+        seen[base_slug] = count + 1
+        slug = base_slug if count == 0 else f"{base_slug}-{count + 1}"
+        level = len(hashes)
+        toc_items.append(f'<li class="toc-level-{level}"><a href="#{escape(slug)}">{escape(heading)}</a></li>')
+        return f'{hashes} <span id="{slug}"></span>{heading}'
+
+    rendered_body = HEADING_RE.sub(replace, body)
+    if not toc_items:
+        return rendered_body, ""
+    toc_html = "<nav class=\"toc-card\" aria-label=\"Report table of contents\"><div class=\"eyebrow\">In this report</div><ul>" + "".join(toc_items) + "</ul></nav>"
+    return rendered_body, toc_html
 
 def derive_timestamp_from_path(path: Path) -> str:
     try:
@@ -217,13 +245,35 @@ def recent_report_cards(reports: list[Report]) -> str:
             <a class=\"text-link\" href=\"{escape(report.url)}\">Open report →</a>
           </article>""" for report in reports[:12])
 
-def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_prefix: str) -> str:
+def metadata_panel(report: Report) -> str:
+    return f"""
+      <section class=\"metadata-panel\" aria-label=\"Report metadata\">
+        <div><span>Generated</span><strong>{escape(report.timestamp)}</strong></div>
+        <div><span>Content type</span><strong>AI-generated demo</strong></div>
+        <div><span>Source</span><strong>Markdown archive</strong></div>
+        <div><span>Archive path</span><strong>{escape(report.source_rel)}</strong></div>
+      </section>
+    """
+
+def report_pager(previous_report: Report | None, next_report: Report | None, asset_prefix: str) -> str:
+    prev_html = f'<a href="{asset_prefix}{escape(previous_report.url)}">← Previous report</a>' if previous_report else '<span>← Previous report</span>'
+    next_html = f'<a href="{asset_prefix}{escape(next_report.url)}">Next report →</a>' if next_report else '<span>Next report →</span>'
+    return f"""
+      <nav class=\"report-pager\" aria-label=\"Report navigation\">
+        {prev_html}
+        <a href=\"{asset_prefix}archive/index.html\">Back to archive</a>
+        {next_html}
+      </nav>
+    """
+
+def html_page(report: Report, asset_prefix: str, previous_report: Report | None = None, next_report: Report | None = None) -> str:
+    pager = report_pager(previous_report, next_report, asset_prefix)
     return f"""<!doctype html>
 <html lang=\"en-AU\">
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>{escape(title)} | {escape(SITE_NAME)}</title>
+  <title>{escape(report.title)} | {escape(SITE_NAME)}</title>
   <link rel=\"stylesheet\" href=\"{asset_prefix}assets/cryptopulse.css\">
 </head>
 <body>
@@ -231,23 +281,29 @@ def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_p
     <article class=\"brief\">
       {demo_banner()}
       {nav(asset_prefix)}
-      <header class=\"hero\">
+      <header class=\"hero report-hero\">
         <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
-        <h1>{escape(title)}</h1>
-        <p>{escape(timestamp)}</p>
+        <h1>{escape(report.title)}</h1>
+        <p>{escape(report.timestamp)}</p>
         {badges()}
       </header>
-      <section class=\"report-warning\">
+      <section class=\"report-warning compact-warning\">
         <div class=\"eyebrow\">Report warning</div>
         <p>{escape(REPORT_NOTICE)}</p>
       </section>
+      {metadata_panel(report)}
       <section class=\"headline\">
         <div class=\"eyebrow\">Headline</div>
-        <p>{escape(headline)}</p>
+        <p>{escape(report.headline)}</p>
       </section>
-      <section class=\"content\">
-        {body_html}
+      {pager}
+      <section class=\"content report-content\">
+        {report.toc_html}
+        <div class=\"report-body\">
+          {report.body_html}
+        </div>
       </section>
+      {pager}
       {footer()}
     </article>
   </main>
@@ -407,16 +463,21 @@ def collect_reports() -> list[Report]:
         timestamp = str(metadata.get("timestamp") or derive_timestamp_from_path(source_path))
         title = title_from(metadata, timestamp, render_body)
         headline = str(metadata.get("headline") or extract_headline(render_body))
-        body_html = render_markdown(remove_leading_h1(render_body))
+        body_without_h1 = remove_leading_h1(render_body)
+        body_with_ids, toc_html = add_heading_ids_and_toc(body_without_h1)
+        body_html = render_markdown(body_with_ids)
         output_path = output_path_for(source_path)
-        reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata))
+        source_rel = source_path.relative_to(ROOT).as_posix()
+        reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata, source_rel, toc_html))
     reports.sort(key=lambda report: report.sort_key, reverse=True)
     return reports
 
 def write_report_pages(reports: list[Report]) -> None:
-    for report in reports:
+    for index, report in enumerate(reports):
+        previous_report = reports[index + 1] if index + 1 < len(reports) else None
+        next_report = reports[index - 1] if index > 0 else None
         report.output_path.parent.mkdir(parents=True, exist_ok=True)
-        report.output_path.write_text(html_page(report.title, report.timestamp, report.headline, report.body_html, asset_prefix_for(report.output_path)), encoding="utf-8")
+        report.output_path.write_text(html_page(report, asset_prefix_for(report.output_path), previous_report, next_report), encoding="utf-8")
 
 def write_site_indexes(reports: list[Report]) -> None:
     (OUT / "index.html").write_text(index_page(reports), encoding="utf-8")
@@ -425,7 +486,7 @@ def write_site_indexes(reports: list[Report]) -> None:
     (archive_dir / "index.html").write_text(archive_index_page(reports), encoding="utf-8")
     if reports:
         latest = reports[0]
-        (OUT / "latest.html").write_text(html_page(latest.title, latest.timestamp, latest.headline, latest.body_html, ""), encoding="utf-8")
+        (OUT / "latest.html").write_text(html_page(latest, "", reports[1] if len(reports) > 1 else None, None), encoding="utf-8")
     manifest = {
         "site": SITE_NAME,
         "description": SITE_DESCRIPTION,
@@ -439,7 +500,7 @@ def write_site_indexes(reports: list[Report]) -> None:
     (OUT / "feed.xml").write_text(rss_feed(reports), encoding="utf-8")
 
 def report_to_manifest(report: Report) -> dict[str, Any]:
-    return {"title": report.title, "timestamp": report.timestamp, "headline": report.headline, "url": report.url, "source": report.source_path.relative_to(ROOT).as_posix(), "content_type": CONTENT_TYPE, "disclaimer": MANIFEST_DISCLAIMER, "metadata": report.metadata}
+    return {"title": report.title, "timestamp": report.timestamp, "headline": report.headline, "url": report.url, "source": report.source_rel, "content_type": CONTENT_TYPE, "disclaimer": MANIFEST_DISCLAIMER, "metadata": report.metadata}
 
 def build() -> None:
     clean_output_dir()
