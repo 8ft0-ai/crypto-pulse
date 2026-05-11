@@ -31,23 +31,19 @@ REPORTS_DIR = ROOT / "reports" / "crypto" / "hourly"
 SITE_SRC = ROOT / "site"
 OUT = ROOT / "_site"
 SITE_URL = "https://8ft0-ai.github.io/crypto-pulse/"
+SITE_NAME = "CryptoPulse Demo"
+SITE_DESCRIPTION = "AI-generated demo crypto market report examples. Not financial advice, investment research, or trading signals."
+CONTENT_TYPE = "ai_generated_demo"
+DEMO_NOTICE_TITLE = "Demo site — AI-generated content"
+DEMO_NOTICE_BODY = "CryptoPulse is a prototype demonstration. Reports on this site are AI-created examples used to show what automated market-report publishing could look like. They may be inaccurate, incomplete, outdated, or misleading. Do not use them for trading or investment decisions."
+REPORT_NOTICE = "This report is AI-generated demo content. It has not been independently verified and should not be used for trading, investing, or risk decisions."
+FOOTER_DISCLAIMER = "CryptoPulse is an experimental demonstration site. All reports are AI-generated examples for product and workflow illustration only. They may contain errors, omissions, hallucinations, stale data, or unsupported claims. Nothing on this site is financial advice, investment research, a recommendation, or a trading signal."
+MANIFEST_DISCLAIMER = "Reports are AI-created examples for demonstration purposes only and must not be used for trading or investment decisions."
 
-REPORT_FILE_RE = re.compile(
-    r"(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$"
-)
-
-# ChatGPT/web citations are useful inside a chat response, but they are not
-# meaningful in a static GitHub Pages render. Preserve them in the archived raw
-# Markdown, but remove them from the generated public HTML.
+REPORT_FILE_RE = re.compile(r"(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$")
 CHATGPT_CITATION_RE = re.compile(r"[^]*")
 LEADING_H1_RE = re.compile(r"^\s*#\s+(.+?)\s*(?:\n+|$)", re.DOTALL)
-
-TZ_OFFSETS = {
-    "AEST": "+10:00",
-    "AEDT": "+11:00",
-    "UTC": "+00:00",
-}
-
+TZ_OFFSETS = {"AEST": "+10:00", "AEDT": "+11:00", "UTC": "+00:00"}
 
 @dataclass
 class Report:
@@ -61,12 +57,10 @@ class Report:
     body_html: str
     metadata: dict[str, Any]
 
-
 def clean_output_dir() -> None:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True, exist_ok=True)
-
 
 def split_front_matter(text: str) -> tuple[dict[str, Any], str]:
     if text.startswith("---\n"):
@@ -79,31 +73,20 @@ def split_front_matter(text: str) -> tuple[dict[str, Any], str]:
             return metadata, body.strip()
     return {}, text.strip()
 
-
 def clean_markdown_for_site(body: str) -> str:
-    """Clean render-only artefacts without mutating the archived report."""
     body = CHATGPT_CITATION_RE.sub("", body)
-    # Remove spaces before punctuation left behind by stripped citations.
     body = re.sub(r"\s+([.,;:])", r"\1", body)
-    # Collapse excessive blank lines introduced by stripping render-only tokens.
     body = re.sub(r"\n{4,}", "\n\n\n", body)
     return body.strip()
 
-
 def extract_leading_h1(body: str) -> str | None:
     match = LEADING_H1_RE.match(body)
-    if not match:
-        return None
-    return match.group(1).strip()
-
+    return match.group(1).strip() if match else None
 
 def remove_leading_h1(body: str) -> str:
-    """Avoid duplicating the report title below the branded page hero."""
     return LEADING_H1_RE.sub("", body, count=1).strip()
 
-
 def derive_timestamp_from_path(path: Path) -> str:
-    """Return a readable timestamp from the archive path when metadata is absent."""
     try:
         rel = path.relative_to(REPORTS_DIR)
         year, month, day = rel.parts[0], rel.parts[1], rel.parts[2]
@@ -116,20 +99,16 @@ def derive_timestamp_from_path(path: Path) -> str:
     except Exception:
         return path.stem.replace("_", " ")
 
-
 def make_sort_key(path: Path, timestamp: str) -> str:
-    """Use archive path first because it is deterministic and sortable."""
     try:
         rel = path.relative_to(REPORTS_DIR)
         year, month, day = rel.parts[0], rel.parts[1], rel.parts[2]
         match = REPORT_FILE_RE.match(path.name)
         if match:
-            hhmm = match.group("hhmm")
-            return f"{year}{month}{day}{hhmm}"
+            return f"{year}{month}{day}{match.group('hhmm')}"
     except Exception:
         pass
     return timestamp
-
 
 def title_from(metadata: dict[str, Any], timestamp: str, body: str) -> str:
     if metadata.get("title"):
@@ -138,12 +117,10 @@ def title_from(metadata: dict[str, Any], timestamp: str, body: str) -> str:
     if leading_h1:
         return leading_h1
     if timestamp:
-        return f"CryptoPulse Intelligence Briefing — {timestamp}"
-    return "CryptoPulse Intelligence Briefing"
-
+        return f"CryptoPulse Demo Briefing — {timestamp}"
+    return "CryptoPulse Demo Briefing"
 
 def extract_headline(body: str) -> str:
-    """Extract a short headline from common report structures."""
     lines = [line.strip() for line in body.splitlines()]
     for i, line in enumerate(lines):
         normalised = line.strip("# :").lower()
@@ -154,31 +131,44 @@ def extract_headline(body: str) -> str:
     for line in lines:
         if line and not line.startswith("#") and not line.startswith("---") and not line.startswith("|"):
             return line.strip("* ")
-    return "Latest generated crypto market intelligence briefing."
-
+    return "Latest AI-generated demo crypto market report example."
 
 def output_path_for(path: Path) -> Path:
-    rel = path.relative_to(REPORTS_DIR).with_suffix(".html")
-    return OUT / "archive" / rel
-
+    return OUT / "archive" / path.relative_to(REPORTS_DIR).with_suffix(".html")
 
 def relative_url(path: Path) -> str:
     return path.relative_to(OUT).as_posix()
 
-
 def asset_prefix_for(output_path: Path) -> str:
     rel = output_path.relative_to(OUT)
-    depth = len(rel.parents) - 1
-    return "../" * depth
-
+    return "../" * (len(rel.parents) - 1)
 
 def render_markdown(body: str) -> str:
-    return markdown.markdown(
-        body,
-        extensions=["extra", "tables", "fenced_code", "sane_lists", "toc"],
-        output_format="html5",
-    )
+    return markdown.markdown(body, extensions=["extra", "tables", "fenced_code", "sane_lists", "toc"], output_format="html5")
 
+def demo_banner() -> str:
+    return f"""
+      <section class=\"demo-banner\" aria-label=\"Demo site notice\">
+        <div class=\"demo-banner-title\">{escape(DEMO_NOTICE_TITLE)}</div>
+        <p>{escape(DEMO_NOTICE_BODY)}</p>
+      </section>
+    """
+
+def badges() -> str:
+    return """
+        <div class=\"badges\" aria-label=\"Content status\">
+          <span>Demo</span>
+          <span>AI-generated</span>
+          <span>Not for trading</span>
+        </div>
+    """
+
+def footer() -> str:
+    return f"""
+      <footer class=\"footer\">
+        <strong>Demo disclaimer:</strong> {escape(FOOTER_DISCLAIMER)}
+      </footer>
+    """
 
 def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_prefix: str) -> str:
     return f"""<!doctype html>
@@ -186,17 +176,23 @@ def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_p
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>{escape(title)}</title>
+  <title>{escape(title)} | {escape(SITE_NAME)}</title>
   <link rel=\"stylesheet\" href=\"{asset_prefix}assets/cryptopulse.css\">
 </head>
 <body>
   <main class=\"page\">
     <article class=\"brief\">
+      {demo_banner()}
       <header class=\"hero\">
-        <div class=\"brandline\"><span class=\"mark\">CP</span> CryptoPulse Intelligence</div>
+        <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
         <h1>{escape(title)}</h1>
         <p>{escape(timestamp)}</p>
+        {badges()}
       </header>
+      <section class=\"report-warning\">
+        <div class=\"eyebrow\">Report warning</div>
+        <p>{escape(REPORT_NOTICE)}</p>
+      </section>
       <section class=\"headline\">
         <div class=\"eyebrow\">Headline</div>
         <p>{escape(headline)}</p>
@@ -204,126 +200,120 @@ def html_page(title: str, timestamp: str, headline: str, body_html: str, asset_p
       <section class=\"content\">
         {body_html}
       </section>
-      <footer class=\"footer\">
-        <strong>Disclaimer:</strong> This is a market update, not financial advice. Crypto markets are volatile and data may change quickly.
-      </footer>
+      {footer()}
     </article>
   </main>
 </body>
 </html>
 """
 
-
 def index_page(reports: list[Report]) -> str:
     latest = reports[0] if reports else None
     recent = reports[:40]
-    latest_block = (
-        f"""
+    latest_block = f"""
         <div class=\"latest-card\">
-          <div class=\"eyebrow\">Latest brief</div>
+          <div class=\"eyebrow\">Latest demo report</div>
           <h2><a href=\"{escape(latest.url)}\">{escape(latest.title)}</a></h2>
           <p class=\"muted\">{escape(latest.timestamp)}</p>
           <p>{escape(latest.headline)}</p>
-          <p><a class=\"button\" href=\"{escape(latest.url)}\">Open latest briefing</a></p>
+          <p><a class=\"button\" href=\"{escape(latest.url)}\">Open latest demo report</a></p>
         </div>
-        """
-        if latest
-        else "<p>No reports have been archived yet.</p>"
-    )
-    recent_items = "\n".join(
-        f"<li><a href=\"{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>"
-        for report in recent
-    )
+        """ if latest else "<p>No reports have been archived yet.</p>"
+    recent_items = "\n".join(f"<li><a href=\"{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>" for report in recent)
     return f"""<!doctype html>
 <html lang=\"en-AU\">
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>CryptoPulse Intelligence</title>
+  <title>{escape(SITE_NAME)}</title>
   <link rel=\"stylesheet\" href=\"assets/cryptopulse.css\">
 </head>
 <body>
   <main class=\"page\">
     <article class=\"brief\">
+      {demo_banner()}
       <header class=\"hero\">
-        <div class=\"brandline\"><span class=\"mark\">CP</span> CryptoPulse Intelligence</div>
-        <h1>CryptoPulse Intelligence</h1>
-        <p>Static archive of generated crypto market intelligence briefs.</p>
+        <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
+        <h1>{escape(SITE_NAME)}</h1>
+        <p>An experimental GitHub Pages site showing how AI-generated crypto market reports might be archived, rendered, and published automatically.</p>
+        {badges()}
       </header>
       <section class=\"content\">
+        <div class=\"explainer-grid\">
+          <section class=\"explainer-card\">
+            <h2>What this is</h2>
+            <p>CryptoPulse is a demonstration site showing how AI-generated market reports could be produced, archived, and published using GitHub Pages.</p>
+          </section>
+          <section class=\"explainer-card warning\">
+            <h2>What this is not</h2>
+            <p>This is not an investment research service, trading system, signal provider, market data product, or financial advice. The reports are generated examples and should not be relied on for accuracy, timeliness, or completeness.</p>
+          </section>
+        </div>
         {latest_block}
-        <h2>Recent reports</h2>
-        <ul class=\"report-list\">
-          {recent_items or '<li>No reports found.</li>'}
-        </ul>
+        <h2>Recent demo reports</h2>
+        <ul class=\"report-list\">{recent_items or '<li>No reports found.</li>'}</ul>
       </section>
+      {footer()}
     </article>
   </main>
 </body>
 </html>
 """
 
-
 def archive_index_page(reports: list[Report]) -> str:
-    items = "\n".join(
-        f"<li><a href=\"../{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>"
-        for report in reports
-    )
+    items = "\n".join(f"<li><a href=\"../{escape(report.url)}\">{escape(report.title)}</a><span class=\"muted\"> — {escape(report.timestamp)}</span></li>" for report in reports)
     return f"""<!doctype html>
 <html lang=\"en-AU\">
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>CryptoPulse Archive</title>
+  <title>Archive | {escape(SITE_NAME)}</title>
   <link rel=\"stylesheet\" href=\"../assets/cryptopulse.css\">
 </head>
 <body>
   <main class=\"page\">
     <article class=\"brief\">
+      {demo_banner()}
       <header class=\"hero\">
-        <div class=\"brandline\"><span class=\"mark\">CP</span> CryptoPulse Intelligence</div>
+        <div class=\"brandline\"><span class=\"mark\">CP</span> {escape(SITE_NAME)}</div>
         <h1>Archive</h1>
-        <p>All generated CryptoPulse reports.</p>
+        <p>All AI-generated CryptoPulse demo reports.</p>
+        {badges()}
       </header>
       <section class=\"content\">
         <p><a href=\"../index.html\">← Home</a></p>
-        <ul class=\"report-list\">
-          {items or '<li>No reports found.</li>'}
-        </ul>
+        <ul class=\"report-list\">{items or '<li>No reports found.</li>'}</ul>
       </section>
+      {footer()}
     </article>
   </main>
 </body>
 </html>
 """
 
-
 def rss_feed(reports: list[Report]) -> str:
     now = format_datetime(datetime.now(timezone.utc), usegmt=True)
-    items: list[str] = []
+    items = []
     for report in reports[:30]:
         absolute_url = urljoin(SITE_URL, report.url)
-        items.append(
-            f"""
+        items.append(f"""
     <item>
       <title>{escape(report.title)}</title>
       <link>{escape(absolute_url)}</link>
       <guid>{escape(absolute_url)}</guid>
-      <description>{escape(report.headline)}</description>
-    </item>"""
-        )
+      <description>{escape(SITE_DESCRIPTION + ' ' + report.headline)}</description>
+    </item>""")
     return f"""<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
 <rss version=\"2.0\">
   <channel>
-    <title>CryptoPulse Intelligence</title>
+    <title>{escape(SITE_NAME)}</title>
     <link>{escape(SITE_URL)}</link>
-    <description>Generated crypto market intelligence briefs.</description>
+    <description>{escape(SITE_DESCRIPTION)}</description>
     <lastBuildDate>{now}</lastBuildDate>
     {''.join(items)}
   </channel>
 </rss>
 """
-
 
 def copy_assets() -> None:
     assets_out = OUT / "assets"
@@ -333,12 +323,10 @@ def copy_assets() -> None:
         raise FileNotFoundError(f"Missing stylesheet: {css_src}")
     shutil.copy(css_src, assets_out / "cryptopulse.css")
 
-
 def collect_reports() -> list[Report]:
     reports: list[Report] = []
     if not REPORTS_DIR.exists():
         return reports
-
     for source_path in sorted(REPORTS_DIR.glob("**/*.md")):
         raw = source_path.read_text(encoding="utf-8")
         metadata, body = split_front_matter(raw)
@@ -348,61 +336,28 @@ def collect_reports() -> list[Report]:
         headline = str(metadata.get("headline") or extract_headline(render_body))
         body_html = render_markdown(remove_leading_h1(render_body))
         output_path = output_path_for(source_path)
-        reports.append(
-            Report(
-                source_path=source_path,
-                output_path=output_path,
-                url=relative_url(output_path),
-                title=title,
-                timestamp=timestamp,
-                sort_key=make_sort_key(source_path, timestamp),
-                headline=headline,
-                body_html=body_html,
-                metadata=metadata,
-            )
-        )
-
+        reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata))
     reports.sort(key=lambda report: report.sort_key, reverse=True)
     return reports
-
 
 def write_report_pages(reports: list[Report]) -> None:
     for report in reports:
         report.output_path.parent.mkdir(parents=True, exist_ok=True)
-        report.output_path.write_text(
-            html_page(
-                title=report.title,
-                timestamp=report.timestamp,
-                headline=report.headline,
-                body_html=report.body_html,
-                asset_prefix=asset_prefix_for(report.output_path),
-            ),
-            encoding="utf-8",
-        )
-
+        report.output_path.write_text(html_page(report.title, report.timestamp, report.headline, report.body_html, asset_prefix_for(report.output_path)), encoding="utf-8")
 
 def write_site_indexes(reports: list[Report]) -> None:
     (OUT / "index.html").write_text(index_page(reports), encoding="utf-8")
-
     archive_dir = OUT / "archive"
     archive_dir.mkdir(parents=True, exist_ok=True)
     (archive_dir / "index.html").write_text(archive_index_page(reports), encoding="utf-8")
-
     if reports:
         latest = reports[0]
-        (OUT / "latest.html").write_text(
-            html_page(
-                title=latest.title,
-                timestamp=latest.timestamp,
-                headline=latest.headline,
-                body_html=latest.body_html,
-                asset_prefix="",
-            ),
-            encoding="utf-8",
-        )
-
+        (OUT / "latest.html").write_text(html_page(latest.title, latest.timestamp, latest.headline, latest.body_html, ""), encoding="utf-8")
     manifest = {
-        "site": "CryptoPulse Intelligence",
+        "site": SITE_NAME,
+        "description": SITE_DESCRIPTION,
+        "content_type": CONTENT_TYPE,
+        "disclaimer": MANIFEST_DISCLAIMER,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "latest": report_to_manifest(reports[0]) if reports else None,
         "reports": [report_to_manifest(report) for report in reports[:100]],
@@ -410,17 +365,8 @@ def write_site_indexes(reports: list[Report]) -> None:
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (OUT / "feed.xml").write_text(rss_feed(reports), encoding="utf-8")
 
-
 def report_to_manifest(report: Report) -> dict[str, Any]:
-    return {
-        "title": report.title,
-        "timestamp": report.timestamp,
-        "headline": report.headline,
-        "url": report.url,
-        "source": report.source_path.relative_to(ROOT).as_posix(),
-        "metadata": report.metadata,
-    }
-
+    return {"title": report.title, "timestamp": report.timestamp, "headline": report.headline, "url": report.url, "source": report.source_path.relative_to(ROOT).as_posix(), "content_type": CONTENT_TYPE, "disclaimer": MANIFEST_DISCLAIMER, "metadata": report.metadata}
 
 def build() -> None:
     clean_output_dir()
@@ -429,7 +375,6 @@ def build() -> None:
     write_report_pages(reports)
     write_site_indexes(reports)
     print(f"Built CryptoPulse Pages site with {len(reports)} report(s).")
-
 
 if __name__ == "__main__":
     build()
