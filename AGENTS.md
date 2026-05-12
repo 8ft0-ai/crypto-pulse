@@ -80,6 +80,95 @@ If forced to use per-file updates for multi-file work, state that explicitly in 
 Notes / limitations
 ```
 
+## Hard rules for large or multi-file changes
+
+Large and multi-file changes are high-risk in this repository because they can affect generated site output, report rendering, deployment workflows, or broad CSS reviewability.
+
+Do not use full-file `update_file` replacement for a large source file unless the full current file has been fetched without truncation and the replacement is based on that exact full content.
+
+Large files include:
+
+- `scripts/build_pages_site.py`;
+- generated-site renderers;
+- large CSS or JavaScript assets;
+- complex workflow YAML files.
+
+If a file fetch is truncated, stop using the GitHub contents API for that file. Do not guess, summarise, patch around, or reconstruct omitted file content. Never rebuild an unseen file tail from memory or inference.
+
+When a large file is required and contents output is truncated, use one of these paths instead:
+
+1. the `Apply AI Patch` workflow;
+2. a narrow patch prepared for manual workflow dispatch;
+3. a smaller refactor issue that first splits the file into safer modules.
+
+If none of those paths is available, stop before writing the large file and explain the safe blocker. Do not open a partial PR to reserve the branch.
+
+For multi-file implementation work, identify all required files before writing, and do not open a PR until all required files for the issue have been updated. A UX issue that requires generator output and CSS must not be opened with CSS-only changes. Generator, markup, metadata, and stylesheet responsibilities must be handled together where the issue requires them.
+
+## Completion discipline for issue-to-PR work
+
+Once the user authorises implementation, complete the issue-to-PR path without stopping at routine checkpoints.
+
+Do not pause after:
+
+- fetching files;
+- creating a branch;
+- making the first file change;
+- hitting a recoverable SHA conflict;
+- discovering a routine connector limitation.
+
+Handle routine interruptions internally and continue. Refresh file SHAs, refetch current branch state, use the safe fallback path, and keep going until the branch and PR are complete.
+
+Only stop early for:
+
+- a hard safety issue;
+- unsafe repository state;
+- truncated source file where no safe patch workflow is available;
+- destructive or scope-changing action requiring explicit user approval.
+
+Do not open placeholder PRs, draft-only scaffolding PRs, or incomplete implementation PRs unless the user explicitly asks for a partial PR.
+
+## CSS change discipline
+
+Keep stylesheet changes narrow and reviewable.
+
+Do not reformat, collapse, reorder, or compress large sections of CSS when adding or adjusting a component. Do not convert existing multi-line CSS blocks into one-line blocks. Broad CSS churn creates unnecessary conflicts and makes reviews harder.
+
+Add component-specific CSS near related sections or under a clear label. Check mobile and print media sections when the component affects responsive or printable output. Avoid changing global selectors, resets, typography, spacing variables, or colour systems unless the issue specifically requires it.
+
+Preserve the existing visual system. CSS should complement generator and markup changes, not substitute for missing generator work.
+
+## PR #36 failure mode to avoid
+
+PR #36 is the explicit example of what not to repeat.
+
+Avoid these failure modes:
+
+- CSS-only implementation when generator changes are required;
+- broad stylesheet reformatting that creates noisy diffs;
+- opening a PR before the core implementation is complete;
+- continuing contents-API full-file edits after file output was truncated;
+- surfacing routine recoverable connector conflicts to the user instead of resolving them internally.
+
+When a previous PR is closed and superseded, inspect the failure reason before writing new changes so the replacement PR directly addresses the process gap.
+
+## Agent skill runbooks
+
+Repo-specific skill runbooks live under:
+
+```text
+.agents/skills/
+```
+
+Relevant skills include:
+
+- `.agents/skills/github-issue-to-pr.md` for repeatable issue-to-PR execution;
+- `.agents/skills/large-file-safe-editing.md` for safe handling of large or truncated files;
+- `.agents/skills/github-pages-generator-changes.md` for generator, report rendering, RSS, manifest, and `_site/` boundaries;
+- `.agents/skills/css-change-discipline.md` for narrow stylesheet work.
+
+Use these runbooks before making related changes.
+
 ## Legacy low-level Git strategy
 
 If direct lower-level Git object operations become fully available again, the following strategy remains acceptable:
@@ -108,7 +197,7 @@ When asked to work on an issue:
 5. Prefer branch names that reference the issue number.
 6. Preserve all demo/disclaimer requirements.
 7. Do not edit generated `_site/` output directly.
-8. Open a PR against `main`.
+8. Open a PR against `main` only after the implementation is complete.
 9. Include:
 
 ```text
@@ -229,6 +318,7 @@ The Pages workflow builds `_site/`, uploads it as a GitHub Pages artefact, and d
 - `_site/`: generated output; do not commit or edit as source.
 - `.github/workflows/pages.yml`: Pages build/deploy workflow.
 - `.github/workflows/apply-ai-patch.yml`: AI multi-file patch application workflow.
+- `.agents/skills/**/*.md`: agent runbooks; update these when process guidance changes.
 - `README.md`: public repository description and local build instructions.
 - `AGENTS.md`: agent operating guidance.
 
@@ -356,4 +446,5 @@ Before opening a PR, check:
 - [ ] Generated `_site/` output was not committed.
 - [ ] Demo disclaimer language is preserved.
 - [ ] README and public metadata remain consistent if positioning changed.
+- [ ] For issue work, all acceptance criteria are addressed before PR creation.
 - [ ] PR body explains verification performed or limitations.
