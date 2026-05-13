@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build CryptoPulse Pages with brief-at-a-glance report panels."""
+"""Build CryptoPulse Pages with brief-at-a-glance and structured source panels."""
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from html import escape
@@ -13,13 +14,49 @@ import build_pages_site_mobile_ux as site
 
 
 BRIEF_GLANCE_STYLE_NAME = "cryptopulse-brief-glance.css"
+STRUCTURED_SOURCE_STYLE_NAME = "cryptopulse-structured-sources.css"
 REPORT_CONTENT_RE = re.compile(r'<section class="content report-content">')
 REPORT_WARNING_RE = re.compile(
     r'(      <section class="report-warning compact-warning">.*?</section>\n)',
     re.DOTALL,
 )
+SOURCE_PANEL_RE = re.compile(
+    r'\s*<section class="metadata-panel source-panel" aria-label="Report source attribution">.*?</section>\s*',
+    re.DOTALL,
+)
 SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
 FALLBACK = "Not specified in archived report."
+
+SOURCE_CATEGORY_LABELS = {
+    "market_data": "Market data",
+    "market": "Market data",
+    "prices": "Market data",
+    "derivatives_data": "Derivatives / liquidations",
+    "derivatives": "Derivatives / liquidations",
+    "liquidations": "Derivatives / liquidations",
+    "etf_flows": "ETF / institutional flows",
+    "institutional_flows": "ETF / institutional flows",
+    "etf": "ETF / institutional flows",
+    "news": "News and macro",
+    "macro": "News and macro",
+    "regulation": "Regulation / official releases",
+    "official_release": "Regulation / official releases",
+    "official_releases": "Regulation / official releases",
+    "protocol_update": "Protocol / exchange announcements",
+    "protocol_updates": "Protocol / exchange announcements",
+    "exchange_announcement": "Protocol / exchange announcements",
+    "exchange_announcements": "Protocol / exchange announcements",
+    "other": "Other",
+}
+SOURCE_CATEGORY_ORDER = [
+    "Market data",
+    "Derivatives / liquidations",
+    "ETF / institutional flows",
+    "News and macro",
+    "Regulation / official releases",
+    "Protocol / exchange announcements",
+    "Other",
+]
 
 
 def base() -> Any:
@@ -44,17 +81,18 @@ def copy_asset(filename: str) -> None:
     shutil.copy(source, destination)
 
 
-def add_brief_stylesheet_links() -> None:
+def add_stylesheet_links() -> None:
     for html_file in base().OUT.glob("**/*.html"):
         html = html_file.read_text(encoding="utf-8")
-        if BRIEF_GLANCE_STYLE_NAME in html:
-            continue
         prefix = relative_prefix(html_file)
-        html = html.replace(
-            "</head>",
-            f'  <link rel="stylesheet" href="{prefix}assets/{BRIEF_GLANCE_STYLE_NAME}">\n</head>',
-            1,
-        )
+        for stylesheet_name in (BRIEF_GLANCE_STYLE_NAME, STRUCTURED_SOURCE_STYLE_NAME):
+            if stylesheet_name in html:
+                continue
+            html = html.replace(
+                "</head>",
+                f'  <link rel="stylesheet" href="{prefix}assets/{stylesheet_name}">\n</head>',
+                1,
+            )
         html_file.write_text(html, encoding="utf-8")
 
 
@@ -286,12 +324,180 @@ def add_brief_panels() -> None:
         add_panel_to_page(base().OUT / "latest.html", reports[0])
 
 
+def source_category(raw_type: str) -> str:
+    key = re.sub(r"[^a-z0-9]+", "_", raw_type.lower()).strip("_")
+    return SOURCE_CATEGORY_LABELS.get(key, "Other")
+
+
+def structured_sources(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_sources = metadata.get("sources")
+    if not isinstance(raw_sources, list):
+        return []
+
+    sources: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in raw_sources:
+        if isinstance(item, str):
+            name = enhanced().clean_line(item)
+            raw_type = "other"
+            url = ""
+            used_for: list[str] = []
+        elif isinstance(item, dict):
+            name = as_text(item.get("name") or item.get("title") or item.get("source"))
+            raw_type = as_text(item.get("type") or item.get("category") or "other") or "other"
+            url = as_text(item.get("url") or item.get("href"))
+            used_for_value = item.get("used_for") or item.get("uses") or item.get("purpose") or []
+            if isinstance(used_for_value, list):
+                used_for = [as_text(value) for value in used_for_value if as_text(value)]
+            else:
+                used_for_text = as_text(used_for_value)
+                used_for = [used_for_text] if used_for_text else []
+        else:
+            continue
+
+        if not name:
+            continue
+
+        key = (name.lower(), url.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        sources.append(
+            {
+                "name": name,
+                "type": raw_type,
+                "category": source_category(raw_type),
+                "url": url,
+                "used_for": used_for,
+            }
+        )
+    return sources
+
+
+def structured_sources_for_report(report: Any) -> list[dict[str, Any]]:
+    raw = report.source_path.read_text(encoding="utf-8")
+    metadata, _body = base().split_front_matter(raw)
+    return structured_sources(metadata)
+
+
+def source_card(source: dict[str, Any]) -> str:
+    url = as_text(source.get("url"))
+    used_for = source.get("used_for") if isinstance(source.get("used_for"), list) else []
+    used_for_html = ""
+    if used_for:
+        used_for_html = (
+            '<div class="structured-source-uses"><span>Used for</span><ul>'
+            + "".join(f"<li>{escape(as_text(item))}</li>" for item in used_for if as_text(item))
+            + "</ul></div>"
+        )
+
+    url_html = (
+        f'<a class="structured-source-url" href="{escape(url)}">Open source</a>'
+        if url
+        else '<span class="structured-source-url missing">Source named; URL unavailable</span>'
+    )
+
+    return f"""
+            <article class="structured-source-card">
+              <div class="structured-source-card-header">
+                <span>{escape(as_text(source.get('category')) or 'Other')}</span>
+                <strong>{escape(as_text(source.get('name')))}</strong>
+              </div>
+              {url_html}
+              {used_for_html}
+            </article>"""
+
+
+def structured_source_panel(sources: list[dict[str, Any]]) -> str:
+    grouped: dict[str, list[dict[str, Any]]] = {label: [] for label in SOURCE_CATEGORY_ORDER}
+    for source in sources:
+        grouped.setdefault(as_text(source.get("category")) or "Other", []).append(source)
+
+    groups_html: list[str] = []
+    for category in SOURCE_CATEGORY_ORDER:
+        category_sources = grouped.get(category) or []
+        if not category_sources:
+            continue
+        cards = "".join(source_card(source) for source in category_sources)
+        groups_html.append(
+            f"""
+          <section class="structured-source-group">
+            <h3>{escape(category)}</h3>
+            <div class="structured-source-grid">{cards}</div>
+          </section>"""
+        )
+
+    return f"""
+      <section class="structured-source-panel" aria-label="Structured report sources">
+        <div class="structured-source-intro">
+          <div class="eyebrow">Source attribution</div>
+          <h2>Structured sources</h2>
+          <p>Rendered from YAML source metadata in the archived AI-generated report. Source URLs are shown only when explicitly provided.</p>
+        </div>
+        {''.join(groups_html)}
+      </section>
+    """
+
+
+def replace_source_panel(html_path: Path, report: Any) -> None:
+    if not html_path.exists():
+        return
+    sources = structured_sources_for_report(report)
+    if not sources:
+        return
+
+    html = html_path.read_text(encoding="utf-8")
+    if "structured-source-panel" in html:
+        return
+
+    panel = structured_source_panel(sources)
+    html = SOURCE_PANEL_RE.sub(f"\n{panel}\n", html, count=1)
+    html_path.write_text(html, encoding="utf-8")
+
+
+def add_structured_source_panels() -> None:
+    reports = base().collect_reports()
+    for report in reports:
+        replace_source_panel(report.output_path, report)
+
+    if reports:
+        replace_source_panel(base().OUT / "latest.html", reports[0])
+
+
+def update_search_index_with_structured_sources() -> None:
+    index_path = base().OUT / "search-index.json"
+    if not index_path.exists():
+        return
+
+    reports_by_path = {report.source_rel: report for report in base().collect_reports()}
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    if not isinstance(index, list):
+        return
+
+    for item in index:
+        if not isinstance(item, dict):
+            continue
+        report = reports_by_path.get(as_text(item.get("path")))
+        if not report:
+            continue
+        sources = structured_sources_for_report(report)
+        if not sources:
+            continue
+        item["structured_source_names"] = [source["name"] for source in sources]
+        item["structured_sources"] = sources
+
+    index_path.write_text(json.dumps(index, indent=2), encoding="utf-8")
+
+
 def build() -> None:
     site.build()
     copy_asset(BRIEF_GLANCE_STYLE_NAME)
-    add_brief_stylesheet_links()
+    copy_asset(STRUCTURED_SOURCE_STYLE_NAME)
+    add_stylesheet_links()
     add_brief_panels()
-    print("Added Brief at a glance panels to report pages and latest.html.")
+    add_structured_source_panels()
+    update_search_index_with_structured_sources()
+    print("Added Brief at a glance panels and structured source cards to generated report pages.")
 
 
 if __name__ == "__main__":
