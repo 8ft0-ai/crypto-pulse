@@ -1,0 +1,121 @@
+.search-filter-panel {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  padding: 20px;
+}
+
+.search-filter-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.search-filter-header h2 {
+  margin: 0 0 6px;
+  border-bottom: 0;
+  padding-bottom: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.search-filter-header p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.search-filter-clear {
+  flex: 0 0 auto;
+  border: 1px solid #bae6fd;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  padding: 9px 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.search-filter-clear:hover {
+  background: #bae6fd;
+}
+
+.search-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.search-filter-grid label {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.search-filter-grid select,
+.search-filter-grid input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 10px 11px;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.search-filter-grid select:focus,
+.search-filter-grid input:focus,
+.search-filter-clear:focus {
+  outline: 3px solid rgba(56, 189, 248, 0.28);
+  border-color: var(--accent-2);
+}
+
+.search-result-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 8px 0 12px;
+}
+
+.search-result-chips span {
+  border: 1px solid #dbe4f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .search-filter-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-filter-clear {
+    align-self: flex-start;
+  }
+
+  .search-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .search-filter-panel {
+    display: none;
+  }
+}
