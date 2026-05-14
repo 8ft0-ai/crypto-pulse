@@ -2,8 +2,8 @@
 
 This module gives the project one coherent build entry point while preserving
 existing generated output behaviour. The older scripts remain available as
-compatibility shims, but GitHub Actions and documentation should invoke this
-package instead of chaining wrapper scripts directly.
+compatibility shims, but GitHub Actions and documentation invoke this package
+instead of chaining wrapper scripts directly.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import importlib
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Callable
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,24 +26,71 @@ def ensure_script_import_path() -> None:
         sys.path.insert(0, scripts_path)
 
 
-def implementation_stage() -> ModuleType:
-    """Return the current full-feature implementation stage.
-
-    The search-filter wrapper is the latest stage in the historical chain and
-    preserves all currently shipped output: base pages, search, data-quality
-    panels, mobile UX, brief-at-a-glance panels, structured sources, and archive
-    filters. This package centralises orchestration so workflows no longer need
-    to know about that internal layering.
-    """
+def stage(name: str) -> ModuleType:
     ensure_script_import_path()
-    return importlib.import_module("build_pages_site_search_filters")
+    return importlib.import_module(name)
+
+
+def build_base_site(base: Any) -> None:
+    """Generate the core home, latest, archive, report, RSS, and index files."""
+    base.build()
+
+
+def add_search_and_quality(base: Any, search: Any) -> None:
+    """Add search page, latest read, metadata chips, and data-quality panels."""
+    search.copy_enhancement_assets()
+    (base.OUT / "search.html").write_text(search.search_page(), encoding="utf-8")
+    search.add_latest_market_read_to_homepage()
+    search.add_metadata_chips_to_report_cards()
+    search.add_data_quality_panels_to_report_pages()
+    search.add_search_link_to_existing_pages()
+    search.add_enhancement_stylesheet_links()
+
+
+def add_mobile_and_product_ux(mobile: Any) -> None:
+    """Add product framing, simplified nav, developer links, and mobile UX."""
+    mobile.copy_asset(mobile.PRODUCT_DEMO_STYLE_NAME)
+    mobile.copy_asset(mobile.MOBILE_UX_STYLE_NAME)
+    mobile.copy_asset(mobile.MOBILE_UX_SCRIPT_NAME)
+    mobile.reframe_homepage()
+    mobile.simplify_primary_navigation()
+    mobile.add_developer_outputs_to_footers()
+    mobile.add_mobile_assets_to_pages()
+
+
+def add_brief_and_sources(brief: Any) -> None:
+    """Add brief-at-a-glance panels and structured source cards."""
+    brief.copy_asset(brief.BRIEF_GLANCE_STYLE_NAME)
+    brief.copy_asset(brief.STRUCTURED_SOURCE_STYLE_NAME)
+    brief.add_stylesheet_links()
+    brief.add_brief_panels()
+    brief.add_structured_source_panels()
+    brief.update_search_index_with_structured_sources()
+
+
+def add_archive_filters(filters: Any) -> None:
+    """Add structured search-index fields and client-side filter controls."""
+    filters.copy_asset(filters.SEARCH_FILTER_STYLE_NAME)
+    filters.add_filter_stylesheet_links()
+    filters.update_search_index_with_filter_metadata()
+    filters.add_filter_controls_to_search_page()
 
 
 def build() -> None:
-    """Build the complete CryptoPulse static site."""
-    stage = implementation_stage()
-    stage_build: Callable[[], None] = getattr(stage, "build")
-    stage_build()
+    """Build the complete CryptoPulse static site from the Markdown archive."""
+    base = stage("build_pages_site")
+    search = stage("build_pages_site_with_search")
+    mobile = stage("build_pages_site_mobile_ux")
+    brief = stage("build_pages_site_brief_glance")
+    filters = stage("build_pages_site_search_filters")
+
+    build_base_site(base)
+    add_search_and_quality(base, search)
+    add_mobile_and_product_ux(mobile)
+    add_brief_and_sources(brief)
+    add_archive_filters(filters)
+
+    print("Built CryptoPulse site with search, data-quality, mobile UX, brief, source-card, and archive-filter enhancements.")
 
 
 if __name__ == "__main__":
