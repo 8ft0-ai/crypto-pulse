@@ -7,6 +7,7 @@ on:
     paths:
       - "reports/crypto/hourly/**/*.md"
       - "site/**"
+      - "site_generator/**"
       - "scripts/build_pages_site.py"
       - "scripts/build_pages_site_with_search.py"
       - "scripts/build_pages_site_mobile_ux.py"
@@ -44,7 +45,7 @@ jobs:
 
       - name: Build static site
         run: |
-          python scripts/build_pages_site_search_filters.py
+          python -m site_generator
 
       - name: Upload GitHub Pages artefact
         uses: actions/upload-pages-artifact@v4
