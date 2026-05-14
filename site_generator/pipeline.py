@@ -14,6 +14,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from site_generator import accessibility
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -76,6 +78,11 @@ def add_archive_filters(filters: Any) -> None:
     filters.add_filter_controls_to_search_page()
 
 
+def add_accessibility_polish(base: Any) -> None:
+    """Add skip links, visible focus states, reduced-motion support, and legends."""
+    accessibility.apply(base)
+
+
 def build() -> None:
     """Build the complete CryptoPulse static site from the Markdown archive."""
     base = stage("build_pages_site")
@@ -89,8 +96,9 @@ def build() -> None:
     add_mobile_and_product_ux(mobile)
     add_brief_and_sources(brief)
     add_archive_filters(filters)
+    add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with search, data-quality, mobile UX, brief, source-card, and archive-filter enhancements.")
+    print("Built CryptoPulse site with search, data-quality, mobile UX, brief, source-card, archive-filter, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
