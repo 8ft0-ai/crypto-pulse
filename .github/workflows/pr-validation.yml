@@ -67,3 +67,4 @@ jobs:
           test -f _site/assets/cryptopulse-brief-glance.css
           test -f _site/assets/cryptopulse-structured-sources.css
           test -f _site/assets/cryptopulse-search-filters.css
+          test -f _site/assets/cryptopulse-accessibility.css
