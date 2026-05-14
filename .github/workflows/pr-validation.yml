@@ -7,6 +7,7 @@ on:
     paths:
       - "reports/crypto/hourly/**/*.md"
       - "site/**"
+      - "site_generator/**"
       - "scripts/**"
       - ".github/workflows/**"
       - "docs/**"
@@ -49,14 +50,20 @@ jobs:
 
       - name: Build static site
         run: |
-          python scripts/build_pages_site_mobile_ux.py
+          python -m site_generator
 
       - name: Verify expected build artefacts exist
         run: |
           test -f _site/index.html
           test -f _site/latest.html
           test -f _site/archive/index.html
+          test -f _site/search.html
           test -f _site/search-index.json
+          test -f _site/manifest.json
+          test -f _site/feed.xml
           test -f _site/assets/cryptopulse.css
           test -f _site/assets/cryptopulse-report-ux.css
           test -f _site/assets/cryptopulse-report-ux.js
+          test -f _site/assets/cryptopulse-brief-glance.css
+          test -f _site/assets/cryptopulse-structured-sources.css
+          test -f _site/assets/cryptopulse-search-filters.css
