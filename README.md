@@ -22,10 +22,10 @@ The archive process should preserve the generated report body exactly and add YA
 
 ## GitHub Pages site
 
-The site is generated from the Markdown archive by:
+The canonical build command is:
 
-```text
-scripts/build_pages_site_mobile_ux.py
+```bash
+python -m site_generator
 ```
 
 The build writes a disposable static site to:
@@ -37,17 +37,49 @@ _site/
 The deployed site contains:
 
 ```text
-index.html                         # Home page and latest demo report card
-latest.html                        # Copy of the latest demo report
-archive/index.html                 # Full report archive
-archive/**/*.html                  # Rendered demo reports
-search.html                        # Browser-side archive search
-manifest.json                      # Machine-readable latest/report index
-search-index.json                  # Browser-side search index
-feed.xml                           # RSS feed
-assets/cryptopulse.css             # Base site styling
-assets/cryptopulse-report-ux.css   # Mobile report-reading UX styling
-assets/cryptopulse-report-ux.js    # Progressive report-reading UX helpers
+index.html                               # Home page and latest demo report card
+latest.html                              # Copy of the latest demo report
+archive/index.html                       # Full report archive
+archive/**/*.html                        # Rendered demo reports
+search.html                              # Browser-side archive search and filters
+manifest.json                            # Machine-readable latest/report index
+search-index.json                        # Browser-side search/filter index
+feed.xml                                 # RSS feed
+assets/cryptopulse.css                   # Base site styling
+assets/cryptopulse-data-quality.css      # Data-quality panel styling
+assets/cryptopulse-product-demo.css      # Product-demo framing
+assets/cryptopulse-report-ux.css         # Mobile report-reading UX styling
+assets/cryptopulse-report-ux.js          # Progressive report-reading UX helpers
+assets/cryptopulse-brief-glance.css      # Brief-at-a-glance panel styling
+assets/cryptopulse-structured-sources.css # Structured source-card styling
+assets/cryptopulse-search-filters.css    # Archive search/filter styling
+```
+
+## Generator architecture
+
+The canonical generator package is:
+
+```text
+site_generator/
+  __init__.py
+  __main__.py
+  pipeline.py
+```
+
+`site_generator.pipeline` orchestrates the build stages directly:
+
+1. base site generation;
+2. search page, latest-market-read, metadata chips, and data-quality panels;
+3. product framing, simplified navigation, developer-output links, and mobile UX;
+4. brief-at-a-glance panels and structured source cards;
+5. structured search-index metadata and client-side archive filters.
+
+The older scripts under `scripts/` remain as implementation modules and compatibility shims during the refactor, but GitHub Actions and local documentation should use the package command above rather than invoking stacked wrappers directly.
+
+Rollback path: if the package orchestration needs to be backed out quickly, the Pages workflow can temporarily be switched back to the previous implementation command:
+
+```bash
+python scripts/build_pages_site_search_filters.py
 ```
 
 ## Publishing workflow
@@ -63,9 +95,12 @@ The workflow runs when changes are pushed to:
 ```text
 reports/crypto/hourly/**/*.md
 site/**
+site_generator/**
 scripts/build_pages_site.py
 scripts/build_pages_site_with_search.py
 scripts/build_pages_site_mobile_ux.py
+scripts/build_pages_site_brief_glance.py
+scripts/build_pages_site_search_filters.py
 .github/workflows/pages.yml
 ```
 
@@ -79,7 +114,7 @@ Pull requests that change reports, site assets, build scripts, workflows, docume
 .github/workflows/pr-validation.yml
 ```
 
-The validation workflow builds the site, checks that expected generated artefacts exist, and rejects committed `_site/` output.
+The validation workflow builds the site with `python -m site_generator`, checks that expected generated artefacts exist, and rejects committed `_site/` output.
 
 For the recommended `main` branch protection settings, see:
 
@@ -110,7 +145,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install pyyaml markdown
-python scripts/build_pages_site_mobile_ux.py
+python -m site_generator
 python -m http.server 8000 --directory _site
 ```
 
