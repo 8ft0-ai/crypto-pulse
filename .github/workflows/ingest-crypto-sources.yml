@@ -71,21 +71,66 @@ jobs:
 
           import json
           import os
+          import sys
           from pathlib import Path
+
+          sys.path.insert(0, str(Path("scripts").resolve()))
+          from validate_crypto_snapshot import classify_snapshot_quality, load_config
 
           snapshot_path = Path(os.environ["SNAPSHOT_PATH"])
           snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+          config = load_config(Path("config/crypto_sources.yml"))
+          quality = classify_snapshot_quality(snapshot, config)
 
           def bullet_list(values: list[str]) -> str:
               if not values:
                   return "- None recorded."
               return "\n".join(f"- {value}" for value in values)
 
-          source_lines = []
+          def source_status(name: str) -> str:
+              payload = snapshot.get("sources", {}).get(name)
+              if not isinstance(payload, dict):
+                  return "missing"
+              return str(payload.get("status", "unknown"))
+
+          def source_lines(names: list[str]) -> str:
+              if not names:
+                  return "- None configured."
+              return "\n".join(f"- `{name}`: `{source_status(name)}`" for name in names)
+
+          def exchange_config_rows() -> list[dict[str, object]]:
+              exchange = config.get("exchange_crosschecks") if isinstance(config, dict) else None
+              rows = exchange.get("sources") if isinstance(exchange, dict) else None
+              return [row for row in rows if isinstance(row, dict) and row.get("name")] if isinstance(rows, list) else []
+
+          def disabled_source_lines() -> str:
+              rows = [row for row in exchange_config_rows() if not bool(row.get("enabled", True))]
+              if not rows:
+                  return "- None configured."
+              lines = []
+              for row in rows:
+                  name = str(row.get("name"))
+                  reason = str(row.get("reason", "disabled for MVP"))
+                  lines.append(f"- `{name}`: disabled / optional only; {reason}")
+              return "\n".join(lines)
+
+          exchange_config = config.get("exchange_crosschecks") if isinstance(config, dict) else {}
+          exchange_snapshot = snapshot.get("exchange_crosscheck") if isinstance(snapshot.get("exchange_crosscheck"), dict) else {}
+          exchange_strategy = str(exchange_config.get("strategy", exchange_snapshot.get("strategy", "not configured"))) if isinstance(exchange_config, dict) else "not configured"
+          selected_exchange = exchange_snapshot.get("selected") or "none"
+          exchange_source_names = [str(name) for name in quality.get("optional_exchange_sources", [])]
+          exchange_status_lines = source_lines(exchange_source_names)
+
+          quality_status = str(quality.get("status", "unknown"))
+          required_source_names = [str(name) for name in quality.get("required_sources", [])]
+          blocking_issues = [str(item) for item in quality.get("blocking_issues", [])]
+          non_blocking_warnings = [str(item) for item in quality.get("non_blocking_warnings", [])]
+
+          source_status_lines = []
           for name, payload in sorted(snapshot.get("sources", {}).items()):
-              status = payload.get("status", "unknown")
-              fetched_at = payload.get("fetched_at_utc", "not recorded")
-              source_lines.append(f"- `{name}`: `{status}` at `{fetched_at}`")
+              status = payload.get("status", "unknown") if isinstance(payload, dict) else "unknown"
+              fetched_at = payload.get("fetched_at_utc", "not recorded") if isinstance(payload, dict) else "not recorded"
+              source_status_lines.append(f"- `{name}`: `{status}` at `{fetched_at}`")
 
           warnings = [str(item) for item in snapshot.get("warnings", [])]
           errors = [str(item) for item in snapshot.get("errors", [])]
@@ -101,9 +146,30 @@ jobs:
           {snapshot_path.as_posix()}
           ```
 
+          ## Snapshot quality
+
+          Status: `{quality_status}`
+
+          Required sources:
+          {source_lines(required_source_names)}
+
+          Exchange cross-checks:
+          - strategy: `{exchange_strategy}`
+          - selected: `{selected_exchange}`
+          {exchange_status_lines}
+
+          Disabled / non-MVP sources:
+          {disabled_source_lines()}
+
+          Blocking issues:
+          {bullet_list(blocking_issues)}
+
+          Non-blocking warnings:
+          {bullet_list(non_blocking_warnings)}
+
           ## Source status
 
-          {chr(10).join(source_lines) if source_lines else "- No source statuses recorded."}
+          {chr(10).join(source_status_lines) if source_status_lines else "- No source statuses recorded."}
 
           ## Warnings
 
