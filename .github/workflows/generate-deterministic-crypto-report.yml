@@ -1,0 +1,313 @@
+name: Generate Deterministic Crypto Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_path:
+        description: "Optional source snapshot path. Defaults to the latest data/crypto/hourly snapshot."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: deterministic-crypto-report
+  cancel-in-progress: false
+
+jobs:
+  generate-report:
+    name: Generate deterministic Markdown report and open PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Resolve source snapshot
+        id: snapshot
+        env:
+          INPUT_SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${INPUT_SNAPSHOT_PATH:-}" ]]; then
+            snapshot_path="$INPUT_SNAPSHOT_PATH"
+          else
+            snapshot_path="$(find data/crypto/hourly -type f -name '*_source_snapshot.json' | sort | tail -n 1)"
+          fi
+
+          if [[ -z "$snapshot_path" ]]; then
+            echo "No source snapshot was provided or found under data/crypto/hourly." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "$snapshot_path" ]]; then
+            echo "Snapshot file does not exist: $snapshot_path" >&2
+            exit 1
+          fi
+
+          echo "snapshot_path=$snapshot_path" >> "$GITHUB_OUTPUT"
+          echo "Resolved source snapshot: $snapshot_path"
+
+      - name: Validate source snapshot
+        env:
+          SNAPSHOT_PATH: ${{ steps.snapshot.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_snapshot.py "$SNAPSHOT_PATH" --config config/crypto_sources.yml
+
+      - name: Generate deterministic Markdown report
+        id: report
+        env:
+          SNAPSHOT_PATH: ${{ steps.snapshot.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          report_path="$(python scripts/generate_crypto_report.py \
+            --snapshot "$SNAPSHOT_PATH" \
+            --output-root reports/crypto \
+            --config config/crypto_sources.yml)"
+
+          if [[ -z "$report_path" ]]; then
+            echo "Report generator did not report an output path." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "$report_path" ]]; then
+            echo "Generated report file does not exist: $report_path" >&2
+            exit 1
+          fi
+
+          echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
+          echo "Generated deterministic report: $report_path"
+
+      - name: Validate generated Markdown shape
+        env:
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+
+          required_patterns=(
+            '^---$'
+            '^schema_version: "deterministic-crypto-report/v1"$'
+            '^quality_status:'
+            '^llm_generated: false$'
+            '^## Product boundary and non-investment-advice notice$'
+            '^## Snapshot quality$'
+            '^## Market summary$'
+            '^## DeFi and stablecoin summary$'
+            '^## Exchange cross-check summary$'
+            '^## Evidence and source status$'
+            '^## Scope limitations$'
+          )
+
+          for pattern in "${required_patterns[@]}"; do
+            if ! grep -Eq "$pattern" "$REPORT_PATH"; then
+              echo "Generated report is missing required pattern: $pattern" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Eiq '\b(buy|sell|hold) (BTC|ETH|SOL|bitcoin|ethereum|solana)\b|target price|price target|trading signal' "$REPORT_PATH"; then
+            echo "Generated report appears to contain disallowed trading language." >&2
+            exit 1
+          fi
+
+      - name: Build PR evidence
+        id: evidence
+        env:
+          SNAPSHOT_PATH: ${{ steps.snapshot.outputs.snapshot_path }}
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("scripts").resolve()))
+          from validate_crypto_snapshot import classify_snapshot_quality, load_config
+
+          snapshot_path = Path(os.environ["SNAPSHOT_PATH"])
+          report_path = Path(os.environ["REPORT_PATH"])
+          snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+          config = load_config(Path("config/crypto_sources.yml"))
+          quality = classify_snapshot_quality(snapshot, config)
+
+          def bullet_list(values: list[str]) -> str:
+              if not values:
+                  return "- None recorded."
+              return "\n".join(f"- {value}" for value in values)
+
+          def source_status(name: str) -> str:
+              payload = snapshot.get("sources", {}).get(name)
+              if not isinstance(payload, dict):
+                  return "missing"
+              return str(payload.get("status", "unknown"))
+
+          changed_files = os.popen("git status --porcelain --untracked-files=all -- reports/crypto").read().strip().splitlines()
+          changed_paths = [line[3:] if len(line) > 3 else line for line in changed_files]
+          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+
+          body = f"""## Summary
+
+          Adds a deterministic raw Markdown crypto report generated from one validated source snapshot.
+
+          Snapshot path:
+
+          ```text
+          {snapshot_path.as_posix()}
+          ```
+
+          Snapshot quality: `{quality.get('status', 'unknown')}`
+
+          Generated report path:
+
+          ```text
+          {report_path.as_posix()}
+          ```
+
+          Changed files:
+          {bullet_list(changed_paths)}
+
+          Required source statuses:
+          {chr(10).join(f"- `{name}`: `{source_status(name)}`" for name in quality.get('required_sources', []))}
+
+          Optional exchange source statuses:
+          {chr(10).join(f"- `{name}`: `{source_status(name)}`" for name in quality.get('optional_exchange_sources', []))}
+
+          Non-blocking warnings:
+          {bullet_list([str(item) for item in quality.get('non_blocking_warnings', [])])}
+
+          Blocking issues:
+          {bullet_list([str(item) for item in quality.get('blocking_issues', [])])}
+
+          ## Verification
+
+          - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()} --config config/crypto_sources.yml`.
+          - Ran `python scripts/generate_crypto_report.py --snapshot {snapshot_path.as_posix()} --output-root reports/crypto --config config/crypto_sources.yml`.
+          - Checked generated Markdown for required deterministic sections.
+          - Checked for disallowed target-price/trading-signal language.
+          - Committed only raw Markdown report files under `reports/crypto/...`.
+          - Did not commit generated `_site/` output.
+
+          ## Scope limitations
+
+          - This PR adds a deterministic raw Markdown report only.
+          - This PR made no LLM calls.
+          - This PR used no secrets or paid API keys.
+          - This PR does not auto-merge.
+          - This PR does not add investment advice, target prices, trading signals, or buy/sell calls to action.
+
+          Workflow run: {run_url}
+          """
+
+          body = "\n".join(line.strip() for line in body.strip().splitlines()) + "\n"
+          pr_body_path = Path(os.environ["RUNNER_TEMP"]) / "deterministic-crypto-report-pr-body.md"
+          pr_body_path.write_text(body, encoding="utf-8")
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"pr_title=Add deterministic crypto report {report_path.stem}\n")
+          PY
+
+      - name: Inspect generated report changes
+        id: publish_context
+        run: |
+          set -euo pipefail
+
+          echo "Full working tree status:"
+          git status --porcelain --untracked-files=all
+
+          if [[ -z "$(git status --porcelain -- reports/crypto)" ]]; then
+            echo "No generated report changes to commit."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^reports\/crypto\// { print }')"
+          echo "Unexpected changes:"
+          if [[ -n "$unexpected_changes" ]]; then
+            printf '%s\n' "$unexpected_changes"
+            exit 1
+          fi
+          echo "None."
+
+          if git status --porcelain --untracked-files=all -- reports/crypto | awk '$2 !~ /^reports\/crypto\/.*\.md$/ { bad=1 } END { exit bad ? 0 : 1 }'; then
+            echo "Generated report changes include non-Markdown files." >&2
+            git status --porcelain --untracked-files=all -- reports/crypto
+            exit 1
+          fi
+
+          branch="automation/deterministic-crypto-report-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git checkout -b "$PUBLISH_BRANCH"
+
+      - name: Commit generated report
+        if: steps.publish_context.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/crypto
+          echo "Files staged for commit:"
+          git diff --cached --name-only
+          git commit -m "Add deterministic crypto report"
+
+      - name: Push automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git push --set-upstream origin "$PUBLISH_BRANCH"
+
+      - name: Open generated report PR
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ steps.evidence.outputs.pr_title }}
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          pr_body_file="$RUNNER_TEMP/deterministic-crypto-report-pr-body.md"
+          head_ref="${GITHUB_REPOSITORY_OWNER}:${PUBLISH_BRANCH}"
+          manual_pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${PUBLISH_BRANCH}?expand=1"
+
+          echo "Opening generated report PR."
+          echo "Manual PR URL: $manual_pr_url"
+
+          if ! gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$PR_TITLE" \
+            --body-file "$pr_body_file" \
+            --base main \
+            --head "$head_ref"; then
+            echo "Failed to create generated report PR." >&2
+            echo "The generated report branch has already been pushed successfully." >&2
+            echo "Manual PR URL: $manual_pr_url" >&2
+            exit 1
+          fi
