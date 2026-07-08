@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -81,6 +82,81 @@ class ExchangeCrosscheckIngestionTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["kraken"], [])
         self.assertEqual(payload["sources"]["okx"], [])
         self.assertEqual(len(warnings), 3)
+
+    def test_build_snapshot_embeds_computed_quality(self) -> None:
+        market = {
+            "assets": [
+                {
+                    "id": "bitcoin",
+                    "symbol": "BTC",
+                    "name": "Bitcoin",
+                    "price_usd": 60000,
+                    "market_cap_usd": 1200000000000,
+                    "volume_24h_usd": 10000000000,
+                    "change_1h_pct": 0.1,
+                    "change_24h_pct": 1.2,
+                    "change_7d_pct": 2.3,
+                    "market_cap_rank": 1,
+                    "last_updated": "2026-07-08T04:34:00Z",
+                },
+                {
+                    "id": "ethereum",
+                    "symbol": "ETH",
+                    "name": "Ethereum",
+                    "price_usd": 3000,
+                    "market_cap_usd": 360000000000,
+                    "volume_24h_usd": 5000000000,
+                    "change_1h_pct": 0.2,
+                    "change_24h_pct": 1.3,
+                    "change_7d_pct": 2.4,
+                    "market_cap_rank": 2,
+                    "last_updated": "2026-07-08T04:34:00Z",
+                },
+                {
+                    "id": "solana",
+                    "symbol": "SOL",
+                    "name": "Solana",
+                    "price_usd": 100,
+                    "market_cap_usd": 55000000000,
+                    "volume_24h_usd": 1000000000,
+                    "change_1h_pct": 0.3,
+                    "change_24h_pct": 1.4,
+                    "change_7d_pct": 2.5,
+                    "market_cap_rank": 5,
+                    "last_updated": "2026-07-08T04:34:00Z",
+                },
+            ]
+        }
+        defi = {
+            "total_tvl_usd": 100000000000,
+            "stablecoins": [
+                {"symbol": "USDT", "name": "Tether", "price_usd": 1.0, "circulating_usd": 100000000000},
+                {"symbol": "USDC", "name": "USD Coin", "price_usd": 1.0, "circulating_usd": 50000000000},
+            ],
+        }
+        exchange_payload = {
+            "strategy": "first_successful",
+            "selected": "coinbase_exchange",
+            "sources": {"coinbase_exchange": [{"symbol": "BTC", "pair": "BTC-USD", "quote": "USD", "price": "60000"}]},
+        }
+        exchange_statuses = {
+            "coinbase_exchange": {"status": "ok", "fetched_at_utc": "2026-07-08T04:34:52Z"},
+            "kraken": {"status": "skipped", "reason": "not attempted after coinbase_exchange satisfied first_successful strategy"},
+            "okx": {"status": "skipped", "reason": "not attempted after coinbase_exchange satisfied first_successful strategy"},
+            "binance": {"status": "skipped", "reason": "GitHub-hosted runners returned HTTP 451"},
+        }
+
+        with (
+            patch.object(ingest, "fetch_coingecko", return_value=(market, {"status": "ok", "fetched_at_utc": "2026-07-08T04:34:52Z"})),
+            patch.object(ingest, "fetch_defillama", return_value=(defi, {"status": "ok", "fetched_at_utc": "2026-07-08T04:34:52Z"})),
+            patch.object(ingest, "fetch_exchange_crosschecks", return_value=(exchange_payload, exchange_statuses, [])),
+        ):
+            snapshot = ingest.build_snapshot(config(), datetime(2026, 7, 8, 4, 34, 52, tzinfo=timezone.utc), "Australia/Sydney")
+
+        self.assertIn("quality", snapshot)
+        self.assertEqual(snapshot["quality"]["status"], "valid-ok")
+        self.assertEqual(snapshot["quality"]["blocking_issues"], [])
+        self.assertEqual(snapshot["quality"]["non_blocking_warnings"], [])
 
 
 if __name__ == "__main__":
