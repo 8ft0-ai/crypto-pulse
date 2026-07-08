@@ -139,37 +139,76 @@ jobs:
               output.write(f"pr_title={title}\n")
           PY
 
-      - name: Commit snapshot and open PR
+      - name: Inspect generated snapshot changes
+        id: publish_context
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_TITLE: ${{ steps.evidence.outputs.pr_title }}
           SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
         run: |
           set -euo pipefail
 
+          echo "Generated snapshot path: $SNAPSHOT_PATH"
+          echo "Full working tree status:"
+          git status --porcelain --untracked-files=all
+
+          echo "Snapshot-scoped status:"
+          git status --porcelain --untracked-files=all -- data/crypto/hourly
+
           if [[ -z "$(git status --porcelain -- data/crypto/hourly)" ]]; then
             echo "No generated source snapshot changes to commit."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^data\/crypto\/hourly\// { print }')"
+          echo "Unexpected changes:"
           if [[ -n "$unexpected_changes" ]]; then
-            echo "Unexpected working tree changes detected:" >&2
-            echo "$unexpected_changes" >&2
+            printf '%s\n' "$unexpected_changes"
             exit 1
           fi
+          echo "None."
 
           branch="automation/crypto-source-ingestion-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "Publish branch: $branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
 
+      - name: Create automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git checkout -b "$PUBLISH_BRANCH"
+
+      - name: Commit generated snapshot
+        if: steps.publish_context.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
           git add data/crypto/hourly
+          echo "Files staged for commit:"
+          git diff --cached --name-only
           git commit -m "Add crypto source snapshot"
-          git push --set-upstream origin "$branch"
 
+      - name: Push automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git push --set-upstream origin "$PUBLISH_BRANCH"
+
+      - name: Open generated snapshot PR
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ steps.evidence.outputs.pr_title }}
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
           gh pr create \
             --title "$PR_TITLE" \
             --body-file "$RUNNER_TEMP/crypto-source-ingestion-pr-body.md" \
             --base main \
-            --head "$branch"
+            --head "$PUBLISH_BRANCH"
