@@ -14,7 +14,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -26,11 +26,14 @@ except ImportError as exc:  # pragma: no cover - exercised only without dependen
     raise SystemExit("PyYAML is required. Install with: pip install pyyaml") from exc
 
 COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
-BINANCE_BASE_URL = "https://api.binance.com/api/v3"
+COINBASE_EXCHANGE_BASE_URL = "https://api.exchange.coinbase.com"
+KRAKEN_BASE_URL = "https://api.kraken.com/0/public"
+OKX_BASE_URL = "https://www.okx.com/api/v5/market"
 DEFILLAMA_BASE_URL = "https://api.llama.fi"
 STABLECOINS_BASE_URL = "https://stablecoins.llama.fi"
 USER_AGENT = "CryptoPulse source ingestion MVP (https://github.com/8ft0-ai/crypto-pulse)"
-SOURCE_STATUS_VALUES = {"ok", "warning", "error"}
+SOURCE_STATUS_VALUES = {"ok", "warning", "error", "skipped"}
+ExchangeFetcher = Callable[[dict[str, Any], int, int], tuple[list[dict[str, Any]], dict[str, Any]]]
 
 
 class SourceFetchError(RuntimeError):
@@ -140,6 +143,10 @@ def source_status(status: str, fetched_at_utc: datetime | None, **extra: Any) ->
     return payload
 
 
+def skipped_source_status(reason: str, **extra: Any) -> dict[str, Any]:
+    return source_status("skipped", None, reason=reason, **extra)
+
+
 def fetch_json(url: str, timeout_seconds: int, max_retries: int) -> Any:
     last_error: Exception | None = None
     for attempt in range(max_retries + 1):
@@ -208,47 +215,255 @@ def fetch_coingecko(config: dict[str, Any], timeout_seconds: int, max_retries: i
     )
 
 
-def fetch_binance(config: dict[str, Any], timeout_seconds: int, max_retries: int) -> tuple[dict[str, Any], dict[str, Any]]:
-    symbols = config_list(config, "assets", "binance_symbols")
-    if not symbols:
-        return {"binance": []}, source_status("warning", None, message="No Binance symbols configured", endpoints=[])
+def exchange_pairs(source_config: dict[str, Any]) -> dict[str, str]:
+    pairs = source_config.get("pairs")
+    if not isinstance(pairs, dict):
+        return {}
+    return {str(symbol).upper(): str(pair) for symbol, pair in pairs.items() if str(symbol).strip() and str(pair).strip()}
+
+
+def exchange_quote(source_config: dict[str, Any]) -> str:
+    return str(source_config.get("quote", "")).upper()
+
+
+def exchange_row(symbol: str, pair: str, quote: str, price: Any, **extra: Any) -> dict[str, Any]:
+    row: dict[str, Any] = {"symbol": symbol, "pair": pair, "quote": quote, "price": price}
+    row.update({key: value for key, value in extra.items() if value is not None})
+    return row
+
+
+def fetch_coinbase_exchange(source_config: dict[str, Any], timeout_seconds: int, max_retries: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    pairs = exchange_pairs(source_config)
+    quote = exchange_quote(source_config)
+    if not pairs:
+        return [], source_status("warning", None, message="No Coinbase Exchange pairs configured", endpoints=[])
 
     fetched_at = datetime.now(timezone.utc)
+    endpoint_template = "/products/{product_id}/ticker"
     rows: list[dict[str, Any]] = []
     symbol_errors: list[dict[str, str]] = []
-    endpoint = "/ticker/24hr"
-    for symbol in symbols:
-        url = f"{BINANCE_BASE_URL}{endpoint}?{urlencode({'symbol': symbol})}"
+    for symbol, pair in pairs.items():
+        endpoint = endpoint_template.format(product_id=pair)
         try:
-            item = fetch_json(url, timeout_seconds, max_retries)
+            item = fetch_json(f"{COINBASE_EXCHANGE_BASE_URL}{endpoint}", timeout_seconds, max_retries)
         except SourceFetchError as exc:
-            symbol_errors.append({"symbol": symbol, "error": str(exc)})
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": str(exc)})
             continue
-        if not isinstance(item, dict):
-            symbol_errors.append({"symbol": symbol, "error": "response was not an object"})
+        if not isinstance(item, dict) or item.get("price") in (None, ""):
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "ticker response did not include price"})
             continue
         rows.append(
-            {
-                "symbol": item.get("symbol", symbol),
-                "last_price": item.get("lastPrice"),
-                "change_24h_pct": item.get("priceChangePercent"),
-                "price_change": item.get("priceChange"),
-                "weighted_avg_price": item.get("weightedAvgPrice"),
-                "volume_24h_base": item.get("volume"),
-                "volume_24h_quote": item.get("quoteVolume"),
-                "open_time_ms": item.get("openTime"),
-                "close_time_ms": item.get("closeTime"),
-            }
+            exchange_row(
+                symbol,
+                pair,
+                quote,
+                item.get("price"),
+                bid=item.get("bid"),
+                ask=item.get("ask"),
+                volume_24h_base=item.get("volume"),
+                trade_id=item.get("trade_id"),
+                source_time=item.get("time"),
+            )
         )
 
-    status = "ok" if not symbol_errors else "warning"
-    return {"binance": rows}, source_status(
+    return rows, exchange_fetch_status(
+        "Coinbase Exchange",
+        fetched_at,
+        [endpoint_template],
+        pairs,
+        rows,
+        symbol_errors,
+    )
+
+
+def fetch_kraken(source_config: dict[str, Any], timeout_seconds: int, max_retries: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    pairs = exchange_pairs(source_config)
+    quote = exchange_quote(source_config)
+    if not pairs:
+        return [], source_status("warning", None, message="No Kraken pairs configured", endpoints=[])
+
+    fetched_at = datetime.now(timezone.utc)
+    endpoint = "/Ticker"
+    rows: list[dict[str, Any]] = []
+    symbol_errors: list[dict[str, str]] = []
+    for symbol, pair in pairs.items():
+        try:
+            payload = fetch_json(f"{KRAKEN_BASE_URL}{endpoint}?{urlencode({'pair': pair})}", timeout_seconds, max_retries)
+        except SourceFetchError as exc:
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": str(exc)})
+            continue
+        if not isinstance(payload, dict):
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "response was not an object"})
+            continue
+        errors = payload.get("error")
+        if isinstance(errors, list) and errors:
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "; ".join(str(error) for error in errors)})
+            continue
+        result = payload.get("result")
+        ticker = next(iter(result.values())) if isinstance(result, dict) and result else None
+        close = ticker.get("c") if isinstance(ticker, dict) else None
+        price = close[0] if isinstance(close, list) and close else None
+        if price in (None, ""):
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "ticker response did not include last close price"})
+            continue
+        volume = ticker.get("v") if isinstance(ticker, dict) else None
+        rows.append(
+            exchange_row(
+                symbol,
+                pair,
+                quote,
+                price,
+                volume_24h_base=volume[1] if isinstance(volume, list) and len(volume) > 1 else None,
+            )
+        )
+
+    return rows, exchange_fetch_status("Kraken", fetched_at, [endpoint], pairs, rows, symbol_errors)
+
+
+def fetch_okx(source_config: dict[str, Any], timeout_seconds: int, max_retries: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    pairs = exchange_pairs(source_config)
+    quote = exchange_quote(source_config)
+    if not pairs:
+        return [], source_status("warning", None, message="No OKX pairs configured", endpoints=[])
+
+    fetched_at = datetime.now(timezone.utc)
+    endpoint = "/ticker"
+    rows: list[dict[str, Any]] = []
+    symbol_errors: list[dict[str, str]] = []
+    for symbol, pair in pairs.items():
+        try:
+            payload = fetch_json(f"{OKX_BASE_URL}{endpoint}?{urlencode({'instId': pair})}", timeout_seconds, max_retries)
+        except SourceFetchError as exc:
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": str(exc)})
+            continue
+        if not isinstance(payload, dict):
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "response was not an object"})
+            continue
+        if str(payload.get("code", "0")) != "0":
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": str(payload.get("msg", "non-zero OKX response code"))})
+            continue
+        data = payload.get("data")
+        item = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else None
+        if not item or item.get("last") in (None, ""):
+            symbol_errors.append({"symbol": symbol, "pair": pair, "error": "ticker response did not include last price"})
+            continue
+        rows.append(
+            exchange_row(
+                symbol,
+                pair,
+                quote,
+                item.get("last"),
+                bid=item.get("bidPx"),
+                ask=item.get("askPx"),
+                volume_24h_base=item.get("vol24h"),
+                volume_24h_quote=item.get("volCcy24h"),
+                source_time_ms=item.get("ts"),
+            )
+        )
+
+    return rows, exchange_fetch_status("OKX", fetched_at, [endpoint], pairs, rows, symbol_errors)
+
+
+def exchange_fetch_status(
+    display_name: str,
+    fetched_at: datetime,
+    endpoints: list[str],
+    pairs: dict[str, str],
+    rows: list[dict[str, Any]],
+    symbol_errors: list[dict[str, str]],
+) -> dict[str, Any]:
+    covered_symbols = {str(row.get("symbol")).upper() for row in rows if row.get("symbol")}
+    required_symbols = set(pairs)
+    missing_symbols = sorted(required_symbols - covered_symbols)
+    if not rows:
+        status = "error"
+    elif symbol_errors or missing_symbols:
+        status = "warning"
+    else:
+        status = "ok"
+    return source_status(
         status,
         fetched_at,
-        endpoints=[endpoint],
-        symbols=symbols,
+        endpoints=endpoints,
+        pairs=pairs,
+        symbols=sorted(required_symbols),
+        covered_symbols=sorted(covered_symbols),
+        missing_symbols=missing_symbols,
         symbol_errors=symbol_errors,
+        message=(
+            f"{display_name} returned all configured exchange cross-check pairs"
+            if status == "ok"
+            else f"{display_name} returned incomplete exchange cross-check evidence"
+        ),
     )
+
+
+EXCHANGE_FETCHERS: dict[str, ExchangeFetcher] = {
+    "coinbase_exchange": fetch_coinbase_exchange,
+    "kraken": fetch_kraken,
+    "okx": fetch_okx,
+}
+
+
+def exchange_source_configs(config: dict[str, Any]) -> list[dict[str, Any]]:
+    exchange_config = config.get("exchange_crosschecks")
+    sources = exchange_config.get("sources") if isinstance(exchange_config, dict) else None
+    if not isinstance(sources, list):
+        return []
+    return [source for source in sources if isinstance(source, dict) and source.get("name")]
+
+
+def exchange_strategy(config: dict[str, Any]) -> str:
+    exchange_config = config.get("exchange_crosschecks")
+    if isinstance(exchange_config, dict):
+        return str(exchange_config.get("strategy", "first_successful"))
+    return "first_successful"
+
+
+def fetch_exchange_crosschecks(
+    config: dict[str, Any], timeout_seconds: int, max_retries: int
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]], list[str]]:
+    strategy = exchange_strategy(config)
+    exchange_sources: dict[str, list[dict[str, Any]]] = {}
+    source_statuses: dict[str, dict[str, Any]] = {}
+    warnings: list[str] = []
+    selected: str | None = None
+
+    for source_config in exchange_source_configs(config):
+        name = str(source_config["name"])
+        exchange_sources[name] = []
+        if not bool(source_config.get("enabled", True)):
+            source_statuses[name] = skipped_source_status(str(source_config.get("reason", "disabled for MVP")))
+            continue
+        if selected and strategy == "first_successful":
+            source_statuses[name] = skipped_source_status(
+                f"not attempted after {selected} satisfied first_successful strategy"
+            )
+            continue
+
+        fetcher = EXCHANGE_FETCHERS.get(name)
+        if fetcher is None:
+            source_statuses[name] = source_status(
+                "warning",
+                datetime.now(timezone.utc),
+                message="Enabled exchange source is not implemented in this no-secrets MVP",
+            )
+            warnings.append(f"{name} exchange cross-check is enabled but not implemented")
+            continue
+
+        try:
+            rows, status = fetcher(source_config, timeout_seconds, max_retries)
+        except SourceFetchError as exc:
+            rows = []
+            status = source_status("error", datetime.now(timezone.utc), message=f"{name} exchange cross-check failed: {exc}")
+        exchange_sources[name] = rows
+        source_statuses[name] = status
+        if status.get("status") == "ok":
+            selected = name
+        else:
+            warnings.append(f"{name} exchange cross-check completed with status {status.get('status', 'unknown')}")
+
+    return {"strategy": strategy, "selected": selected, "sources": exchange_sources}, source_statuses, warnings
 
 
 def fetch_defillama(config: dict[str, Any], timeout_seconds: int, max_retries: int) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -321,7 +536,7 @@ def build_snapshot(config: dict[str, Any], now_utc: datetime, timezone_name: str
     max_retries = config_int(config, 2, "limits", "max_retries")
 
     snapshot: dict[str, Any] = {
-        "schema_version": "0.1",
+        "schema_version": "0.2",
         "run": {
             "generated_at_utc": isoformat_utc(now_utc),
             "generated_at_local": local_now.replace(microsecond=0).isoformat(),
@@ -332,19 +547,13 @@ def build_snapshot(config: dict[str, Any], now_utc: datetime, timezone_name: str
         },
         "sources": {},
         "market": {"assets": []},
-        "exchange_crosscheck": {"binance": []},
+        "exchange_crosscheck": {"strategy": exchange_strategy(config), "selected": None, "sources": {}},
         "defi": {"total_tvl_usd": None, "stablecoins": []},
         "warnings": [],
         "errors": [],
     }
 
-    source_fetches = [
-        ("coingecko", fetch_coingecko),
-        ("binance", fetch_binance),
-        ("defillama", fetch_defillama),
-    ]
-
-    for source_name, fetcher in source_fetches:
+    for source_name, fetcher in (("coingecko", fetch_coingecko), ("defillama", fetch_defillama)):
         try:
             data, status = fetcher(config, timeout_seconds, max_retries)
         except SourceFetchError as exc:
@@ -359,10 +568,13 @@ def build_snapshot(config: dict[str, Any], now_utc: datetime, timezone_name: str
 
         if source_name == "coingecko":
             snapshot["market"].update(data)
-        elif source_name == "binance":
-            snapshot["exchange_crosscheck"].update(data)
         elif source_name == "defillama":
             snapshot["defi"].update(data)
+
+    exchange_payload, exchange_statuses, exchange_warnings = fetch_exchange_crosschecks(config, timeout_seconds, max_retries)
+    snapshot["exchange_crosscheck"].update(exchange_payload)
+    snapshot["sources"].update(exchange_statuses)
+    snapshot["warnings"].extend(exchange_warnings)
 
     return snapshot
 
