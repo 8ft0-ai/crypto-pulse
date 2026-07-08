@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,6 +29,15 @@ class SnapshotQualityFixtureTests(unittest.TestCase):
 
     def test_optional_source_warning_is_degraded_not_invalid(self) -> None:
         self.assert_validates_as("valid_degraded_optional_source_warning.json", "valid-degraded")
+
+    def test_embedded_quality_status_mismatch_is_invalid(self) -> None:
+        payload = json.loads((FIXTURES / "valid_ok_snapshot.json").read_text(encoding="utf-8"))
+        payload["quality"]["status"] = "invalid"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "quality_status_mismatch_source_snapshot.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValidationError, "quality.status"):
+                validate_snapshot(path, CONFIG)
 
     def test_missing_required_source_is_invalid(self) -> None:
         self.assert_rejected("invalid_missing_required_source.json")
