@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import sys
 import tempfile
 import unittest
@@ -18,8 +19,13 @@ CONFIG = ROOT / "config" / "crypto_sources.yml"
 class DeterministicCryptoReportGeneratorTests(unittest.TestCase):
     def test_generates_report_from_valid_ok_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            output_path = generate_report(FIXTURES / "valid_ok_snapshot.json", Path(tmp), CONFIG)
-            self.assertEqual(output_path.as_posix().split("/")[-4:], ["2026", "07", "08", "1434_AEST.md"])
+            tmp_root = Path(tmp)
+            snapshot_path = tmp_root / "data" / "crypto" / "hourly" / "2026" / "07" / "08" / "1434_AEST_source_snapshot.json"
+            snapshot_path.parent.mkdir(parents=True)
+            shutil.copyfile(FIXTURES / "valid_ok_snapshot.json", snapshot_path)
+
+            output_path = generate_report(snapshot_path, tmp_root / "reports" / "crypto", CONFIG)
+            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/2026/07/08/1434_AEST.md")
             body = output_path.read_text(encoding="utf-8")
 
         self.assertIn("schema_version: \"deterministic-crypto-report/v1\"", body)
