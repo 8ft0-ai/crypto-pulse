@@ -146,7 +146,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- data/crypto/hourly; then
+          if [[ -z "$(git status --porcelain -- data/crypto/hourly)" ]]; then
             echo "No generated source snapshot changes to commit."
             exit 0
           fi
