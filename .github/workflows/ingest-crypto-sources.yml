@@ -131,7 +131,8 @@ jobs:
           """
 
           body = "\n".join(line.strip() for line in body.strip().splitlines()) + "\n"
-          Path("pr-body.md").write_text(body, encoding="utf-8")
+          pr_body_path = Path(os.environ["RUNNER_TEMP"]) / "crypto-source-ingestion-pr-body.md"
+          pr_body_path.write_text(body, encoding="utf-8")
 
           title = f"Add crypto source snapshot {snapshot_path.stem}"
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
@@ -169,6 +170,6 @@ jobs:
 
           gh pr create \
             --title "$PR_TITLE" \
-            --body-file pr-body.md \
+            --body-file "$RUNNER_TEMP/crypto-source-ingestion-pr-body.md" \
             --base main \
             --head "$branch"
