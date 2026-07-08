@@ -94,37 +94,12 @@ jobs:
           echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
           echo "Generated deterministic report: $report_path"
 
-      - name: Validate generated Markdown shape
+      - name: Validate generated Markdown report
         env:
           REPORT_PATH: ${{ steps.report.outputs.report_path }}
         run: |
           set -euo pipefail
-
-          required_patterns=(
-            '^---$'
-            '^schema_version: "deterministic-crypto-report/v1"$'
-            '^quality_status:'
-            '^llm_generated: false$'
-            '^## Product boundary and non-investment-advice notice$'
-            '^## Snapshot quality$'
-            '^## Market summary$'
-            '^## DeFi and stablecoin summary$'
-            '^## Exchange cross-check summary$'
-            '^## Evidence and source status$'
-            '^## Scope limitations$'
-          )
-
-          for pattern in "${required_patterns[@]}"; do
-            if ! grep -Eq "$pattern" "$REPORT_PATH"; then
-              echo "Generated report is missing required pattern: $pattern" >&2
-              exit 1
-            fi
-          done
-
-          if grep -Eiq '\b(buy|sell|hold) (BTC|ETH|SOL|bitcoin|ethereum|solana)\b|target price|price target|trading signal' "$REPORT_PATH"; then
-            echo "Generated report appears to contain disallowed trading language." >&2
-            exit 1
-          fi
+          python scripts/validate_crypto_report.py "$REPORT_PATH" --root .
 
       - name: Build PR evidence
         id: evidence
@@ -202,8 +177,7 @@ jobs:
 
           - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()} --config config/crypto_sources.yml`.
           - Ran `python scripts/generate_crypto_report.py --snapshot {snapshot_path.as_posix()} --output-root reports/crypto --config config/crypto_sources.yml`.
-          - Checked generated Markdown for required deterministic sections.
-          - Checked for disallowed target-price/trading-signal language.
+          - Ran `python scripts/validate_crypto_report.py {report_path.as_posix()} --root .`.
           - Committed only raw Markdown report files under `reports/crypto/...`.
           - Did not commit generated `_site/` output.
 
