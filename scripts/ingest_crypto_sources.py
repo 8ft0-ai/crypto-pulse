@@ -20,6 +20,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from validate_crypto_snapshot import classify_snapshot_quality
+
 try:
     import yaml
 except ImportError as exc:  # pragma: no cover - exercised only without dependency
@@ -575,6 +577,7 @@ def build_snapshot(config: dict[str, Any], now_utc: datetime, timezone_name: str
     snapshot["exchange_crosscheck"].update(exchange_payload)
     snapshot["sources"].update(exchange_statuses)
     snapshot["warnings"].extend(exchange_warnings)
+    snapshot["quality"] = classify_snapshot_quality(snapshot, config)
 
     return snapshot
 
