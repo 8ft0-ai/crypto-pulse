@@ -177,10 +177,48 @@ def title(snapshot: dict[str, Any]) -> str:
         return "# Crypto market evidence snapshot"
 
 
+def source_status_summary(snapshot: dict[str, Any], names: list[str]) -> str:
+    if not names:
+        return "none configured"
+    return ", ".join(f"{name}: {source_status(snapshot, name)}" for name in names)
+
+
+def asset_count(snapshot: dict[str, Any]) -> int:
+    return len(as_list(as_dict(snapshot.get("market")).get("assets")))
+
+
+def stablecoin_count(snapshot: dict[str, Any]) -> int:
+    return len(as_list(as_dict(snapshot.get("defi")).get("stablecoins")))
+
+
+def snapshot_at_a_glance(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[str, Any]) -> str:
+    exchange = as_dict(snapshot.get("exchange_crosscheck"))
+    required = [str(value) for value in as_list(quality.get("required_sources"))]
+    optional = [str(value) for value in as_list(quality.get("optional_exchange_sources"))]
+    lines = [
+        "## Snapshot at a glance",
+        "",
+        "This deterministic brief is generated from one archived source snapshot. The table below is a review aid so the reader can assess source coverage before reading the numeric tables.",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        f"| Source snapshot | `{snapshot_path.as_posix()}` |",
+        f"| Snapshot quality | `{safe_text(quality.get('status'))}` |",
+        f"| Required sources | {source_status_summary(snapshot, required)} |",
+        f"| Selected exchange cross-check | `{safe_text(exchange.get('selected'), 'none')}` |",
+        f"| Optional exchange sources | {source_status_summary(snapshot, optional)} |",
+        f"| Market assets covered | {asset_count(snapshot)} |",
+        f"| Stablecoins covered | {stablecoin_count(snapshot)} |",
+    ]
+    return "\n".join(lines)
+
+
 def market_section(snapshot: dict[str, Any]) -> str:
     assets = as_list(as_dict(snapshot.get("market")).get("assets"))
     rows = [
         "## Market summary",
+        "",
+        "Source-provided market fields are listed without interpretation. Percentage changes are recorded observations from the snapshot, not forecasts or trade direction.",
         "",
         "| Asset | Price USD | 1h | 24h | 7d | Market cap USD | 24h volume USD | Rank | Updated |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
@@ -212,6 +250,8 @@ def defi_section(snapshot: dict[str, Any]) -> str:
     rows = [
         "## DeFi and stablecoin summary",
         "",
+        "This section records DeFi TVL and stablecoin fields from the validated source snapshot. It is included for source context, not valuation commentary.",
+        "",
         f"Total DeFi TVL: USD {integer_money(defi.get('total_tvl_usd'))}.",
         "",
         "| Stablecoin | Price USD | Circulating USD |",
@@ -231,6 +271,8 @@ def exchange_section(snapshot: dict[str, Any], quality: dict[str, Any]) -> str:
     sources = as_dict(exchange.get("sources"))
     rows = [
         "## Exchange cross-check summary",
+        "",
+        "The exchange cross-check is a source consistency check. It does not rank venues, express preference, or provide execution guidance.",
         "",
         f"Strategy: `{safe_text(exchange.get('strategy'))}`",
         "",
@@ -296,6 +338,8 @@ def evidence_section(snapshot: dict[str, Any], snapshot_path: Path) -> str:
     lines = [
         "## Evidence and source status",
         "",
+        "Use this section to trace every displayed value back to the archived snapshot and its source-status records.",
+        "",
         f"Source snapshot: `{snapshot_path.as_posix()}`",
         "",
         "| Source | Status | Fetched at | Notes |",
@@ -331,6 +375,8 @@ def render_report(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[s
         "## Product boundary and non-investment-advice notice",
         "",
         "This report is deterministic demonstration content generated from one validated source snapshot. It is not financial advice, investment research, a recommendation, a trading signal, or a call to buy, sell, or hold any asset.",
+        "",
+        snapshot_at_a_glance(snapshot, snapshot_path, quality),
         "",
         quality_section(snapshot, quality),
         "",
