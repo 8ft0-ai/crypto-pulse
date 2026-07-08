@@ -32,7 +32,7 @@ class DeterministicCryptoReportGeneratorTests(unittest.TestCase):
             shutil.copyfile(FIXTURES / "valid_ok_snapshot.json", snapshot_path)
 
             output_path = generate_report(snapshot_path, tmp_root / "reports" / "crypto", CONFIG)
-            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/2026/07/08/1434_AEST.md")
+            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/hourly/2026/07/08/1434_AEST.md")
             body = output_path.read_text(encoding="utf-8")
 
         self.assertIn("schema_version: \"deterministic-crypto-report/v1\"", body)
@@ -53,7 +53,7 @@ class DeterministicCryptoReportGeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             output_path = generate_report(REAL_PR89_SNAPSHOT, tmp_root / "reports" / "crypto", CONFIG)
-            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/2026/07/08/1742_AEST.md")
+            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/hourly/2026/07/08/1742_AEST.md")
             body = output_path.read_text(encoding="utf-8")
             generated_site = tmp_root / "_site"
 

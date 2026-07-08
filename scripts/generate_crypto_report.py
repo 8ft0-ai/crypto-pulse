@@ -146,6 +146,11 @@ def front_matter(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[st
     return "\n".join(lines)
 
 
+def report_archive_root(output_root: Path) -> Path:
+    """Return the source-side archive directory discovered by the site generator."""
+    return output_root if output_root.name == "hourly" else output_root / "hourly"
+
+
 def report_output_path(snapshot: dict[str, Any], snapshot_path: Path, output_root: Path) -> Path:
     run = as_dict(snapshot.get("run"))
     local_text = safe_text(run.get("generated_at_local"), "")
@@ -163,7 +168,7 @@ def report_output_path(snapshot: dict[str, Any], snapshot_path: Path, output_roo
     stem = snapshot_path.stem
     if stem.endswith("_source_snapshot"):
         stem = stem.removesuffix("_source_snapshot")
-    return output_root / year / month / day / f"{stem}.md"
+    return report_archive_root(output_root) / year / month / day / f"{stem}.md"
 
 
 def title(snapshot: dict[str, Any]) -> str:
