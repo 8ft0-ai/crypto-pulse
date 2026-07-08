@@ -207,8 +207,27 @@ jobs:
           PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
         run: |
           set -euo pipefail
-          gh pr create \
+          pr_body_file="$RUNNER_TEMP/crypto-source-ingestion-pr-body.md"
+          head_ref="${GITHUB_REPOSITORY_OWNER}:${PUBLISH_BRANCH}"
+          manual_pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${PUBLISH_BRANCH}?expand=1"
+
+          echo "Opening generated snapshot PR."
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Base: main"
+          echo "Head: $head_ref"
+          echo "Title: $PR_TITLE"
+          echo "Manual PR URL: $manual_pr_url"
+
+          if ! gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
             --title "$PR_TITLE" \
-            --body-file "$RUNNER_TEMP/crypto-source-ingestion-pr-body.md" \
+            --body-file "$pr_body_file" \
             --base main \
-            --head "$PUBLISH_BRANCH"
+            --head "$head_ref"; then
+            echo "Failed to create generated snapshot PR." >&2
+            echo "The generated snapshot branch has already been pushed successfully." >&2
+            echo "Manual PR URL: $manual_pr_url" >&2
+            echo "Check repository Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests." >&2
+            gh auth status || true
+            exit 1
+          fi
