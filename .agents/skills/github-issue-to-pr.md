@@ -20,17 +20,26 @@ Complete the full issue-to-PR path in one coherent run. Do not stop at branch cr
 
 ## Choosing an edit path
 
-Prefer the repository `Apply AI Patch` workflow for multi-file work, especially when generator, CSS, workflow, or runbook files are changed together.
+`Apply AI Patch` is the preferred write path for multi-file agent changes because it gives the repository one branch, one coherent implementation commit, and one pull request. It is not a hard requirement in every execution environment.
 
-Use contents API updates only when the patch workflow cannot be triggered from the current environment or when the change is a safe, small file edit. If contents updates are used for multi-file work, state that limitation in the PR body.
+Use this hierarchy:
 
-Do not use full-file contents replacement for large files when fetched content was truncated. Use a patch workflow or split the work first.
+1. Prefer the repository `Apply AI Patch` workflow for multi-file changes when workflow dispatch is available, especially when generator, CSS, workflow, or runbook files are changed together.
+2. Use a lower-level Git object or atomic commit path when available and safe, especially when it can preserve the one-commit review shape without full-file replacement risk.
+3. Use the GitHub contents API fallback when the patch workflow cannot be triggered from the current environment, or when the change is limited to small, new, or safely fetched files.
+4. Stop or hand off when the required change touches large or truncated files and no safe patch or atomic commit path is available.
+
+Do not use full-file contents replacement for large files when fetched content was truncated. Use a patch workflow, a lower-level atomic commit path, or split the work first.
+
+When contents API updates are used for multi-file work, state that limitation in the PR body. Include why `Apply AI Patch` was not used, which fallback write path was used, whether multiple commits were produced, how the changed files were verified, and confirmation that generated `_site/` output was not committed.
+
+For more detail, see `docs/agent-write-strategies.md`.
 
 ## Completion discipline
 
 Handle recoverable SHA conflicts, branch creation conflicts, and connector limitations internally. Refresh the file SHA or branch state and continue.
 
-Stop early only for a hard safety issue, unsafe repository state, truncated large-file content with no safe patch route, or destructive/scope-changing action requiring explicit approval.
+Stop early only for a hard safety issue, unsafe repository state, truncated large-file content with no safe patch route, or destructive/scope-changing action requiring explicit user approval.
 
 Do not open placeholder, CSS-only, or partial PRs unless explicitly requested by the user.
 
