@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 import tempfile
@@ -14,6 +15,12 @@ from validate_crypto_snapshot import ValidationError
 
 FIXTURES = ROOT / "tests" / "fixtures"
 CONFIG = ROOT / "config" / "crypto_sources.yml"
+REAL_PR89_SNAPSHOT = ROOT / "data" / "crypto" / "hourly" / "2026" / "07" / "08" / "1742_AEST_source_snapshot.json"
+PROHIBITED_ADVICE_RE = re.compile(
+    r"\b(?:buy|sell|hold)\s+(?:BTC|ETH|SOL|bitcoin|ethereum|solana)\b|"
+    r"\btarget price\b|\bprice target\b|\bposition guidance\b",
+    re.IGNORECASE,
+)
 
 
 class DeterministicCryptoReportGeneratorTests(unittest.TestCase):
@@ -40,6 +47,33 @@ class DeterministicCryptoReportGeneratorTests(unittest.TestCase):
         self.assertIn("## Scope limitations", body)
         self.assertIn("not financial advice", body)
         self.assertIn("llm_generated: false", body)
+
+    def test_real_pr89_snapshot_generates_expected_report_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_root = Path(tmp)
+            output_path = generate_report(REAL_PR89_SNAPSHOT, tmp_root / "reports" / "crypto", CONFIG)
+            self.assertEqual(output_path.relative_to(tmp_root).as_posix(), "reports/crypto/2026/07/08/1742_AEST.md")
+            body = output_path.read_text(encoding="utf-8")
+            generated_site = tmp_root / "_site"
+
+        self.assertIn("source_snapshot:", body)
+        self.assertIn("1742_AEST_source_snapshot.json", body)
+        self.assertIn("quality_status: \"valid-ok\"", body)
+        self.assertIn("selected_exchange_crosscheck: \"coinbase_exchange\"", body)
+        self.assertIn("Selected exchange cross-check: `coinbase_exchange`", body)
+        self.assertIn("## Product boundary and non-investment-advice notice", body)
+        self.assertIn("## Snapshot quality", body)
+        self.assertIn("## Market summary", body)
+        self.assertIn("## DeFi and stablecoin summary", body)
+        self.assertIn("## Exchange cross-check summary", body)
+        self.assertIn("## Evidence and source status", body)
+        self.assertIn("## Scope limitations", body)
+        self.assertIn("| coingecko | ok |", body)
+        self.assertIn("| defillama | ok |", body)
+        self.assertIn("not financial advice", body)
+        self.assertIn("llm_generated: false", body)
+        self.assertIsNone(PROHIBITED_ADVICE_RE.search(body))
+        self.assertFalse(generated_site.exists())
 
     def test_invalid_snapshot_fails_without_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
