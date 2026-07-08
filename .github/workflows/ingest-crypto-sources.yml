@@ -151,7 +151,7 @@ jobs:
             exit 0
           fi
 
-          unexpected_changes="$(git status --short | grep -vE '^[ AM?]{2}data/crypto/hourly/' || true)"
+          unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^data\/crypto\/hourly\// { print }')"
           if [[ -n "$unexpected_changes" ]]; then
             echo "Unexpected working tree changes detected:" >&2
             echo "$unexpected_changes" >&2
