@@ -18,6 +18,9 @@ defillama:
   include_total_tvl: true
   include_stablecoins: true
   stablecoin_limit: 10
+  major_stablecoins:
+    - USDT
+    - USDC
 
 sources:
   coingecko:
