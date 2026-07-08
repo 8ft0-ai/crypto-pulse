@@ -1,12 +1,12 @@
 assets:
+  required_symbols:
+    - BTC
+    - ETH
+    - SOL
   coingecko_ids:
     - bitcoin
     - ethereum
     - solana
-  binance_symbols:
-    - BTCUSDT
-    - ETHUSDT
-    - SOLUSDT
 
 coingecko:
   vs_currency: usd
@@ -18,6 +18,56 @@ defillama:
   include_total_tvl: true
   include_stablecoins: true
   stablecoin_limit: 10
+
+sources:
+  coingecko:
+    required: true
+    role: market
+  defillama:
+    required: true
+    role: defi_stablecoins
+
+exchange_crosschecks:
+  required: false
+  strategy: first_successful
+  sources:
+    - name: coinbase_exchange
+      enabled: true
+      quote: USD
+      pairs:
+        BTC: BTC-USD
+        ETH: ETH-USD
+        SOL: SOL-USD
+    - name: kraken
+      enabled: true
+      quote: USD
+      pairs:
+        BTC: XBTUSD
+        ETH: ETHUSD
+        SOL: SOLUSD
+    - name: okx
+      enabled: true
+      quote: USDT
+      pairs:
+        BTC: BTC-USDT
+        ETH: ETH-USDT
+        SOL: SOL-USDT
+    - name: binance
+      enabled: false
+      quote: USDT
+      reason: GitHub-hosted runners returned HTTP 451
+    - name: bybit
+      enabled: false
+      quote: USDT
+      reason: GitHub-hosted runners returned HTTP 403
+    - name: cryptocompare
+      enabled: false
+      quote: USD
+      reason: No-secrets MVP returned HTTP 401 without an API key
+
+quality:
+  freshness_tolerance_minutes: 180
+  stablecoin_peg_warning_threshold_pct: 1.0
 
 limits:
   request_timeout_seconds: 20
