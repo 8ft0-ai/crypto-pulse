@@ -136,36 +136,47 @@ jobs:
                   return "missing"
               return str(payload.get("status", "unknown"))
 
+          def source_status_lines(names: list[object]) -> str:
+              return "\n".join(f"- `{name}`: `{source_status(str(name))}`" for name in names) or "- None configured."
+
           changed_files = os.popen("git status --porcelain --untracked-files=all -- reports/crypto").read().strip().splitlines()
           changed_paths = [line[3:] if len(line) > 3 else line for line in changed_files]
           run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          exchange = snapshot.get("exchange_crosscheck") if isinstance(snapshot.get("exchange_crosscheck"), dict) else {}
+          selected_exchange = exchange.get("selected") or "none"
 
           body = f"""## Summary
 
-          Adds a deterministic raw Markdown crypto report generated from one validated source snapshot.
+          Adds one deterministic raw Markdown crypto report generated from one validated source snapshot.
 
-          Snapshot path:
+          ## Report evidence
 
-          ```text
-          {snapshot_path.as_posix()}
-          ```
+          Source snapshot: `{snapshot_path.as_posix()}`
+
+          Generated report: `{report_path.as_posix()}`
 
           Snapshot quality: `{quality.get('status', 'unknown')}`
 
-          Generated report path:
+          Required sources:
+          {source_status_lines([str(name) for name in quality.get('required_sources', [])])}
 
-          ```text
-          {report_path.as_posix()}
-          ```
+          Selected exchange cross-check: `{selected_exchange}`
+
+          Report validation: `passed` — ran `python scripts/validate_crypto_report.py {report_path.as_posix()} --root .`.
+
+          Advice-language check: `passed` — deterministic report validator checked for prohibited advice-like language, including buy/sell/hold recommendations, target prices, trading signals, entry/exit points, stop-loss/take-profit language, and position guidance.
 
           Changed files:
           {bullet_list(changed_paths)}
 
-          Required source statuses:
-          {chr(10).join(f"- `{name}`: `{source_status(name)}`" for name in quality.get('required_sources', []))}
+          _site committed: `no`
+
+          Workflow run: {run_url}
+
+          ## Additional source evidence
 
           Optional exchange source statuses:
-          {chr(10).join(f"- `{name}`: `{source_status(name)}`" for name in quality.get('optional_exchange_sources', []))}
+          {source_status_lines([str(name) for name in quality.get('optional_exchange_sources', [])])}
 
           Non-blocking warnings:
           {bullet_list([str(item) for item in quality.get('non_blocking_warnings', [])])}
@@ -173,7 +184,7 @@ jobs:
           Blocking issues:
           {bullet_list([str(item) for item in quality.get('blocking_issues', [])])}
 
-          ## Verification
+          ## Verification commands
 
           - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()} --config config/crypto_sources.yml`.
           - Ran `python scripts/generate_crypto_report.py --snapshot {snapshot_path.as_posix()} --output-root reports/crypto --config config/crypto_sources.yml`.
@@ -183,13 +194,12 @@ jobs:
 
           ## Scope limitations
 
-          - This PR adds a deterministic raw Markdown report only.
-          - This PR made no LLM calls.
-          - This PR used no secrets or paid API keys.
+          - This PR adds a deterministic Markdown report only.
+          - This PR does not call an LLM.
+          - This PR does not provide investment advice or trading recommendations.
+          - This PR does not publish or deploy the report.
           - This PR does not auto-merge.
-          - This PR does not add investment advice, target prices, trading signals, or buy/sell calls to action.
-
-          Workflow run: {run_url}
+          - This PR used no secrets or paid API keys.
           """
 
           body = "\n".join(line.strip() for line in body.strip().splitlines()) + "\n"
