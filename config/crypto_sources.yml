@@ -1,0 +1,24 @@
+assets:
+  coingecko_ids:
+    - bitcoin
+    - ethereum
+    - solana
+  binance_symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+
+coingecko:
+  vs_currency: usd
+  include_market_cap: true
+  include_24h_vol: true
+  include_24h_change: true
+
+defillama:
+  include_total_tvl: true
+  include_stablecoins: true
+  stablecoin_limit: 10
+
+limits:
+  request_timeout_seconds: 20
+  max_retries: 2
