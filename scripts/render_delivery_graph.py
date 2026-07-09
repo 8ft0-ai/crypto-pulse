@@ -8,8 +8,8 @@ from typing import Any
 from validate_delivery_graph import load_delivery_graph, validate_delivery_graph
 
 
-DEFAULT_INPUT = Path("docs/delivery/delivery.yaml")
-DEFAULT_OUTPUT = Path("docs/delivery/graph.md")
+DEFAULT_INPUT = Path("planning/delivery/delivery.yaml")
+DEFAULT_OUTPUT = Path("planning/delivery/graph.md")
 
 
 def render_delivery_graph(path: Path) -> str:
@@ -21,7 +21,7 @@ def render_delivery_graph(path: Path) -> str:
     lines = [
         "# CryptoPulse delivery graph",
         "",
-        "This file is generated from `docs/delivery/delivery.yaml` by `scripts/render_delivery_graph.py`.",
+        "This file is generated from `planning/delivery/delivery.yaml` by `scripts/render_delivery_graph.py`.",
         "",
         "The graph is a curated navigation layer over GitHub issues, pull requests, workflow runs, commits, and delivery records. It is not the canonical audit trail.",
         "",
@@ -91,12 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--input",
         default=str(DEFAULT_INPUT),
-        help="Path to delivery graph YAML. Defaults to docs/delivery/delivery.yaml.",
+        help="Path to delivery graph YAML. Defaults to planning/delivery/delivery.yaml.",
     )
     parser.add_argument(
         "--output",
         default=str(DEFAULT_OUTPUT),
-        help="Path to write generated Markdown. Defaults to docs/delivery/graph.md.",
+        help="Path to write generated Markdown. Defaults to planning/delivery/graph.md.",
     )
     return parser
 

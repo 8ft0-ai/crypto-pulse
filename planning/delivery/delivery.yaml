@@ -6,21 +6,21 @@ nodes:
     title: Phase 1 — Source evidence spine
     status: complete
     summary: Scheduled ingestion can produce a scoped valid-ok source snapshot PR.
-    record: docs/delivery/phase-01-source-evidence-spine.md
+    record: planning/delivery/phase-01-source-evidence-spine.md
 
   - id: phase-2
     type: phase
     title: Phase 2 — Deterministic report review loop
     status: complete
     summary: A merged valid-ok source snapshot can produce a reviewed deterministic Markdown report PR and render through the static site generator without committing _site output.
-    record: docs/delivery/phase-02-deterministic-report-review-loop.md
+    record: planning/delivery/phase-02-deterministic-report-review-loop.md
 
   - id: phase-3
     type: phase
     title: Phase 3 — Self-proving generated report PRs
     status: complete
     summary: Generated report PRs carry their own pre-PR proof, with downstream PR validation retained as defence in depth.
-    record: docs/delivery/phase-03-self-proving-generated-report-prs.md
+    record: planning/delivery/phase-03-self-proving-generated-report-prs.md
 
   - id: issue-75
     type: issue
@@ -43,27 +43,12 @@ nodes:
     url: https://github.com/8ft0-ai/crypto-pulse/issues/115
     status: closed
 
-  - id: issue-122
-    type: issue
-    title: Prove end-to-end self-proving generated report flow
-    number: 122
-    url: https://github.com/8ft0-ai/crypto-pulse/issues/122
-    status: closed
-
-  - id: issue-123
-    type: issue
-    title: Phase 3 close-out evidence
-    number: 123
-    url: https://github.com/8ft0-ai/crypto-pulse/issues/123
-    status: closed
-
   - id: pr-89
     type: pull_request
     title: Add crypto source snapshot 1742_AEST_source_snapshot
     number: 89
     url: https://github.com/8ft0-ai/crypto-pulse/pull/89
     status: merged
-    merge_commit: 178703aef4be8fc0ecf35677e1ffeffe7d4d4a52
 
   - id: pr-104
     type: pull_request
@@ -71,7 +56,6 @@ nodes:
     number: 104
     url: https://github.com/8ft0-ai/crypto-pulse/pull/104
     status: merged
-    merge_commit: f6083aff44377b6819ce66d56da848e289124eb8
 
   - id: pr-132
     type: pull_request
@@ -79,7 +63,6 @@ nodes:
     number: 132
     url: https://github.com/8ft0-ai/crypto-pulse/pull/132
     status: merged
-    merge_commit: 5a77e5aa315f72c76363a7286396c67c8ec43405
 
   - id: pr-134
     type: pull_request
@@ -87,33 +70,6 @@ nodes:
     number: 134
     url: https://github.com/8ft0-ai/crypto-pulse/pull/134
     status: merged
-    merge_commit: 06039f42d3b4eb20889c7fafe4d983a1f2dde3f1
-
-  - id: pr-138
-    type: pull_request
-    title: Split roadmap planning and delivery records
-    number: 138
-    url: https://github.com/8ft0-ai/crypto-pulse/pull/138
-    status: merged
-    merge_commit: 21d816a5c35a6cb51f1d4490c999ac89f1424f7c
-
-  - id: run-28926128310
-    type: workflow_run
-    title: Source snapshot workflow run
-    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28926128310
-    conclusion: success
-
-  - id: run-28940526728
-    type: workflow_run
-    title: Deterministic report generation workflow run
-    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940526728
-    conclusion: success
-
-  - id: run-28940544039
-    type: workflow_run
-    title: Phase 2 downstream PR validation
-    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940544039
-    conclusion: success
 
   - id: run-28999816016
     type: workflow_run
@@ -141,13 +97,6 @@ nodes:
     artifact_kind: report
     committed: true
 
-  - id: artifact-rendered-1742
-    type: artifact
-    title: Rendered archive path 1742_AEST
-    path: _site/archive/2026/07/08/1742_AEST.html
-    artifact_kind: rendered_proof
-    committed: false
-
   - id: artifact-report-2031
     type: artifact
     title: Deterministic report 2031_AEST
@@ -155,68 +104,22 @@ nodes:
     artifact_kind: report
     committed: true
 
-  - id: artifact-rendered-2031
-    type: artifact
-    title: Rendered archive path 2031_AEST
-    path: _site/archive/2026/07/08/2031_AEST.html
-    artifact_kind: rendered_proof
-    committed: false
-
-  - id: artifact-evidence-builder
-    type: artifact
-    title: Report PR evidence builder
-    path: scripts/build_report_pr_evidence.py
-    artifact_kind: script
-    committed: true
-
-  - id: artifact-scope-validator
-    type: artifact
-    title: Generated report scope validator
-    path: scripts/validate_generated_report_pr_scope.py
-    artifact_kind: script
-    committed: true
-
   - id: artifact-delivery-index
     type: artifact
     title: Delivery records index
-    path: docs/delivery/index.md
+    path: planning/delivery/index.md
     artifact_kind: documentation
     committed: true
 
   - id: problem-approval-gated-validation
     type: problem
     title: Generated PR validation can be approval-gated
-    summary: Generated PRs created by GitHub Actions using GITHUB_TOKEN can require downstream PR validation approval before proof is visible.
-
-  - id: decision-self-proof-before-pr
-    type: decision
-    title: Prove generated report before opening PR
-    summary: Keep GITHUB_TOKEN and make the generating workflow run validation, tests, site build, rendered-path proof, changed-file scope validation, and PR evidence construction before opening the generated PR.
+    summary: Generated PRs from automation can require downstream PR validation approval before proof is visible.
 
   - id: boundary-no-committed-site
     type: boundary
     title: No committed _site output
     summary: Generated _site output may be built for proof, but must remain disposable and uncommitted.
-
-  - id: boundary-no-credential-expansion
-    type: boundary
-    title: No GitHub App token or PAT
-    summary: Phase 3 deliberately avoided credential expansion and kept GitHub App tokens or PATs as a later option.
-
-  - id: boundary-no-llm-report-narrative
-    type: boundary
-    title: No LLM-generated report narrative
-    summary: Deterministic reports remain non-LLM generated in the proven flow.
-
-  - id: boundary-no-investment-advice
-    type: boundary
-    title: No investment advice
-    summary: Reports remain demo content and must not become recommendations, trading signals, investment research, or position guidance.
-
-  - id: lesson-source-snapshots-as-evidence
-    type: lesson
-    title: Treat source snapshots as immutable evidence
-    summary: Source ingestion, report generation, and site publication should remain separate, reviewable steps.
 
   - id: lesson-layered-validation
     type: lesson
@@ -235,11 +138,6 @@ edges:
     label: proved by
 
   - from: pr-89
-    to: run-28926128310
-    type: generated_by
-    label: generated by
-
-  - from: pr-89
     to: artifact-source-snapshot-1742
     type: produced
     label: produced
@@ -254,11 +152,6 @@ edges:
     type: enabled
     label: enabled
 
-  - from: phase-1
-    to: lesson-source-snapshots-as-evidence
-    type: carried_forward_to
-    label: carried forward
-
   - from: phase-2
     to: issue-90
     type: depends_on
@@ -270,24 +163,9 @@ edges:
     label: proved by
 
   - from: pr-104
-    to: run-28940526728
-    type: generated_by
-    label: generated by
-
-  - from: pr-104
-    to: run-28940544039
-    type: validated_by
-    label: validated by
-
-  - from: pr-104
     to: artifact-report-1742
     type: produced
     label: produced
-
-  - from: run-28940544039
-    to: artifact-rendered-1742
-    type: produced
-    label: proved rendered path
 
   - from: phase-2
     to: problem-approval-gated-validation
@@ -305,24 +183,9 @@ edges:
     label: governed by
 
   - from: phase-3
-    to: decision-self-proof-before-pr
-    type: resolved_by
-    label: resolved by
-
-  - from: decision-self-proof-before-pr
     to: pr-132
     type: proved_by
     label: proved by
-
-  - from: phase-3
-    to: pr-132
-    type: proved_by
-    label: proved by
-
-  - from: pr-132
-    to: issue-122
-    type: proved_by
-    label: closed proof issue
 
   - from: pr-132
     to: run-28999816016
@@ -339,35 +202,10 @@ edges:
     type: produced
     label: produced
 
-  - from: run-28999816016
-    to: artifact-rendered-2031
-    type: produced
-    label: proved rendered path
-
-  - from: phase-3
-    to: artifact-evidence-builder
-    type: implemented_by
-    label: implemented by
-
-  - from: phase-3
-    to: artifact-scope-validator
-    type: implemented_by
-    label: implemented by
-
   - from: phase-3
     to: pr-134
     type: closed_out_by
     label: closed out by
-
-  - from: pr-134
-    to: issue-123
-    type: recorded_by
-    label: recorded in
-
-  - from: pr-138
-    to: artifact-delivery-index
-    type: produced
-    label: produced
 
   - from: phase-1
     to: boundary-no-committed-site
@@ -381,21 +219,6 @@ edges:
 
   - from: phase-3
     to: boundary-no-committed-site
-    type: preserved
-    label: preserved
-
-  - from: phase-3
-    to: boundary-no-credential-expansion
-    type: preserved
-    label: preserved
-
-  - from: phase-3
-    to: boundary-no-llm-report-narrative
-    type: preserved
-    label: preserved
-
-  - from: phase-3
-    to: boundary-no-investment-advice
     type: preserved
     label: preserved
 

@@ -80,7 +80,7 @@ _site/archive/2026/07/08/1742_AEST.html       # rendered proof path only; not co
 - Raw Markdown reports remain the source of truth.
 - `_site/` remains generated/disposable and uncommitted.
 - No LLM-generated report narrative was introduced in this phase.
-- No investment advice, trading recommendations, trading signals, target prices, or position guidance were introduced.
+- No advice-like or recommendation-style report language was introduced.
 - No auto-publishing or auto-merge was introduced.
 - No secrets or paid API keys were introduced.
 

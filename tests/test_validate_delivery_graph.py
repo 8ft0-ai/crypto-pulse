@@ -49,7 +49,7 @@ VALID_GRAPH = {
 
 class DeliveryGraphValidationTests(unittest.TestCase):
     def test_repository_delivery_graph_is_valid(self) -> None:
-        result = validate_delivery_graph(ROOT / "docs" / "delivery" / "delivery.yaml")
+        result = validate_delivery_graph(ROOT / "planning" / "delivery" / "delivery.yaml")
         self.assertGreaterEqual(result.node_count, 3)
         self.assertGreaterEqual(result.edge_count, 3)
 

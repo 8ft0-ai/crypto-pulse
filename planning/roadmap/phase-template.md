@@ -2,7 +2,7 @@
 
 Status: shaping.
 
-This is a forward-looking roadmap spec. It should describe intended work before delivery. After the phase is delivered, close-out evidence should move into `docs/delivery/` as a completed delivery record.
+This is a forward-looking roadmap spec. It should describe intended work before delivery. After the phase is delivered, close-out evidence should move into `planning/delivery/` as a completed delivery record.
 
 ## Problem statement
 
@@ -69,8 +69,8 @@ The phase is complete when:
 - [ ] implementation PRs are merged;
 - [ ] the proof issue records concrete evidence;
 - [ ] close-out evidence is added to the parent issue;
-- [ ] the delivery record is added under `docs/delivery/`;
-- [ ] `docs/delivery-log.md` is updated if the phase should appear in the concise ledger;
+- [ ] the delivery record is added under `planning/delivery/`;
+- [ ] `planning/delivery-log.md` is updated if the phase should appear in the concise ledger;
 - [ ] generated `_site/` output is not committed.
 
 ## Follow-on delivery record
@@ -78,7 +78,7 @@ The phase is complete when:
 At close-out, create or update:
 
 ```text
-docs/delivery/phase-N-short-phase-name.md
+planning/delivery/phase-N-short-phase-name.md
 ```
 
 The completed delivery record should explain what actually shipped, what proved it, what artefacts were produced, and what boundaries were preserved.

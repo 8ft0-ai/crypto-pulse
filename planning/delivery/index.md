@@ -7,9 +7,10 @@ These files are not the canonical audit trail. The canonical audit trail remains
 ## Planning versus delivery
 
 ```text
-docs/roadmap/  -> active or future phase planning
-docs/delivery/ -> completed phase close-out records
-docs/delivery-log.md -> concise chronological ledger
+planning/roadmap/  -> active or future phase planning
+planning/delivery/ -> completed phase close-out records
+planning/delivery-log.md -> concise chronological ledger
+docs/              -> repository, product, and engineering docs
 ```
 
 A roadmap phase spec should explain intended work before delivery. A delivery record should explain what actually shipped, what proved it, what artefacts were produced, and what boundaries were preserved.
