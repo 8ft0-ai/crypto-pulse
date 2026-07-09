@@ -194,7 +194,7 @@ Phase 3 is complete when:
 - [x] a real generated report PR demonstrates source snapshot validation, report validation, tests, site build, rendered-path proof, changed-file scope proof, and `_site` exclusion before PR creation;
 - [x] downstream PR validation remains available as defence in depth;
 - [x] no GitHub App token, PAT, auto-merge, auto-publish, LLM narrative, investment advice, secrets, paid API keys, or committed `_site/` output are introduced;
-- [ ] close-out evidence is added to the parent issue and delivery log.
+- [x] close-out evidence is added to the parent issue and delivery log.
 
 ## Close-out proof
 
