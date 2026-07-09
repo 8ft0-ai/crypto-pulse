@@ -22,6 +22,8 @@ class DeterministicReportWorkflowEvidenceTests(unittest.TestCase):
             "Selected exchange cross-check:",
             "Report validation:",
             "Advice-language check:",
+            "Static site build:",
+            "Rendered archive path:",
             "Changed files:",
             "_site committed:",
             "Workflow run:",
@@ -49,6 +51,38 @@ class DeterministicReportWorkflowEvidenceTests(unittest.TestCase):
         self.assertIn(validator, self.body)
         self.assertLess(self.body.index(validator), self.body.index(evidence_step))
         self.assertLess(self.body.index(evidence_step), self.body.index(pr_step))
+
+    def test_workflow_runs_site_preview_before_evidence_and_pr_creation(self) -> None:
+        site_build_step = "- name: Build static site preview"
+        rendered_path_step = "- name: Verify rendered report preview"
+        evidence_step = "- name: Build PR evidence"
+        pr_step = "- name: Open generated report PR"
+        self.assertIn("python -m site_generator", self.body)
+        self.assertLess(self.body.index(site_build_step), self.body.index(rendered_path_step))
+        self.assertLess(self.body.index(rendered_path_step), self.body.index(evidence_step))
+        self.assertLess(self.body.index(evidence_step), self.body.index(pr_step))
+
+    def test_site_preview_proof_records_rendered_archive_path(self) -> None:
+        required_markers = [
+            "id: site_preview",
+            "rendered_archive_path=$rendered_path",
+            "RENDERED_ARCHIVE_PATH: ${{ steps.site_preview.outputs.rendered_archive_path }}",
+            "Rendered archive path:",
+            "Verified rendered report preview exists at",
+        ]
+        for marker in required_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.body)
+
+    def test_workflow_keeps_site_output_uncommitted(self) -> None:
+        required_markers = [
+            "$2 !~ /^_site\\//",
+            "Generated _site/ output must not be staged or committed.",
+            "git add reports/crypto",
+        ]
+        for marker in required_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.body)
 
     def test_advice_evidence_mentions_prohibited_language_classes(self) -> None:
         prohibited_markers = [
