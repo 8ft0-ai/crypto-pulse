@@ -64,38 +64,32 @@ class DeliveryGraphValidationTests(unittest.TestCase):
     def test_duplicate_node_id_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         graph["nodes"].append(deepcopy(graph["nodes"][0]))
-        with self.assertValidationFails(graph, "duplicate node id"):
-            pass
+        self.assert_validation_fails(graph, "duplicate node id")
 
     def test_missing_edge_endpoint_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         graph["edges"].append({"from": "phase-1", "to": "missing", "type": "produced"})
-        with self.assertValidationFails(graph, "missing target node"):
-            pass
+        self.assert_validation_fails(graph, "missing target node")
 
     def test_invalid_node_type_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         graph["nodes"][0]["type"] = "milestone"
-        with self.assertValidationFails(graph, "invalid node type"):
-            pass
+        self.assert_validation_fails(graph, "invalid node type")
 
     def test_invalid_edge_type_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         graph["edges"][0]["type"] = "points_sideways"
-        with self.assertValidationFails(graph, "invalid edge type"):
-            pass
+        self.assert_validation_fails(graph, "invalid edge type")
 
     def test_missing_required_field_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         del graph["nodes"][0]["summary"]
-        with self.assertValidationFails(graph, "missing required fields"):
-            pass
+        self.assert_validation_fails(graph, "missing required fields")
 
     def test_committed_site_artifact_fails(self) -> None:
         graph = deepcopy(VALID_GRAPH)
         graph["nodes"][2]["committed"] = True
-        with self.assertValidationFails(graph, "committed _site output"):
-            pass
+        self.assert_validation_fails(graph, "committed _site output")
 
     def test_cli_validates_repository_graph(self) -> None:
         result = subprocess.run(
@@ -107,25 +101,12 @@ class DeliveryGraphValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Delivery graph validation: passed", result.stdout)
 
-    def assertValidationFails(self, graph: dict, message: str):  # noqa: N802 - unittest helper style
-        test_case = self
-
-        class _ValidationContext:
-            def __enter__(self):
-                self.tmp = tempfile.TemporaryDirectory()
-                self.repo_root = Path(self.tmp.name)
-                self.graph_path = test_case.write_graph(self.repo_root, graph)
-                self.assertion = test_case.assertRaisesRegex(DeliveryGraphValidationError, message)
-                self.assertion.__enter__()
-                validate_delivery_graph(self.graph_path, repo_root=self.repo_root)
-
-            def __exit__(self, exc_type, exc, tb):
-                try:
-                    return self.assertion.__exit__(exc_type, exc, tb)
-                finally:
-                    self.tmp.cleanup()
-
-        return _ValidationContext()
+    def assert_validation_fails(self, graph: dict, message: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            graph_path = self.write_graph(repo_root, graph)
+            with self.assertRaisesRegex(DeliveryGraphValidationError, message):
+                validate_delivery_graph(graph_path, repo_root=repo_root)
 
     def write_graph(self, repo_root: Path, graph: dict) -> Path:
         import yaml
