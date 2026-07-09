@@ -53,7 +53,13 @@ Delivery notes:
 
 ## Phase 3 — Self-proving generated report PRs
 
-Status: not started.
+Status: shaping.
+
+Spec:
+
+```text
+docs/roadmap/phase-03-self-proving-generated-report-prs.md
+```
 
 Proposed direction: make generated report PRs self-proving before they are opened.
 
