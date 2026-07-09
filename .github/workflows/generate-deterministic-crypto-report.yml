@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install pyyaml markdown
 
       - name: Resolve source snapshot
         id: snapshot
@@ -101,11 +101,39 @@ jobs:
           set -euo pipefail
           python scripts/validate_crypto_report.py "$REPORT_PATH" --root .
 
+      - name: Build static site preview
+        run: |
+          set -euo pipefail
+          python -m site_generator
+
+      - name: Verify rendered report preview
+        id: site_preview
+        env:
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+
+          report_relative="${REPORT_PATH#reports/crypto/hourly/}"
+          if [[ "$report_relative" == "$REPORT_PATH" ]]; then
+            echo "Generated report path is outside reports/crypto/hourly: $REPORT_PATH" >&2
+            exit 1
+          fi
+
+          rendered_path="_site/archive/${report_relative%.md}.html"
+          if [[ ! -f "$rendered_path" ]]; then
+            echo "Expected rendered report preview does not exist: $rendered_path" >&2
+            exit 1
+          fi
+
+          echo "rendered_archive_path=$rendered_path" >> "$GITHUB_OUTPUT"
+          echo "Rendered report preview: $rendered_path"
+
       - name: Build PR evidence
         id: evidence
         env:
           SNAPSHOT_PATH: ${{ steps.snapshot.outputs.snapshot_path }}
           REPORT_PATH: ${{ steps.report.outputs.report_path }}
+          RENDERED_ARCHIVE_PATH: ${{ steps.site_preview.outputs.rendered_archive_path }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -121,6 +149,7 @@ jobs:
 
           snapshot_path = Path(os.environ["SNAPSHOT_PATH"])
           report_path = Path(os.environ["REPORT_PATH"])
+          rendered_archive_path = Path(os.environ["RENDERED_ARCHIVE_PATH"])
           snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
           config = load_config(Path("config/crypto_sources.yml"))
           quality = classify_snapshot_quality(snapshot, config)
@@ -166,6 +195,10 @@ jobs:
 
           Advice-language check: `passed` — deterministic report validator checked for prohibited advice-like language, including buy/sell/hold recommendations, target prices, trading signals, entry/exit points, stop-loss/take-profit language, and position guidance.
 
+          Static site build: `passed` — ran `python -m site_generator`.
+
+          Rendered archive path: `{rendered_archive_path.as_posix()}`
+
           Changed files:
           {bullet_list(changed_paths)}
 
@@ -189,6 +222,8 @@ jobs:
           - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()} --config config/crypto_sources.yml`.
           - Ran `python scripts/generate_crypto_report.py --snapshot {snapshot_path.as_posix()} --output-root reports/crypto --config config/crypto_sources.yml`.
           - Ran `python scripts/validate_crypto_report.py {report_path.as_posix()} --root .`.
+          - Ran `python -m site_generator`.
+          - Verified rendered report preview exists at `{rendered_archive_path.as_posix()}`.
           - Committed only raw Markdown report files under `reports/crypto/...`.
           - Did not commit generated `_site/` output.
 
@@ -224,8 +259,8 @@ jobs:
             exit 0
           fi
 
-          unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^reports\/crypto\// { print }')"
-          echo "Unexpected changes:"
+          unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^reports\/crypto\// && $2 !~ /^_site\// { print }')"
+          echo "Unexpected changes outside generated report files and disposable _site output:"
           if [[ -n "$unexpected_changes" ]]; then
             printf '%s\n' "$unexpected_changes"
             exit 1
@@ -257,6 +292,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/crypto
+          if git diff --cached --name-only | grep -E '^_site/'; then
+            echo "Generated _site/ output must not be staged or committed." >&2
+            exit 1
+          fi
           echo "Files staged for commit:"
           git diff --cached --name-only
           git commit -m "Add deterministic crypto report"
