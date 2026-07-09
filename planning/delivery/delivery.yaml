@@ -1,0 +1,228 @@
+schema_version: delivery-graph/v1
+
+nodes:
+  - id: phase-1
+    type: phase
+    title: Phase 1 — Source evidence spine
+    status: complete
+    summary: Scheduled ingestion can produce a scoped valid-ok source snapshot PR.
+    record: planning/delivery/phase-01-source-evidence-spine.md
+
+  - id: phase-2
+    type: phase
+    title: Phase 2 — Deterministic report review loop
+    status: complete
+    summary: A merged valid-ok source snapshot can produce a reviewed deterministic Markdown report PR and render through the static site generator without committing _site output.
+    record: planning/delivery/phase-02-deterministic-report-review-loop.md
+
+  - id: phase-3
+    type: phase
+    title: Phase 3 — Self-proving generated report PRs
+    status: complete
+    summary: Generated report PRs carry their own pre-PR proof, with downstream PR validation retained as defence in depth.
+    record: planning/delivery/phase-03-self-proving-generated-report-prs.md
+
+  - id: issue-75
+    type: issue
+    title: Build source evidence v1 and deterministic report spine
+    number: 75
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/75
+    status: closed
+
+  - id: issue-90
+    type: issue
+    title: Phase 2 — Prove deterministic report generation and review loop
+    number: 90
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/90
+    status: closed
+
+  - id: issue-115
+    type: issue
+    title: Phase 3 — Make generated report PRs self-proving
+    number: 115
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/115
+    status: closed
+
+  - id: pr-89
+    type: pull_request
+    title: Add crypto source snapshot 1742_AEST_source_snapshot
+    number: 89
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/89
+    status: merged
+
+  - id: pr-104
+    type: pull_request
+    title: Add deterministic crypto report 1742_AEST
+    number: 104
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/104
+    status: merged
+
+  - id: pr-132
+    type: pull_request
+    title: Add deterministic crypto report 2031_AEST
+    number: 132
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/132
+    status: merged
+
+  - id: pr-134
+    type: pull_request
+    title: Record Phase 3 close-out evidence
+    number: 134
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/134
+    status: merged
+
+  - id: run-28999816016
+    type: workflow_run
+    title: Self-proving report generation workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28999816016
+    conclusion: success
+
+  - id: run-29000320882
+    type: workflow_run
+    title: Phase 3 downstream PR validation
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29000320882
+    conclusion: success
+
+  - id: artifact-source-snapshot-1742
+    type: artifact
+    title: Source snapshot 1742_AEST
+    path: data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
+    artifact_kind: source_snapshot
+    committed: true
+
+  - id: artifact-report-1742
+    type: artifact
+    title: Deterministic report 1742_AEST
+    path: reports/crypto/hourly/2026/07/08/1742_AEST.md
+    artifact_kind: report
+    committed: true
+
+  - id: artifact-report-2031
+    type: artifact
+    title: Deterministic report 2031_AEST
+    path: reports/crypto/hourly/2026/07/08/2031_AEST.md
+    artifact_kind: report
+    committed: true
+
+  - id: artifact-delivery-index
+    type: artifact
+    title: Delivery records index
+    path: planning/delivery/index.md
+    artifact_kind: documentation
+    committed: true
+
+  - id: problem-approval-gated-validation
+    type: problem
+    title: Generated PR validation can be approval-gated
+    summary: Generated PRs from automation can require downstream PR validation approval before proof is visible.
+
+  - id: boundary-no-committed-site
+    type: boundary
+    title: No committed _site output
+    summary: Generated _site output may be built for proof, but must remain disposable and uncommitted.
+
+  - id: lesson-layered-validation
+    type: lesson
+    title: Treat pre-PR proof and downstream validation as layered controls
+    summary: Self-proofing makes generated PRs reviewable before downstream validation, but does not make downstream validation unnecessary.
+
+edges:
+  - from: issue-75
+    to: phase-1
+    type: implemented_by
+    label: controlled
+
+  - from: phase-1
+    to: pr-89
+    type: proved_by
+    label: proved by
+
+  - from: pr-89
+    to: artifact-source-snapshot-1742
+    type: produced
+    label: produced
+
+  - from: artifact-source-snapshot-1742
+    to: phase-2
+    type: enabled
+    label: enabled
+
+  - from: phase-1
+    to: phase-2
+    type: enabled
+    label: enabled
+
+  - from: phase-2
+    to: issue-90
+    type: depends_on
+    label: governed by
+
+  - from: phase-2
+    to: pr-104
+    type: proved_by
+    label: proved by
+
+  - from: pr-104
+    to: artifact-report-1742
+    type: produced
+    label: produced
+
+  - from: phase-2
+    to: problem-approval-gated-validation
+    type: revealed_problem
+    label: revealed problem
+
+  - from: problem-approval-gated-validation
+    to: phase-3
+    type: motivated
+    label: motivated
+
+  - from: phase-3
+    to: issue-115
+    type: depends_on
+    label: governed by
+
+  - from: phase-3
+    to: pr-132
+    type: proved_by
+    label: proved by
+
+  - from: pr-132
+    to: run-28999816016
+    type: generated_by
+    label: generated by
+
+  - from: pr-132
+    to: run-29000320882
+    type: validated_by
+    label: validated by
+
+  - from: pr-132
+    to: artifact-report-2031
+    type: produced
+    label: produced
+
+  - from: phase-3
+    to: pr-134
+    type: closed_out_by
+    label: closed out by
+
+  - from: phase-1
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-2
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: lesson-layered-validation
+    type: carried_forward_to
+    label: carried forward
