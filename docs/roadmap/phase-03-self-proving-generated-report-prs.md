@@ -1,8 +1,8 @@
 # Phase 3 — Self-proving generated report PRs
 
-Status: shaping.
+Status: complete.
 
-This specification defines Phase 3 before opening the full implementation issue tree. It should be treated as the design anchor for the next set of linked issues and PRs.
+This specification defined Phase 3 before opening the full implementation issue tree. It is now the close-out record for the completed Phase 3 delivery.
 
 ## Problem statement
 
@@ -36,7 +36,7 @@ GitHub App tokens may be reconsidered later if self-proofing is not sufficient, 
 
 ## Current workflow
 
-The current generated report flow is conceptually:
+The pre-Phase 3 generated report flow was conceptually:
 
 ```text
 manual workflow_dispatch
@@ -55,11 +55,11 @@ pull_request workflow
   -> verify expected build artefacts
 ```
 
-The weakness is that the second workflow can be approval-gated for PRs created by automation using `GITHUB_TOKEN`.
+The weakness was that the second workflow can be approval-gated for PRs created by automation using `GITHUB_TOKEN`.
 
 ## Target workflow
 
-The generated report workflow should become:
+The generated report workflow target was:
 
 ```text
 resolve source snapshot
@@ -188,32 +188,29 @@ Mitigation: explicitly keep GitHub App tokens and PATs out of Phase 3. Add crede
 
 Phase 3 is complete when:
 
-- the Phase 3 parent issue and linked child issues exist;
-- the generated report workflow runs the critical proof steps before opening a PR;
-- generated report PRs contain the self-proof evidence contract;
-- a real generated report PR demonstrates source snapshot validation, report validation, tests, site build, rendered-path proof, changed-file scope proof, and `_site` exclusion before PR creation;
-- downstream PR validation remains available as defence in depth;
-- no GitHub App token, PAT, auto-merge, auto-publish, LLM narrative, investment advice, secrets, paid API keys, or committed `_site/` output are introduced;
-- close-out evidence is added to the parent issue and delivery log.
+- [x] the Phase 3 parent issue and linked child issues exist;
+- [x] the generated report workflow runs the critical proof steps before opening a PR;
+- [x] generated report PRs contain the self-proof evidence contract;
+- [x] a real generated report PR demonstrates source snapshot validation, report validation, tests, site build, rendered-path proof, changed-file scope proof, and `_site` exclusion before PR creation;
+- [x] downstream PR validation remains available as defence in depth;
+- [x] no GitHub App token, PAT, auto-merge, auto-publish, LLM narrative, investment advice, secrets, paid API keys, or committed `_site/` output are introduced;
+- [x] close-out evidence is added to the parent issue and delivery log.
 
-## Follow-on issue plan
-
-After this spec merges, create the Phase 3 parent issue:
+## Close-out proof
 
 ```text
-Phase 3: Make generated report PRs self-proving
+Parent issue: #115
+Close-out issue: #123
+Implementation issues: #116, #117, #118, #119, #120, #121
+Proof issue: #122
+Key implementation PRs: #124, #125, #126, #129, #130, #131
+Generated report proof PR: #132
+Generated report workflow run: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28999816016
+Generated report path: reports/crypto/hourly/2026/07/08/2031_AEST.md
+Rendered archive path: _site/archive/2026/07/08/2031_AEST.html
+Downstream PR validation run: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29000320882
+Generated report merge commit: 5a77e5aa315f72c76363a7286396c67c8ec43405
+_site committed: no
 ```
 
-Then create linked child issues using the implementation slices above. Each child issue should include:
-
-```text
-Parent phase:
-Phase spec:
-Goal:
-Acceptance criteria:
-Evidence required:
-Dependencies:
-Out of scope:
-```
-
-Do not rely on native GitHub sub-issues. Use explicit parent references and linked issue checklists so the structure remains usable through the connector.
+Final close-out evidence is recorded in #115 and `docs/delivery-log.md` as part of #123.

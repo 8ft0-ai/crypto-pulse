@@ -53,35 +53,29 @@ Delivery notes:
 
 ## Phase 3 — Self-proving generated report PRs
 
-Status: shaping.
+Status: complete.
 
-Spec:
-
-```text
-docs/roadmap/phase-03-self-proving-generated-report-prs.md
-```
-
-Proposed direction: make generated report PRs self-proving before they are opened.
-
-Motivation from Phase 2:
+Primary outcome: generated report PRs now carry their own pre-PR proof from the report-generation workflow, with downstream PR validation retained as defence in depth.
 
 ```text
-Generated PRs created by GitHub Actions with GITHUB_TOKEN may leave downstream PR validation in an approval-required state.
+Parent issue: #115
+Close-out issue: #123
+Implementation issues: #116, #117, #118, #119, #120, #121
+Proof issue: #122
+Key implementation PRs: #124, #125, #126, #129, #130, #131
+Generated report proof PR: #132
+Generated report workflow run: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28999816016
+Generated report path: reports/crypto/hourly/2026/07/08/2031_AEST.md
+Rendered archive path: _site/archive/2026/07/08/2031_AEST.html
+Downstream PR validation run: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29000320882
+Generated report merge commit: 5a77e5aa315f72c76363a7286396c67c8ec43405
+_site committed: no
 ```
 
-Target outcome:
+Delivery notes:
 
-```text
-The report generation workflow performs the critical proof steps before opening the generated PR:
-- validate source snapshot
-- generate deterministic Markdown report
-- validate generated report
-- run relevant tests
-- build static site
-- prove rendered report path exists
-- inspect changed files
-- build complete PR evidence
-- open PR
-```
-
-Downstream PR validation should remain valuable, but it should be defence in depth rather than the only proof source.
+- Generated report PR bodies now use `scripts/build_report_pr_evidence.py` to render deterministic self-proof evidence.
+- The generated report workflow validates the source snapshot, generates the Markdown report, validates the generated report, runs unit tests, builds the static site, verifies the rendered archive path, inspects changed files, validates changed-file scope, builds PR evidence, and only then opens the generated report PR.
+- PR #132 proved the flow end to end using a `valid-ok` snapshot and changed exactly one raw Markdown report file.
+- Downstream PR validation still ran and passed as defence in depth.
+- Phase 3 did not introduce a GitHub App token, personal access token, auto-merge, auto-publish, committed `_site/` output, LLM-generated report narrative, investment advice, secrets, or paid API keys.
