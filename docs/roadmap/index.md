@@ -18,12 +18,13 @@ close-out comments              -> final proof trail
 
 Native GitHub sub-issues are optional. The connector can create and update issues, but cannot reliably create native sub-issue relationships, so parent/child structure should be explicit in Markdown and issue bodies.
 
-## Completed phases
+## Phases
 
 | Phase | Status | Primary outcome | Phase record |
 | --- | --- | --- | --- |
 | Phase 1 — Source evidence spine | Complete | Scheduled ingestion can produce a scoped `valid-ok` source snapshot PR. | [phase-01-source-evidence-spine.md](phase-01-source-evidence-spine.md) |
 | Phase 2 — Deterministic report review loop | Complete | A merged `valid-ok` source snapshot can produce a reviewed deterministic Markdown report PR and be rendered by the static site generator without committing `_site/`. | [phase-02-deterministic-report-review-loop.md](phase-02-deterministic-report-review-loop.md) |
+| Phase 3 — Self-proving generated report PRs | Shaping | Generated report PRs should carry their own proof before they are opened, with downstream PR validation retained as defence in depth. | [phase-03-self-proving-generated-report-prs.md](phase-03-self-proving-generated-report-prs.md) |
 
 ## Next phase direction
 
