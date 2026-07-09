@@ -101,6 +101,11 @@ jobs:
           set -euo pipefail
           python scripts/validate_crypto_report.py "$REPORT_PATH" --root .
 
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests
+
       - name: Build static site preview
         run: |
           set -euo pipefail
@@ -222,6 +227,7 @@ jobs:
           - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()} --config config/crypto_sources.yml`.
           - Ran `python scripts/generate_crypto_report.py --snapshot {snapshot_path.as_posix()} --output-root reports/crypto --config config/crypto_sources.yml`.
           - Ran `python scripts/validate_crypto_report.py {report_path.as_posix()} --root .`.
+          - Ran `python -m unittest discover -s tests`.
           - Ran `python -m site_generator`.
           - Verified rendered report preview exists at `{rendered_archive_path.as_posix()}`.
           - Committed only raw Markdown report files under `reports/crypto/...`.
@@ -276,6 +282,16 @@ jobs:
           branch="automation/deterministic-crypto-report-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate generated report changed-file scope
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          changed_files_path="$RUNNER_TEMP/generated-report-changed-files.txt"
+          git status --porcelain --untracked-files=all -- reports/crypto | awk '{ print $2 }' > "$changed_files_path"
+          python scripts/validate_generated_report_pr_scope.py --from-file "$changed_files_path"
 
       - name: Create automation branch
         if: steps.publish_context.outputs.should_publish == 'true'
