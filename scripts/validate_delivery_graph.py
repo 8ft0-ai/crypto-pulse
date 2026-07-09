@@ -212,8 +212,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "path",
         nargs="?",
-        default="docs/delivery/delivery.yaml",
-        help="Path to delivery graph YAML. Defaults to docs/delivery/delivery.yaml.",
+        default="planning/delivery/delivery.yaml",
+        help="Path to delivery graph YAML. Defaults to planning/delivery/delivery.yaml.",
     )
     return parser
 
