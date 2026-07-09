@@ -2,15 +2,35 @@
 
 Status: complete.
 
-This is a retrospective record. It does not replace the original issue, pull-request, or workflow history.
+This is a post-delivery record. It does not replace the original issue, pull-request, workflow-run, commit, or evidence-comment history.
 
-## Outcome
+## Primary outcome
+
+Scheduled ingestion can produce a scoped `valid-ok` source snapshot PR.
 
 Phase 1 established the source-evidence spine for CryptoPulse: the repository can archive crypto source snapshots as raw evidence under `data/crypto/hourly/...`, validate the snapshot, and review the generated source package through a scoped pull request.
 
-The most concrete proof point now carried forward is PR #89, which added the merged `valid-ok` source snapshot later used by Phase 2.
+The most concrete proof point carried forward is PR #89, which added the merged `valid-ok` source snapshot later used by Phase 2.
 
-## Key evidence
+## Parent issue
+
+```text
+#75 — Build source evidence v1 and deterministic report spine
+```
+
+## Linked issues / work breakdown
+
+```text
+#76, #77, #78, #79, #80, #81, #82
+```
+
+## Key PRs
+
+```text
+#89 — Add crypto source snapshot 1742_AEST_source_snapshot
+```
+
+## Final proof evidence
 
 ```text
 Source snapshot PR: #89
@@ -20,22 +40,29 @@ Snapshot quality: valid-ok
 Required sources: coingecko, defillama
 Selected exchange cross-check: coinbase_exchange
 Source snapshot PR merge commit: 178703aef4be8fc0ecf35677e1ffeffe7d4d4a52
+_site committed: no
 ```
 
-## What this phase proved
+## Produced artefacts
 
-- Source data can be captured as an auditable snapshot.
-- Snapshot validation can classify source quality before downstream report generation.
-- Snapshot PRs can be scoped to `data/crypto/hourly/...`.
-- Generated `_site/` output remains out of scope and uncommitted.
-- The no-secrets MVP can operate with public/no-key sources and explicitly record disabled or skipped sources.
+```text
+data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
+```
+
+## Validation evidence
+
+- Source data was captured as an auditable snapshot.
+- Snapshot validation classified source quality before downstream report generation.
+- The source snapshot PR was scoped to `data/crypto/hourly/...`.
+- Required source status and selected exchange cross-check were recorded.
+- Disabled or unavailable sources were recorded rather than hidden.
 
 ## Boundaries preserved
 
 - No Markdown market report was generated as part of the source snapshot PR.
 - No LLM call was required for source ingestion.
 - No generated `_site/` output was committed.
-- Disabled or unavailable sources were recorded rather than hidden.
+- No secrets or paid API keys were introduced.
 
 ## Carry-forward lesson
 
