@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from site_generator import accessibility
+from site_generator import accessibility, homepage_summary
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +42,7 @@ def add_search_and_quality(base: Any, search: Any) -> None:
     """Add search page, latest read, metadata chips, and data-quality panels."""
     search.copy_enhancement_assets()
     (base.OUT / "search.html").write_text(search.search_page(), encoding="utf-8")
+    search.latest_market_read_panel = lambda report: homepage_summary.latest_market_read_panel(report, search, base)
     search.add_latest_market_read_to_homepage()
     search.add_metadata_chips_to_report_cards()
     search.add_data_quality_panels_to_report_pages()
