@@ -15,6 +15,8 @@ class DeliveryGraphRendererTests(unittest.TestCase):
         markdown = render_delivery_graph(ROOT / "planning" / "delivery" / "delivery.yaml")
         required_markers = [
             "# CryptoPulse delivery graph",
+            "Baseline\\nPre-phase baseline",
+            "pre_phase_baseline -->|enabled formal phase delivery| phase_1",
             "Phase 1 — Source evidence spine",
             "Phase 2 — Deterministic report review loop",
             "Phase 3 — Self-proving generated report PRs",

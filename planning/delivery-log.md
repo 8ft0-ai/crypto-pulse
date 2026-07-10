@@ -2,6 +2,27 @@
 
 This log records completed CryptoPulse delivery phases in one place. It is a curated management record, not a replacement for the canonical GitHub issue, pull-request, commit, and workflow history.
 
+## Pre-phase baseline — before formal Phase 1
+
+Status: complete.
+
+Primary outcome: useful early repository history is preserved without rewriting it as a formal delivery phase.
+
+```text
+Baseline record: planning/delivery/pre-phase-baseline.md
+Representative foundational issues: #1, #6, #7, #8, #44, #45, #63, #64, #65
+Representative foundational PRs: #2, #3, #4, #5, #9, #12, #13, #46, #51, #69, #71
+Representative process-learning issues/PRs: #11/#14, #21/#22, #27/#28, #36/#37/#38
+Graph edge: pre-phase-baseline -> phase-1, enabled formal phase delivery
+_site committed: no
+```
+
+Delivery notes:
+
+- Phase 1 remains the first formal phase-managed delivery phase.
+- The pre-phase baseline captures early demo positioning, site UX, repository guidance, PR discipline, ingestion MVP work, scheduled ingestion automation, and snapshot quality hardening.
+- The delivery graph intentionally models this as one compact baseline node rather than a node for every early PR.
+
 ## Phase 1 — Source evidence spine
 
 Status: complete.

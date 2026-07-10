@@ -55,6 +55,8 @@ def _node_label(node: dict[str, Any]) -> str:
     node_type = str(node["type"]).replace("_", " ").title()
     title = str(node["title"])
 
+    if node["type"] == "baseline":
+        return f"Baseline\\n{title}"
     if node["type"] == "phase":
         return f"Phase\\n{title}"
     if node["type"] == "pull_request":
