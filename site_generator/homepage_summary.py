@@ -1,6 +1,6 @@
 """Schema-aware rendering for the homepage latest-report summary.
 
-The report archive contains multiple report formats.  This adapter keeps the
+The report archive contains multiple report formats. This adapter keeps the
 homepage useful without promoting product-boundary boilerplate or rendering
 retired fields as repeated placeholders.
 """
@@ -16,9 +16,12 @@ BOILERPLATE_PATTERNS = (
     r"\bnot financial advice\b",
     r"\bfor demonstration purposes only\b",
     r"\bdemo(?:nstration)? content\b",
+    r"\bdeterministic demonstration content\b",
     r"\bdoes not constitute (?:financial|investment) advice\b",
     r"\bno investment advice\b",
     r"\bnot live verified market data\b",
+    r"\bshould not be used for (?:trading|investing|risk decisions)\b",
+    r"\bcall to buy, sell, or hold\b",
 )
 
 PLACEHOLDER_PATTERNS = (
@@ -58,6 +61,23 @@ def first_meaningful(values: list[str]) -> str:
         if is_meaningful(value):
             return value.strip()
     return ""
+
+
+def safe_headline(body: str, extracted: str) -> str:
+    """Return a non-boilerplate headline for shared homepage/archive surfaces."""
+    if is_meaningful(extracted):
+        return extracted.strip()
+
+    candidates: list[str] = []
+    for raw_line in body.splitlines():
+        line = raw_line.strip().strip("* ")
+        if not line or line.startswith(("#", "|", "---")):
+            continue
+        if re.match(r"^(source|generated|timestamp|report id)\s*:", line, re.IGNORECASE):
+            continue
+        candidates.append(line)
+
+    return first_meaningful(candidates) or "Deterministic source-snapshot evidence report."
 
 
 def _section_summary(body: str, search: Any) -> str:
@@ -106,7 +126,7 @@ def latest_market_read_panel(report: Any, search: Any, base: Any) -> str:
     data_quality = search.extract_data_quality(body, metadata)
     if not is_meaningful(data_quality):
         live_status = str(metadata.get("live_data_status") or "").strip()
-        data_quality = f"Live data status: {live_status}" if live_status else "See the source report for provenance and data-quality detail."
+        data_quality = f"Live data status: {live_status}" if live_status and is_meaningful(live_status) else "See the source report for provenance and data-quality detail."
 
     cards: list[str] = []
     if primary_summary:
