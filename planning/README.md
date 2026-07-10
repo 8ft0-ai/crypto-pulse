@@ -6,6 +6,18 @@ It is separate from `docs/` on purpose. `docs/` should contain repository, produ
 
 The GitHub issue, pull-request, workflow-run, commit, and evidence-comment history remains the canonical audit trail. These planning files are a curated navigation layer over that history.
 
+## Start here
+
+For a future reader, use this order:
+
+```text
+planning/README.md              -> orientation and operating rules
+planning/roadmap/index.md       -> planning intent and phase specs
+planning/delivery/index.md      -> completed delivery records and graph guidance
+planning/delivery-log.md        -> concise chronological ledger
+planning/delivery/graph.md      -> visual causal map
+```
+
 ## Structure
 
 ```text
