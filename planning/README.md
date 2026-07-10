@@ -58,6 +58,14 @@ It renders to:
 planning/delivery/graph.md
 ```
 
+The graph explains causality and proof. It should show why the system changed direction, what proved a phase, what artefacts became dependencies, and what boundaries or lessons carried forward. It is not a complete issue or pull-request inventory, and it must not replace GitHub history.
+
+For modelling policy, see:
+
+```text
+planning/delivery/graph-modelling-rules.md
+```
+
 Validate the graph with:
 
 ```bash
