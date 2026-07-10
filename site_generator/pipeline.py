@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from site_generator import accessibility, homepage_summary, report_provenance
+from site_generator import accessibility, homepage_hierarchy, homepage_summary, report_provenance
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,10 +97,11 @@ def build() -> None:
     add_mobile_and_product_ux(mobile)
     add_brief_and_sources(brief)
     report_provenance.apply(base)
+    homepage_hierarchy.apply(base)
     add_archive_filters(filters)
     add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with provenance-first report pages, search, data-quality, mobile UX, brief, source-card, archive-filter, and accessibility enhancements.")
+    print("Built CryptoPulse site with provenance-first report pages, hierarchy-led homepage, search, data-quality, mobile UX, brief, source-card, archive-filter, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
