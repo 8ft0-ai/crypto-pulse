@@ -71,7 +71,22 @@ The phase is complete when:
 - [ ] close-out evidence is added to the parent issue;
 - [ ] the delivery record is added under `planning/delivery/`;
 - [ ] `planning/delivery-log.md` is updated if the phase should appear in the concise ledger;
+- [ ] `planning/delivery/delivery.yaml` is updated, or explicitly marked not applicable;
+- [ ] `planning/delivery/graph.md` is regenerated when `delivery.yaml` changes;
+- [ ] `planning/roadmap/` is updated only if roadmap intent, scope, acceptance gates, or next-phase direction changed;
 - [ ] generated `_site/` output is not committed.
+
+## Close-out PR checklist
+
+For the PR that closes this phase:
+
+- [ ] Update `planning/delivery/<phase>.md`.
+- [ ] Update `planning/delivery-log.md`.
+- [ ] Update `planning/delivery/delivery.yaml`.
+- [ ] Regenerate `planning/delivery/graph.md`.
+- [ ] Update `planning/roadmap/` only if roadmap intent or next-phase direction changed.
+- [ ] Confirm raw Markdown reports remain the source of truth.
+- [ ] Confirm generated `_site/` output is not committed.
 
 ## Follow-on delivery record
 
