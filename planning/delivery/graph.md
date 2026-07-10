@@ -6,6 +6,7 @@ The graph is a curated navigation layer over GitHub issues, pull requests, workf
 
 ```mermaid
 flowchart LR
+  pre_phase_baseline["Baseline\nPre-phase baseline"]
   phase_1["Phase\nPhase 1 — Source evidence spine"]
   phase_2["Phase\nPhase 2 — Deterministic report review loop"]
   phase_3["Phase\nPhase 3 — Self-proving generated report PRs"]
@@ -26,6 +27,7 @@ flowchart LR
   boundary_no_committed_site["Boundary\nNo committed _site output"]
   lesson_layered_validation["Lesson\nTreat pre-PR proof and downstream validation as layered controls"]
 
+  pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
   phase_1 -->|proved by| pr_89
   pr_89 -->|produced| artifact_source_snapshot_1742
