@@ -73,6 +73,12 @@
   background: #fef2f2;
 }
 
+/* The unavailable badge uses a tinted background; darken its compact label
+   so normal-size text clears the WCAG AA 4.5:1 contrast threshold. */
+.data-quality-unavailable span {
+  color: #5f6f85;
+}
+
 @media (max-width: 720px) {
   .report-data-quality-panel {
     grid-template-columns: 1fr;
