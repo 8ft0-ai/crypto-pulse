@@ -26,6 +26,8 @@ A roadmap phase spec should explain intended work before delivery. A delivery re
 
 Phase 1 remains the first formal phase-managed delivery phase. The pre-phase baseline is a historical record, not Phase 0.
 
+Post-Phase 3 operating-model tidy-ups are tracked in the concise ledger rather than as separate phase records because they stabilise the operating model without creating a new delivery phase.
+
 ## Structured delivery graph
 
 The completed delivery history also has a small structured graph layer:
@@ -78,7 +80,7 @@ The shape is a guide rather than a rigid template. The record should stay readab
 
 ## Concise delivery ledger
 
-For a compact chronological summary of completed phases, see:
+For a compact chronological summary of completed phases and post-phase operating-model tidy-ups, see:
 
 ```text
 ../delivery-log.md
