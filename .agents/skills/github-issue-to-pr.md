@@ -43,6 +43,37 @@ Stop early only for a hard safety issue, unsafe repository state, truncated larg
 
 Do not open placeholder, CSS-only, or partial PRs unless explicitly requested by the user.
 
+## Planning close-out discipline
+
+`planning/` is the repository planning control surface. It is separate from `docs/`, which is for repository, product, and engineering documentation.
+
+Small non-phase PRs do not need to update planning records unless they materially change the roadmap, delivery history, or planning model.
+
+A PR that closes a delivery phase must update, or explicitly mark as not applicable, these planning assets:
+
+```text
+planning/delivery/<phase>.md
+planning/delivery-log.md
+planning/delivery/delivery.yaml
+planning/delivery/graph.md
+```
+
+The delivery graph is generated output from the YAML metadata. When `planning/delivery/delivery.yaml` changes, regenerate and commit the graph:
+
+```bash
+python scripts/render_delivery_graph.py
+python scripts/validate_delivery_graph.py
+```
+
+Update roadmap files only when planning intent changes. Examples include new phase direction, changed phase scope, changed acceptance gates, or a new future roadmap spec:
+
+```text
+planning/roadmap/index.md
+planning/roadmap/<phase-or-next-phase>.md
+```
+
+Do not move raw report truth into planning records. Raw Markdown reports remain the source of truth, and generated `_site/` output remains disposable and must not be committed.
+
 ## PR body checklist
 
 Every issue PR should include:
@@ -53,6 +84,8 @@ Every issue PR should include:
 - an acceptance criteria checklist;
 - verification notes;
 - limitations, especially if the preferred patch workflow could not be used.
+
+For phase close-out PRs, also include evidence that the relevant planning delivery record, delivery log, delivery YAML, and generated graph were updated or explicitly marked not applicable.
 
 ## Superseding bad PRs
 
