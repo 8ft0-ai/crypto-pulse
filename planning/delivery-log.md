@@ -100,3 +100,27 @@ Delivery notes:
 - PR #132 proved the flow end to end using a `valid-ok` snapshot and changed exactly one raw Markdown report file.
 - Downstream PR validation still ran and passed as defence in depth.
 - Phase 3 did not introduce a GitHub App token, personal access token, auto-merge, auto-publish, committed `_site/` output, LLM-generated report narrative, investment advice, secrets, or paid API keys.
+
+## Post-Phase 3 operating-model tidy-ups
+
+Status: complete.
+
+Primary outcome: the demo keeps running with less review inventory, and the planning layer now has explicit close-out and graph-modelling rules.
+
+```text
+Rolling source snapshot PR issue: #149
+Rolling source snapshot PR: #152
+Planning close-out guidance issue: #150
+Planning close-out guidance PR: #154
+Delivery graph modelling rules issue: #151
+Delivery graph modelling rules PR: #155
+Rolling source snapshot branch: automation/source-snapshot-rolling
+Rolling source snapshot PR title: Update rolling crypto source snapshot
+_site committed: no
+```
+
+Delivery notes:
+
+- #149 changed scheduled ingestion from creating a new generated snapshot PR every run to updating one rolling source snapshot PR.
+- #150 codified that phase close-out PRs must update the relevant planning delivery record, delivery log, delivery YAML, and generated graph where applicable.
+- #151 documented that the delivery graph is a compact causal map, not a complete issue or PR inventory.

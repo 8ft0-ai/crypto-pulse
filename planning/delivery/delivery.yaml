@@ -50,12 +50,34 @@ nodes:
     url: https://github.com/8ft0-ai/crypto-pulse/issues/115
     status: closed
 
+  - id: issue-122
+    type: issue
+    title: Prove end-to-end self-proving generated report flow
+    number: 122
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/122
+    status: closed
+
+  - id: issue-123
+    type: issue
+    title: Phase 3 close-out evidence
+    number: 123
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/123
+    status: closed
+
+  - id: issue-149
+    type: issue
+    title: Use a rolling source snapshot PR for scheduled ingestion
+    number: 149
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/149
+    status: closed
+
   - id: pr-89
     type: pull_request
     title: Add crypto source snapshot 1742_AEST_source_snapshot
     number: 89
     url: https://github.com/8ft0-ai/crypto-pulse/pull/89
     status: merged
+    merge_commit: 178703aef4be8fc0ecf35677e1ffeffe7d4d4a52
 
   - id: pr-104
     type: pull_request
@@ -63,6 +85,7 @@ nodes:
     number: 104
     url: https://github.com/8ft0-ai/crypto-pulse/pull/104
     status: merged
+    merge_commit: f6083aff44377b6819ce66d56da848e289124eb8
 
   - id: pr-132
     type: pull_request
@@ -70,6 +93,7 @@ nodes:
     number: 132
     url: https://github.com/8ft0-ai/crypto-pulse/pull/132
     status: merged
+    merge_commit: 5a77e5aa315f72c76363a7286396c67c8ec43405
 
   - id: pr-134
     type: pull_request
@@ -77,6 +101,33 @@ nodes:
     number: 134
     url: https://github.com/8ft0-ai/crypto-pulse/pull/134
     status: merged
+    merge_commit: 06039f42d3b4eb20889c7fafe4d983a1f2dde3f1
+
+  - id: pr-152
+    type: pull_request
+    title: Use rolling source snapshot PR for ingestion
+    number: 152
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/152
+    status: merged
+    merge_commit: d6567af92330aed9ff75636b2d6286488450f413
+
+  - id: run-28926128310
+    type: workflow_run
+    title: Source snapshot workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28926128310
+    conclusion: success
+
+  - id: run-28940526728
+    type: workflow_run
+    title: Deterministic report generation workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940526728
+    conclusion: success
+
+  - id: run-28940544039
+    type: workflow_run
+    title: Phase 2 downstream PR validation
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940544039
+    conclusion: success
 
   - id: run-28999816016
     type: workflow_run
@@ -104,11 +155,39 @@ nodes:
     artifact_kind: report
     committed: true
 
+  - id: artifact-rendered-1742
+    type: artifact
+    title: Rendered archive path 1742_AEST
+    path: _site/archive/2026/07/08/1742_AEST.html
+    artifact_kind: rendered_proof
+    committed: false
+
   - id: artifact-report-2031
     type: artifact
     title: Deterministic report 2031_AEST
     path: reports/crypto/hourly/2026/07/08/2031_AEST.md
     artifact_kind: report
+    committed: true
+
+  - id: artifact-rendered-2031
+    type: artifact
+    title: Rendered archive path 2031_AEST
+    path: _site/archive/2026/07/08/2031_AEST.html
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: artifact-evidence-builder
+    type: artifact
+    title: Report PR evidence builder
+    path: scripts/build_report_pr_evidence.py
+    artifact_kind: script
+    committed: true
+
+  - id: artifact-scope-validator
+    type: artifact
+    title: Generated report scope validator
+    path: scripts/validate_generated_report_pr_scope.py
+    artifact_kind: script
     committed: true
 
   - id: artifact-delivery-index
@@ -123,10 +202,45 @@ nodes:
     title: Generated PR validation can be approval-gated
     summary: Generated PRs from automation can require downstream PR validation approval before proof is visible.
 
+  - id: problem-snapshot-pr-backlog
+    type: problem
+    title: Generated snapshot PR backlog
+    summary: Scheduled ingestion originally opened a new generated source snapshot PR each run, creating review inventory faster than the demo needed.
+
+  - id: decision-self-proof-before-pr
+    type: decision
+    title: Prove generated report before opening PR
+    summary: Keep the existing workflow identity and make the generating workflow run validation, tests, site build, rendered-path proof, changed-file scope validation, and PR evidence construction before opening the generated PR.
+
+  - id: decision-rolling-source-snapshot-pr
+    type: decision
+    title: Use one rolling source snapshot PR
+    summary: Keep the scheduled ingestion demo running while updating a stable rolling branch and PR instead of opening a new snapshot PR every run.
+
   - id: boundary-no-committed-site
     type: boundary
     title: No committed _site output
     summary: Generated _site output may be built for proof, but must remain disposable and uncommitted.
+
+  - id: boundary-no-credential-expansion
+    type: boundary
+    title: No credential expansion
+    summary: Phase 3 deliberately avoided expanding repository credentials.
+
+  - id: boundary-no-llm-report-narrative
+    type: boundary
+    title: No LLM-generated report narrative
+    summary: Deterministic reports remain non-LLM generated in the proven flow.
+
+  - id: boundary-no-advice-like-content
+    type: boundary
+    title: No advice-like report content
+    summary: Reports remain demo content and must not become recommendations or trading guidance.
+
+  - id: lesson-source-snapshots-as-evidence
+    type: lesson
+    title: Treat source snapshots as immutable evidence
+    summary: Source ingestion, report generation, and site publication should remain separate, reviewable steps.
 
   - id: lesson-layered-validation
     type: lesson
@@ -150,6 +264,11 @@ edges:
     label: proved by
 
   - from: pr-89
+    to: run-28926128310
+    type: generated_by
+    label: generated by
+
+  - from: pr-89
     to: artifact-source-snapshot-1742
     type: produced
     label: produced
@@ -164,6 +283,11 @@ edges:
     type: enabled
     label: enabled
 
+  - from: phase-1
+    to: lesson-source-snapshots-as-evidence
+    type: carried_forward_to
+    label: carried forward
+
   - from: phase-2
     to: issue-90
     type: depends_on
@@ -175,9 +299,24 @@ edges:
     label: proved by
 
   - from: pr-104
+    to: run-28940526728
+    type: generated_by
+    label: generated by
+
+  - from: pr-104
+    to: run-28940544039
+    type: validated_by
+    label: validated by
+
+  - from: pr-104
     to: artifact-report-1742
     type: produced
     label: produced
+
+  - from: run-28940544039
+    to: artifact-rendered-1742
+    type: produced
+    label: proved rendered path
 
   - from: phase-2
     to: problem-approval-gated-validation
@@ -195,9 +334,24 @@ edges:
     label: governed by
 
   - from: phase-3
+    to: decision-self-proof-before-pr
+    type: resolved_by
+    label: resolved by
+
+  - from: decision-self-proof-before-pr
     to: pr-132
     type: proved_by
     label: proved by
+
+  - from: phase-3
+    to: pr-132
+    type: proved_by
+    label: proved by
+
+  - from: pr-132
+    to: issue-122
+    type: proved_by
+    label: closed proof issue
 
   - from: pr-132
     to: run-28999816016
@@ -214,10 +368,55 @@ edges:
     type: produced
     label: produced
 
+  - from: run-28999816016
+    to: artifact-rendered-2031
+    type: produced
+    label: proved rendered path
+
+  - from: phase-3
+    to: artifact-evidence-builder
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-3
+    to: artifact-scope-validator
+    type: implemented_by
+    label: implemented by
+
   - from: phase-3
     to: pr-134
     type: closed_out_by
     label: closed out by
+
+  - from: pr-134
+    to: issue-123
+    type: recorded_by
+    label: recorded in
+
+  - from: phase-1
+    to: problem-snapshot-pr-backlog
+    type: carried_forward_to
+    label: exposed operating friction
+
+  - from: problem-snapshot-pr-backlog
+    to: decision-rolling-source-snapshot-pr
+    type: motivated
+    label: motivated
+
+  - from: decision-rolling-source-snapshot-pr
+    to: pr-152
+    type: implemented_by
+    label: implemented by
+
+  - from: pr-152
+    to: issue-149
+    type: recorded_by
+    label: closed issue
+
+  - from: pr-152
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
 
   - from: phase-1
     to: boundary-no-committed-site
@@ -231,6 +430,21 @@ edges:
 
   - from: phase-3
     to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-credential-expansion
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-llm-report-narrative
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-advice-like-content
     type: preserved
     label: preserved
 
