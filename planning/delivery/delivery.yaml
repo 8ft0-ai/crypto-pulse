@@ -1,6 +1,13 @@
 schema_version: delivery-graph/v1
 
 nodes:
+  - id: pre-phase-baseline
+    type: baseline
+    title: Pre-phase baseline
+    status: complete
+    summary: Early repository history before formal phase-managed delivery, including demo positioning, site UX, process hardening, ingestion MVP work, scheduled ingestion automation, and snapshot quality hardening.
+    record: planning/delivery/pre-phase-baseline.md
+
   - id: phase-1
     type: phase
     title: Phase 1 — Source evidence spine
@@ -127,6 +134,11 @@ nodes:
     summary: Self-proofing makes generated PRs reviewable before downstream validation, but does not make downstream validation unnecessary.
 
 edges:
+  - from: pre-phase-baseline
+    to: phase-1
+    type: enabled
+    label: enabled formal phase delivery
+
   - from: issue-75
     to: phase-1
     type: implemented_by
