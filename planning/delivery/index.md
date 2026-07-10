@@ -1,6 +1,6 @@
 # CryptoPulse delivery records
 
-This directory contains post-delivery records for completed CryptoPulse phases.
+This directory contains post-delivery records for completed CryptoPulse phases and the pre-phase baseline that existed before formal phase-managed delivery started.
 
 These files are not the canonical audit trail. The canonical audit trail remains the GitHub issue, pull-request, workflow-run, commit, and evidence-comment history. The delivery records are a curated management layer that makes completed work easier to understand without reconstructing it from GitHub history alone.
 
@@ -15,13 +15,16 @@ docs/              -> repository, product, and engineering docs
 
 A roadmap phase spec should explain intended work before delivery. A delivery record should explain what actually shipped, what proved it, what artefacts were produced, and what boundaries were preserved.
 
-## Completed phases
+## Baseline and completed phases
 
-| Phase | Primary outcome | Delivery record |
+| Record | Primary outcome | Delivery record |
 | --- | --- | --- |
+| Pre-phase baseline | Preserves useful early repository history before formal phase-managed delivery, without pretending it was planned as a phase. | [pre-phase-baseline.md](pre-phase-baseline.md) |
 | Phase 1 — Source evidence spine | Scheduled ingestion can produce a scoped `valid-ok` source snapshot PR. | [phase-01-source-evidence-spine.md](phase-01-source-evidence-spine.md) |
 | Phase 2 — Deterministic report review loop | A merged `valid-ok` source snapshot can produce a reviewed deterministic Markdown report PR and render through the static site generator without committing `_site/`. | [phase-02-deterministic-report-review-loop.md](phase-02-deterministic-report-review-loop.md) |
 | Phase 3 — Self-proving generated report PRs | Generated report PRs carry their own pre-PR proof, with downstream PR validation retained as defence in depth. | [phase-03-self-proving-generated-report-prs.md](phase-03-self-proving-generated-report-prs.md) |
+
+Phase 1 remains the first formal phase-managed delivery phase. The pre-phase baseline is a historical record, not Phase 0.
 
 ## Structured delivery graph
 
