@@ -96,7 +96,11 @@ pre-phase-baseline -> phase-1
 label: enabled formal phase delivery
 ```
 
-The detailed early inventory belongs in this Markdown record, not in the graph.
+The detailed early inventory belongs in this Markdown record, not in the graph. For the general modelling policy, see:
+
+```text
+graph-modelling-rules.md
+```
 
 ## Boundaries preserved
 
