@@ -21,6 +21,26 @@ def meaningful(value: object) -> bool:
     return bool(text) and text not in MISSING and "not specified" not in text
 
 
+def plausible_metric_value(value: object) -> bool:
+    """Return whether an extracted BTC/ETH slot looks like a numeric market value.
+
+    Legacy tables are not schema-consistent. A simple digit check is too weak because
+    category labels such as ``ETH, L2s, DeFi majors`` also contain digits. Valid
+    values must contain a digit and begin like a signed number, approximation,
+    currency value, or the legacy ``Flat to`` range form.
+    """
+    text = clean(value)
+    if not meaningful(text) or not re.search(r"\d", text):
+        return False
+    return bool(
+        re.match(
+            r"^(?:~\s*)?(?:approx(?:imately)?\s+)?(?:flat\s+to\s+)?(?:[-+]?\s*)?(?:US\$|USD\s*)?(?:\d|\.\d)",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
 def table_cells(line: str) -> list[str]:
     return [clean(cell) for cell in line.strip().strip("|").split("|")]
 
@@ -38,9 +58,9 @@ def asset_changes(body: str, symbol: str) -> dict[str, str]:
             continue
         one_hour_index, day_index = ((2, 3) if asset_index == 0 else (asset_index + 2, asset_index + 3))
         result: dict[str, str] = {}
-        if one_hour_index < len(cells) and re.search(r"[-+]?\d", cells[one_hour_index]):
+        if one_hour_index < len(cells) and plausible_metric_value(cells[one_hour_index]):
             result["1h"] = cells[one_hour_index]
-        if day_index < len(cells) and re.search(r"[-+]?\d", cells[day_index]):
+        if day_index < len(cells) and plausible_metric_value(cells[day_index]):
             result["24h"] = cells[day_index]
         if result:
             return result
@@ -70,7 +90,7 @@ def report_metrics(report: Any, base: Any) -> list[tuple[str, str, str]]:
         changes = asset_changes(body, symbol)
         value = changes.get("24h") or changes.get("1h")
         period = "24h" if changes.get("24h") else "1h"
-        if value and meaningful(value):
+        if value and plausible_metric_value(value):
             direction = "up" if value.lstrip().startswith("+") else "down" if value.lstrip().startswith("-") else "flat"
             metrics.append((f"{symbol} {period}", value, direction))
     quality = data_quality(metadata, body)
