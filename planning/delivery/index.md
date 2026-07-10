@@ -37,6 +37,14 @@ graph.md      -> generated Mermaid graph for GitHub review
 
 Use the graph to navigate why phases happened, what each phase produced, and which issues, PRs, workflow runs, artefacts, boundaries, and lessons are connected.
 
+The graph is a compact causal map. It is not a complete issue or pull-request inventory and should not model every generated snapshot PR, every small implementation PR, or every early pre-phase PR individually.
+
+For the modelling policy, see:
+
+```text
+graph-modelling-rules.md
+```
+
 The graph is validated by:
 
 ```bash
