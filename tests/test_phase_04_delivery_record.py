@@ -19,7 +19,7 @@ def test_phase_04_delivery_record_captures_required_evidence() -> None:
         "29083425572",
         "29084860287",
         "https://8ft0-ai.github.io/crypto-pulse/",
-        "_site/ remains generated and uncommitted",
+        "`_site/` remains generated and uncommitted",
         "Delivery graph update: N/A",
     ):
         assert value in text
