@@ -22,6 +22,28 @@ After a phase is complete, record what actually shipped in `planning/delivery/`.
 
 Keep `planning/delivery-log.md` concise. It is the chronological ledger, not the full narrative record.
 
+## Phase close-out checklist
+
+A PR that closes a delivery phase should update, or explicitly mark as not applicable, the following planning assets:
+
+```text
+planning/delivery/<phase>.md
+planning/delivery-log.md
+planning/delivery/delivery.yaml
+planning/delivery/graph.md
+```
+
+If the phase changes future direction, also update the relevant roadmap files:
+
+```text
+planning/roadmap/index.md
+planning/roadmap/<phase-or-next-phase>.md
+```
+
+Do not update roadmap specs for every small implementation PR. Use roadmap updates when planning intent, scope, acceptance gates, or next-phase direction changes. Use delivery updates when recording what actually shipped.
+
+Raw Markdown reports remain the source of truth. Generated `_site/` output remains disposable and must not be committed.
+
 ## Delivery graph
 
 The structured delivery graph lives in:
@@ -47,3 +69,5 @@ Regenerate the Mermaid graph with:
 ```bash
 python scripts/render_delivery_graph.py
 ```
+
+When `planning/delivery/delivery.yaml` changes, `planning/delivery/graph.md` must be regenerated and committed in the same PR.

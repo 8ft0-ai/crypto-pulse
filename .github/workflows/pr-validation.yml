@@ -11,6 +11,7 @@ on:
       - "scripts/**"
       - ".github/workflows/**"
       - "docs/**"
+      - "planning/**"
       - "README.md"
       - "tests/**"
       - "config/**"
