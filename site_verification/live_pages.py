@@ -45,6 +45,36 @@ def accessible_name_missing(role_text: str, aria_label: str | None, title: str |
     return not any((role_text or "").strip() for role_text in (role_text, aria_label or "", title or ""))
 
 
+def normalise_axe_results(raw: dict[str, Any]) -> dict[str, Any]:
+    """Preserve actionable Axe rule and node evidence in a stable JSON shape."""
+    violations: list[dict[str, Any]] = []
+    for violation in raw.get("violations", []):
+        nodes: list[dict[str, Any]] = []
+        for node in violation.get("nodes", []):
+            nodes.append(
+                {
+                    "target": node.get("target", []),
+                    "html": node.get("html", ""),
+                    "failureSummary": node.get("failureSummary", ""),
+                    "foreground": node.get("foreground"),
+                    "background": node.get("background"),
+                    "fontSize": node.get("fontSize"),
+                    "fontWeight": node.get("fontWeight"),
+                }
+            )
+        violations.append(
+            {
+                "id": violation.get("id", ""),
+                "impact": violation.get("impact"),
+                "description": violation.get("description", ""),
+                "help": violation.get("help", ""),
+                "helpUrl": violation.get("helpUrl", ""),
+                "nodes": nodes,
+            }
+        )
+    return {"violations": violations}
+
+
 def _goto_with_retry(page: Any, url: str, attempts: int = 6) -> Any:
     last_error: Exception | None = None
     for attempt in range(attempts):
@@ -76,12 +106,40 @@ def _capture_page(page: Any, name: str, url: str, output: Path, axe_source: str)
     unnamed = [control for control in controls if accessible_name_missing(control["text"], control["aria"], control["title"])]
 
     page.add_script_tag(content=axe_source)
-    axe = page.evaluate(
+    raw_axe = page.evaluate(
         """async () => {
           const result = await axe.run(document, {runOnly: {type: 'tag', values: ['wcag2a', 'wcag2aa']}});
-          return {violations: result.violations.map(v => ({id: v.id, impact: v.impact, description: v.description, nodes: v.nodes.length}))};
+          return {
+            violations: result.violations.map(v => ({
+              id: v.id,
+              impact: v.impact,
+              description: v.description,
+              help: v.help,
+              helpUrl: v.helpUrl,
+              nodes: v.nodes.map(node => {
+                let element = null;
+                try {
+                  const selector = Array.isArray(node.target) ? node.target[0] : node.target;
+                  element = selector ? document.querySelector(selector) : null;
+                } catch (_) {
+                  element = null;
+                }
+                const style = element ? window.getComputedStyle(element) : null;
+                return {
+                  target: node.target,
+                  html: node.html,
+                  failureSummary: node.failureSummary,
+                  foreground: style ? style.color : null,
+                  background: style ? style.backgroundColor : null,
+                  fontSize: style ? style.fontSize : null,
+                  fontWeight: style ? style.fontWeight : null
+                };
+              })
+            }))
+          };
         }"""
     )
+    axe = normalise_axe_results(raw_axe)
     serious = [item for item in axe["violations"] if item.get("impact") in {"serious", "critical"}]
 
     failures: list[str] = []
@@ -142,7 +200,6 @@ def run() -> int:
 
         homepage_text = (output / "homepage.txt").read_text(encoding="utf-8")
         archive_text = (output / "archive.txt").read_text(encoding="utf-8")
-        homepage_cards = page.locator("body")  # page is reused below; selectors are evaluated after navigation.
 
         _goto_with_retry(page, urljoin(base_url, ""))
         cards = page.locator(".archive-preview-card").all_inner_texts()
