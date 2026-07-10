@@ -1,0 +1,28 @@
+.archive-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin: .85rem 0;
+}
+
+.archive-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .35rem;
+  padding: .35rem .55rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .82rem;
+}
+
+.archive-metric span { font-weight: 600; }
+.archive-metric strong { font-weight: 700; }
+.archive-metric-up strong::before { content: "Up "; }
+.archive-metric-down strong::before { content: "Down "; }
+.archive-metric-flat strong::before { content: "Change "; }
+.archive-metric-status strong::before { content: "Status: "; }
+
+@media (max-width: 720px) {
+  .archive-metrics { display: grid; grid-template-columns: 1fr; }
+  .archive-metric { justify-content: space-between; width: 100%; }
+}
