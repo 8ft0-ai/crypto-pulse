@@ -1,0 +1,64 @@
+name: Verify CryptoPulse Live Pages
+
+on:
+  workflow_run:
+    workflows:
+      - Publish CryptoPulse Pages
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crypto-pulse-live-pages-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js for Axe
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install browser verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          npm install --no-save axe-core@4.10.3
+          python -m playwright install --with-deps chromium
+
+      - name: Run live-site verification
+        env:
+          CRYPTOPULSE_BASE_URL: https://8ft0-ai.github.io/crypto-pulse/
+          DEPLOYMENT_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          EVIDENCE_DIR: live-site-evidence
+          AXE_PATH: node_modules/axe-core/axe.min.js
+        run: python -m site_verification.live_pages
+
+      - name: Upload live-site evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptopulse-live-site-evidence
+          path: live-site-evidence/
+          if-no-files-found: error
+          retention-days: 30
