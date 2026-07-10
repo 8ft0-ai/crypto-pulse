@@ -124,3 +124,31 @@ Delivery notes:
 - #149 changed scheduled ingestion from creating a new generated snapshot PR every run to updating one rolling source snapshot PR.
 - #150 codified that phase close-out PRs must update the relevant planning delivery record, delivery log, delivery YAML, and generated graph where applicable.
 - #151 documented that the delivery graph is a compact causal map, not a complete issue or PR inventory.
+
+## Phase 4 — Live-site provenance UX
+
+Status: implementation complete; public live-site fetch requires external confirmation.
+
+Primary outcome: CryptoPulse now leads with provenance, generation boundaries and schema-aware rendering rather than placeholder-heavy market commentary.
+
+```text
+Parent issue: #160
+Close-out issue: #165
+Implementation issues: #161, #163, #162, #164
+Implementation PRs: #166, #167, #168, #169
+Validation runs: 29081901945, 29082778088, 29083425572, 29084860287
+Delivery record: planning/delivery/phase-04-live-site-provenance-ux.md
+Configured live URL: https://8ft0-ai.github.io/crypto-pulse/
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- Homepage extraction excludes product-boundary boilerplate and suppresses unavailable retired fields.
+- Report pages surface source quality, provenance and generation boundaries before extracted summaries and full report content.
+- Homepage hierarchy now explains the demo and its auditable publishing model before report and archive scanning.
+- Archive cards show hourly timestamps and stable BTC, ETH and data-quality slots where available, with non-colour direction and status cues.
+- Focused tests and all four implementation PR validation runs passed.
+- A direct public HTTP smoke test was attempted during close-out, but the execution environment could not resolve the GitHub Pages host. This limitation is recorded rather than treated as a pass.
+- Issue #165 and parent #160 should close only after an external browser confirms the homepage, latest report, archive and search pages on the deployed site.
