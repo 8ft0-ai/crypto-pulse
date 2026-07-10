@@ -16,6 +16,11 @@ def clean(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip(" .")
 
 
+def meaningful(value: object) -> bool:
+    text = clean(value).lower()
+    return bool(text) and text not in MISSING and "not specified" not in text
+
+
 def table_cells(line: str) -> list[str]:
     return [clean(cell) for cell in line.strip().strip("|").split("|")]
 
@@ -45,12 +50,12 @@ def asset_changes(body: str, symbol: str) -> dict[str, str]:
 def data_quality(metadata: dict[str, Any], body: str) -> str:
     for key in ("live_data_status", "data_quality", "data_status"):
         value = clean(metadata.get(key))
-        if value.lower() not in MISSING:
+        if meaningful(value):
             return value
     match = re.search(r"Data quality:\s*(?P<items>(?:\n\s*-\s+.+)+)", body, re.IGNORECASE)
     if match:
         values = [clean(line.lstrip("-* ")) for line in match.group("items").splitlines()]
-        values = [value for value in values if value.lower() not in MISSING]
+        values = [value for value in values if meaningful(value)]
         if values:
             return values[0]
     return ""
@@ -65,11 +70,11 @@ def report_metrics(report: Any, base: Any) -> list[tuple[str, str, str]]:
         changes = asset_changes(body, symbol)
         value = changes.get("24h") or changes.get("1h")
         period = "24h" if changes.get("24h") else "1h"
-        if value:
+        if value and meaningful(value):
             direction = "up" if value.lstrip().startswith("+") else "down" if value.lstrip().startswith("-") else "flat"
             metrics.append((f"{symbol} {period}", value, direction))
     quality = data_quality(metadata, body)
-    if quality:
+    if meaningful(quality):
         metrics.append(("Data", quality, "status"))
     return metrics
 
@@ -88,7 +93,20 @@ def time_label(report: Any) -> str:
     parts = [clean(report.year), clean(report.month), clean(report.day)]
     date = "-".join(part for part in parts if part)
     clock = " ".join(part for part in (clean(report.time_label), clean(report.tz)) if part)
+    if not clock:
+        match = re.match(r"(?P<hhmm>\d{4})_(?P<tz>[A-Z]{2,5})", Path(report.source_path).stem)
+        if match:
+            hhmm = match.group("hhmm")
+            clock = f"{hhmm[:2]}:{hhmm[2:]} {match.group('tz')}"
     return " · ".join(part for part in (date, clock) if part) or clean(report.timestamp)
+
+
+def display_headline(report: Any) -> str:
+    headline = clean(getattr(report, "headline", ""))
+    lowered = headline.lower()
+    if not headline or "not financial advice" in lowered or "deterministic demonstration content" in lowered:
+        return ""
+    return headline
 
 
 def recent_report_cards(reports: list[Any], base: Any) -> str:
@@ -96,7 +114,9 @@ def recent_report_cards(reports: list[Any], base: Any) -> str:
         return "<p>No reports found.</p>"
     cards = []
     for report in reports[:12]:
-        cards.append(f'''\n          <article class="report-card archive-preview-card">\n            <div class="eyebrow">{escape(time_label(report))}</div>\n            <h3><a href="{escape(report.url)}">{escape(report.title)}</a></h3>\n            <p>{escape(report.headline)}</p>\n            {metric_html(report_metrics(report, base))}\n            <a class="text-link" href="{escape(report.url)}">Open report →</a>\n          </article>''')
+        headline = display_headline(report)
+        headline_html = f'<p>{escape(headline)}</p>' if headline else ""
+        cards.append(f'''\n          <article class="report-card archive-preview-card">\n            <div class="eyebrow">{escape(time_label(report))}</div>\n            <h3><a href="{escape(report.url)}">{escape(report.title)}</a></h3>\n            {headline_html}\n            {metric_html(report_metrics(report, base))}\n            <a class="text-link" href="{escape(report.url)}">Open report →</a>\n          </article>''')
     return "\n".join(cards)
 
 
@@ -120,7 +140,9 @@ def grouped_archive(reports: list[Any], base: Any) -> str:
                 parts.append(f'<section class="archive-day" data-day="{escape(day)}"><h4>{escape(day_label)}</h4><div class="archive-card-grid">')
                 for report in day_reports:
                     keywords = " ".join([report.title, report.headline, report.timestamp, " ".join(report.source_items)]).lower()
-                    parts.append(f'''\n                      <article class="archive-card" data-year="{escape(report.year)}" data-month="{escape(report.month)}" data-day="{escape(report.day)}" data-keywords="{escape(keywords)}">\n                        <div class="eyebrow">{escape(time_label(report))}</div>\n                        <h5><a href="../{escape(report.url)}">{escape(report.title)}</a></h5>\n                        <p>{escape(report.headline)}</p>\n                        {metric_html(report_metrics(report, base))}\n                        <a class="text-link" href="../{escape(report.url)}">Open report →</a>\n                      </article>''')
+                    headline = display_headline(report)
+                    headline_html = f'<p>{escape(headline)}</p>' if headline else ""
+                    parts.append(f'''\n                      <article class="archive-card" data-year="{escape(report.year)}" data-month="{escape(report.month)}" data-day="{escape(report.day)}" data-keywords="{escape(keywords)}">\n                        <div class="eyebrow">{escape(time_label(report))}</div>\n                        <h5><a href="../{escape(report.url)}">{escape(report.title)}</a></h5>\n                        {headline_html}\n                        {metric_html(report_metrics(report, base))}\n                        <a class="text-link" href="../{escape(report.url)}">Open report →</a>\n                      </article>''')
                 parts.append("</div></section>")
             parts.append('<p class="return-top"><a href="#top">Return to top ↑</a></p></section>')
         parts.append("</section>")
