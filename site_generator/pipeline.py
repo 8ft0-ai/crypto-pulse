@@ -39,12 +39,13 @@ def build_base_site(base: Any) -> None:
 
 
 def add_search_and_quality(base: Any, search: Any) -> None:
-    """Add search page, latest read, metadata chips, and data-quality panels."""
+    """Add search page, latest read, and report data-quality panels."""
     search.copy_enhancement_assets()
     (base.OUT / "search.html").write_text(search.search_page(), encoding="utf-8")
     search.latest_market_read_panel = lambda report: homepage_summary.latest_market_read_panel(report, search, base)
     search.add_latest_market_read_to_homepage()
-    search.add_metadata_chips_to_report_cards()
+    # Archive cards now own their stable metric vocabulary. The older metadata-chip
+    # post-processor is intentionally not run because it duplicated the same slots.
     search.add_data_quality_panels_to_report_pages()
     search.add_search_link_to_existing_pages()
     search.add_enhancement_stylesheet_links()
@@ -84,6 +85,12 @@ def add_accessibility_polish(base: Any) -> None:
     accessibility.apply(base)
 
 
+def configure_safe_headlines(base: Any) -> None:
+    """Prevent disclaimer boilerplate becoming shared card/stat headline text."""
+    original_extract = base.extract_headline
+    base.extract_headline = lambda body: homepage_summary.safe_headline(body, original_extract(body))
+
+
 def build() -> None:
     """Build the complete CryptoPulse static site from the Markdown archive."""
     base = stage("build_pages_site")
@@ -92,6 +99,7 @@ def build() -> None:
     brief = stage("build_pages_site_brief_glance")
     filters = stage("build_pages_site_search_filters")
 
+    configure_safe_headlines(base)
     archive_cards.configure(base)
     build_base_site(base)
     archive_cards.copy_style(base)
@@ -103,7 +111,7 @@ def build() -> None:
     add_archive_filters(filters)
     add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, search, data-quality, mobile UX, brief, source-card, archive-filter, and accessibility enhancements.")
+    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, search, data-quality, mobile UX, brief, source-card, archive-filter, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
