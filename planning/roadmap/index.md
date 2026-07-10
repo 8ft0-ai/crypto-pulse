@@ -38,6 +38,12 @@ phase-template.md
 
 A new roadmap phase spec should stay forward-looking. At close-out, put completed evidence into `planning/delivery/` and keep the roadmap directory focused on planning intent.
 
+## Active roadmap specs
+
+| Phase | Status | Planning record | Delivery record |
+| --- | --- | --- | --- |
+| Phase 4 — Live-site provenance UX | Shaping | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | Pending |
+
 ## Retrospective roadmap specs
 
 Phases 1–3 were reconstructed after delivery to preserve the intended roadmap shape alongside the completed delivery records.
