@@ -108,13 +108,13 @@ It can also be run manually from the GitHub Actions tab.
 
 ## Pull request validation
 
-Pull requests that change reports, site assets, build scripts, workflows, documentation, or the README are validated by:
+Pull requests that change reports, site assets, build scripts, workflows, documentation, planning assets, tests, config, or the README are validated by:
 
 ```text
 .github/workflows/pr-validation.yml
 ```
 
-The validation workflow builds the site with `python -m site_generator`, checks that expected generated artefacts exist, and rejects committed `_site/` output.
+The validation workflow builds the site with `python -m site_generator`, checks that expected generated artefacts exist, runs unit tests, and rejects committed `_site/` output.
 
 For the recommended `main` branch protection settings, see:
 
