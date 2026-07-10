@@ -54,6 +54,14 @@ jobs:
           AXE_PATH: node_modules/axe-core/axe.min.js
         run: python -m site_verification.live_pages
 
+      - name: Publish verification summary
+        if: always()
+        env:
+          CRYPTOPULSE_BASE_URL: https://8ft0-ai.github.io/crypto-pulse/
+          DEPLOYMENT_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          EVIDENCE_DIR: live-site-evidence
+        run: python -m site_verification.actions_summary
+
       - name: Upload live-site evidence
         if: always()
         uses: actions/upload-artifact@v4
