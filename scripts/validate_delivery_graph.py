@@ -11,6 +11,7 @@ import yaml
 SCHEMA_VERSION = "delivery-graph/v1"
 
 ALLOWED_NODE_TYPES = {
+    "baseline",
     "phase",
     "problem",
     "decision",
@@ -50,6 +51,7 @@ ALLOWED_ARTIFACT_KINDS = {
 }
 
 REQUIRED_FIELDS_BY_TYPE = {
+    "baseline": {"id", "type", "title", "status", "summary"},
     "phase": {"id", "type", "title", "status", "summary"},
     "problem": {"id", "type", "title", "summary"},
     "decision": {"id", "type", "title", "summary"},
@@ -137,8 +139,8 @@ def _validate_type_specific_node(node: dict[str, Any], *, repo_root: Path) -> No
     node_id = str(node["id"])
     node_type = str(node["type"])
 
-    if node_type == "phase" and node.get("status") not in ALLOWED_PHASE_STATUSES:
-        raise DeliveryGraphValidationError(f"phase {node_id} has invalid status: {node.get('status')}")
+    if node_type in {"baseline", "phase"} and node.get("status") not in ALLOWED_PHASE_STATUSES:
+        raise DeliveryGraphValidationError(f"{node_type} {node_id} has invalid status: {node.get('status')}")
 
     if node_type in {"issue", "pull_request"}:
         if not isinstance(node.get("number"), int):
