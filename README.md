@@ -106,6 +106,22 @@ scripts/build_pages_site_search_filters.py
 
 It can also be run manually from the GitHub Actions tab.
 
+## Post-deployment live-site evidence
+
+After a successful Pages deployment, this workflow checks the public site with Chromium:
+
+```text
+.github/workflows/verify-live-pages.yml
+```
+
+It captures rendered HTML, visible text, full-page screenshots, structured results and Axe accessibility evidence for the homepage, latest report, archive and search. Every run uploads a 30-day artifact named:
+
+```text
+cryptopulse-live-site-evidence
+```
+
+The workflow can also be started manually. See `docs/live-site-evidence.md` for the checks, artifact contents and review steps.
+
 ## Pull request validation
 
 Pull requests that change reports, site assets, build scripts, workflows, documentation, planning assets, tests, config, or the README are validated by:
