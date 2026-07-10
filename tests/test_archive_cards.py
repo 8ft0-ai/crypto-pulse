@@ -66,6 +66,39 @@ def test_missing_metrics_are_omitted_without_placeholder_text(tmp_path):
     assert "partial" in html
 
 
+def test_legacy_category_text_is_not_rendered_as_eth_change(tmp_path):
+    item = report(tmp_path, """
+| Metric | BTC | ETH |
+| --- | --- | --- |
+| 1h | -0.10% | -0.20% |
+| 24h | -0.17% | ETH, L2s, DeFi majors |
+""")
+    html = archive_cards.recent_report_cards([item], BaseStub)
+    assert "BTC 24h" in html and "-0.17%" in html
+    assert "ETH, L2s, DeFi majors" not in html
+    assert "ETH 24h" not in html
+
+
+def test_plausible_metric_values_preserve_valid_legacy_formats():
+    for value in (
+        "+1.9%",
+        "-0.17%",
+        "~+2–3%",
+        "~US$81,100–81,600",
+        "Flat to +4.9%",
+        "+0.9% CG / +0.53% CMC",
+    ):
+        assert archive_cards.plausible_metric_value(value)
+
+    for value in (
+        "ETH, L2s, DeFi majors",
+        "selective altcoin leadership",
+        "not specified",
+        "unavailable",
+    ):
+        assert not archive_cards.plausible_metric_value(value)
+
+
 def test_disclaimer_headline_is_not_rendered_on_archive_card(tmp_path):
     item = report(
         tmp_path,
