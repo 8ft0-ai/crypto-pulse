@@ -42,13 +42,20 @@ class GovernedLlmEvaluationWorkflowTests(unittest.TestCase):
         self.assertNotIn("reports/crypto", self.text)
         self.assertNotIn("analysis/crypto", self.text)
 
-    def test_exact_source_controlled_plan_is_used(self) -> None:
+    def test_exact_source_controlled_plan_and_viability_policy_are_used(self) -> None:
         self.assertIn("--config config/llm-evaluation.yml", self.text)
+        self.assertIn("--viability-config config/llm-evaluation-viability.yml", self.text)
         self.assertIn("python -m llm_analysis.evaluation prepare", self.text)
         self.assertIn("python -m llm_analysis.evaluation_runner", self.text)
         self.assertNotIn("python -m llm_analysis.evaluation run", self.text)
         self.assertNotIn("openrouter/free", self.text)
         self.assertNotIn("openrouter/auto", self.text)
+
+    def test_protected_run_is_time_bounded_and_single_job(self) -> None:
+        evaluate = self.workflow["jobs"]["evaluate"]
+        self.assertEqual(evaluate["timeout-minutes"], 30)
+        self.assertEqual(self.workflow["concurrency"]["cancel-in-progress"], False)
+        self.assertEqual(evaluate["permissions"] if "permissions" in evaluate else self.workflow["permissions"], {"contents": "read"})
 
 
 if __name__ == "__main__":
