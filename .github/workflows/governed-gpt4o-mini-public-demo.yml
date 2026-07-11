@@ -1,4 +1,4 @@
-name: Governed GPT-4o mini public-data demo
+name: Governed GPT-4o mini public-data diagnostic
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: governed-gpt4o-mini-public-demo-${{ github.run_id }}
+  group: governed-gpt4o-mini-public-data-diagnostic-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           fi
 
   prepare:
-    name: Freeze and classify public-data demo corpus
+    name: Freeze and classify public-data diagnostic corpus
     needs: guard
     runs-on: ubuntu-latest
     outputs:
@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_benchmark_projection prepare \
+          python -m llm_analysis.public_demo_diagnostic prepare \
             --repository-root . \
             --profile config/llm-public-data-demo.yml \
             --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo-prepared"
@@ -69,7 +69,7 @@ jobs:
           retention-days: 7
 
   evaluate:
-    name: Run bounded protected GPT-4o mini public-data demo
+    name: Run bounded protected GPT-4o mini diagnostic corpus
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -102,7 +102,7 @@ jobs:
           name: governed-gpt4o-mini-public-demo-prepared-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/governed-gpt4o-mini-public-demo-prepared
 
-      - name: Run controlled public-data demo benchmark
+      - name: Run controlled public-data diagnostic corpus
         id: benchmark
         continue-on-error: true
         env:
@@ -111,7 +111,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_benchmark_projection run \
+          python -m llm_analysis.public_demo_diagnostic run \
             --repository-root . \
             --profile config/llm-public-data-demo.yml \
             --viability-config config/llm-evaluation-viability.yml \
@@ -119,18 +119,18 @@ jobs:
             --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo" \
             --trusted-main-sha "$TRUSTED_SHA"
 
-      - name: Publish demo benchmark summary
+      - name: Publish diagnostic summary
         if: always()
         shell: bash
         run: |
           if [[ -f "$RUNNER_TEMP/governed-gpt4o-mini-public-demo/actions-summary.md" ]]; then
             cat "$RUNNER_TEMP/governed-gpt4o-mini-public-demo/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "# Governed GPT-4o mini public-data demo" >> "$GITHUB_STEP_SUMMARY"
-            echo "The benchmark failed before a complete diagnostic summary was produced." >> "$GITHUB_STEP_SUMMARY"
+            echo "# Governed GPT-4o mini public-data diagnostic" >> "$GITHUB_STEP_SUMMARY"
+            echo "The diagnostic run failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload non-published demo artefacts
+      - name: Upload non-published diagnostic artefacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -139,9 +139,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Fail when demo benchmark infrastructure failed
+      - name: Fail when diagnostic infrastructure failed
         if: steps.benchmark.outcome != 'success'
         shell: bash
         run: |
-          echo "The controlled public-data demo benchmark did not complete. Review diagnostic artefacts." >&2
+          echo "The controlled public-data diagnostic did not complete. Review retained artefacts." >&2
           exit 1
