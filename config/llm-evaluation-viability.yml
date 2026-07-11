@@ -10,5 +10,5 @@ pacing:
     - 60
   maximum_delay_seconds: 300
 stages:
-  smoke_case_key: normal
+  smoke_case_key: historical-normal-crosschecked
   maximum_full_corpus_candidates: 2
