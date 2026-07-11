@@ -21,7 +21,21 @@ A separate paced viability experiment was subsequently run under #201 after the 
 
 The follow-up outcome is **`free-proof-no-go`**. Two candidates had no ZDR-compatible route, while the third exhausted its bounded rate-limit retry budget despite minimum request spacing and `Retry-After` handling. No candidate reached contract smoke testing or the full corpus.
 
-The free-model option is therefore closed for Phase 5. The remaining planning choice in #199 is a separately approved paid proof or park-and-close. ZDR, data-collection denial, disabled cross-model fallback and disabled automatic generation remain unchanged.
+The free-model option is therefore closed for Phase 5. ZDR, data-collection denial, disabled cross-model fallback and disabled automatic generation remain unchanged.
+
+## GPT-4o mini public-data proof
+
+The project then approved a narrowly isolated public-data demonstration using `openai/gpt-4o-mini`, ordinary provider retention, denied data collection, strict structured output and no cross-model fallback.
+
+- Reviewer-visible decision: [`public-demo-decision.md`](public-demo-decision.md)
+- Machine-readable decision: [`public-demo-decision.yml`](public-demo-decision.yml)
+- Source diagnostic run: [29151358149](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29151358149)
+
+The run completed route preflight, smoke generation and all ten frozen corpus calls through actual provider `OpenAI`. The core capability proof succeeded: GPT-4o mini consumed governed evidence and produced schema-valid, evidence-referenced, policy-compliant responses, including safe handling of the prompt-injection case.
+
+The current model-authored natural-prose contract nevertheless received only `1/10` hard passes. The reviewed outcome is **`public-demo-no-go` for that contract**, not an intrinsic model no-go. Most failures came from stochastic numeric presentation and claim-taxonomy selection rather than unsupported facts.
+
+Issue #228 now shapes a semantic claim-plan contract with deterministic repository-owned prose rendering. Further wording-specific validator patches and model comparison are deferred until that contract is stable. #189 remains blocked, and automatic generation and publication remain disabled.
 
 ## Fixed corpus
 
@@ -39,17 +53,19 @@ The two mutations are deliberately labelled `evaluation-only`. They are not hist
 
 The original source-controlled comparison contains exactly two explicit free model slugs: the current Nemotron candidate and one Qwen alternative. `openrouter/free`, `openrouter/auto`, paid models and cross-model fallback are prohibited.
 
-The final follow-up uses a separate immutable configuration, `config/llm-evaluation-free-proof.yml`, so the original two-model plan and its reviewed no-go remain independently reproducible.
+The final free-model follow-up uses a separate immutable configuration, `config/llm-evaluation-free-proof.yml`, so the original two-model plan and its reviewed no-go remain independently reproducible.
 
-At execution time the workflow checks the public OpenRouter catalogue again. A disappeared, expired, non-zero-price or structured-output-ineligible model is recorded as ineligible rather than silently replaced.
+The GPT-4o mini public-data path uses a separate profile and paid benchmark configuration so its public-input policy exception and reviewed evidence remain independently auditable.
+
+At execution time the workflows check the public OpenRouter catalogue again. A disappeared, expired, incorrectly priced or structured-output-ineligible model is recorded as ineligible rather than silently replaced.
 
 ## Operating sequence
 
 ```text
 merge evaluation harness
-manually dispatch Governed LLM model evaluation from main
+manually dispatch protected evaluation from main
 review evaluation artefacts and reviewer worksheet
-commit the approved retain/change/no-go decision in a separate review PR
+commit the approved decision in a separate review PR
 ```
 
 The separate decision PR is required because pull-request code must not receive `OPENROUTER_API_KEY`, and workflow artefacts must be reviewed before a production-proof configuration is selected.
