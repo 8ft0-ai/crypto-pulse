@@ -19,6 +19,8 @@ class EvaluationRunnerTests(unittest.TestCase):
             ".",
             "--config",
             "config/llm-evaluation.yml",
+            "--viability-config",
+            "config/llm-evaluation-viability.yml",
             "--prepared-dir",
             "/tmp/prepared",
             "--output-dir",
@@ -31,7 +33,7 @@ class EvaluationRunnerTests(unittest.TestCase):
             patch.object(sys, "argv", argv),
             patch.dict(os.environ, {"OPENROUTER_API_KEY": secret}, clear=False),
             patch(
-                "llm_analysis.evaluation_runner.execute_evaluation",
+                "llm_analysis.evaluation_runner.execute_viability_evaluation",
                 return_value={"decision": {"decision": "retain", "selected_model": "model"}},
             ) as execute,
             contextlib.redirect_stdout(output),
@@ -40,6 +42,10 @@ class EvaluationRunnerTests(unittest.TestCase):
 
         self.assertEqual(execute.call_args.kwargs["api_key"], secret)
         self.assertEqual(execute.call_args.kwargs["trusted_main_sha"], "abc123")
+        self.assertEqual(
+            execute.call_args.kwargs["viability_config_path"],
+            "config/llm-evaluation-viability.yml",
+        )
         self.assertNotIn(secret, output.getvalue())
         self.assertIn('"decision": "retain"', output.getvalue())
 
@@ -57,7 +63,7 @@ class EvaluationRunnerTests(unittest.TestCase):
             patch.object(sys, "argv", argv),
             patch.dict(os.environ, {"OPENROUTER_API_KEY": secret}, clear=False),
             patch(
-                "llm_analysis.evaluation_runner.execute_evaluation",
+                "llm_analysis.evaluation_runner.execute_viability_evaluation",
                 side_effect=ValueError(f"provider rejected {secret}"),
             ),
             contextlib.redirect_stdout(output),

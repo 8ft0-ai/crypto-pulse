@@ -72,6 +72,7 @@ jobs:
     name: Run bounded protected model comparison
     needs: prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: governed-llm-dry-run
     steps:
       - name: Check out exact trusted main commit
@@ -113,6 +114,7 @@ jobs:
           python -m llm_analysis.evaluation_runner \
             --repository-root . \
             --config config/llm-evaluation.yml \
+            --viability-config config/llm-evaluation-viability.yml \
             --prepared-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared" \
             --output-dir "$RUNNER_TEMP/governed-llm-evaluation" \
             --trusted-main-sha "$TRUSTED_SHA"
