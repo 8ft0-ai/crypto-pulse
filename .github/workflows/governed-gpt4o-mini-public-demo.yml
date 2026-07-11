@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_benchmark_compat prepare \
+          python -m llm_analysis.public_demo_benchmark_projection prepare \
             --repository-root . \
             --profile config/llm-public-data-demo.yml \
             --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo-prepared"
@@ -111,7 +111,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_benchmark_compat run \
+          python -m llm_analysis.public_demo_benchmark_projection run \
             --repository-root . \
             --profile config/llm-public-data-demo.yml \
             --viability-config config/llm-evaluation-viability.yml \
