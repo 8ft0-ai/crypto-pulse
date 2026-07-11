@@ -1,0 +1,145 @@
+name: Governed LLM model evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-llm-evaluation-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from the main branch." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Freeze and validate evaluation corpus
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Validate corpus locks and build deterministic bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.evaluation prepare \
+            --repository-root . \
+            --config config/llm-evaluation.yml \
+            --output-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared"
+
+      - name: Upload prepared corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-evaluation-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-evaluation-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  evaluate:
+    name: Run bounded protected model comparison
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Download prepared corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: governed-llm-evaluation-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-evaluation-prepared
+
+      - name: Run controlled evaluation
+        id: evaluation
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.evaluation run \
+            --repository-root . \
+            --config config/llm-evaluation.yml \
+            --prepared-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared" \
+            --output-dir "$RUNNER_TEMP/governed-llm-evaluation" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Publish evaluation summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/governed-llm-evaluation/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/governed-llm-evaluation/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Governed LLM model evaluation" >> "$GITHUB_STEP_SUMMARY"
+            echo "The evaluation failed before a complete diagnostic summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload non-published evaluation artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-evaluation/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail when evaluation infrastructure failed
+        if: steps.evaluation.outcome != 'success'
+        shell: bash
+        run: |
+          echo "The controlled evaluation did not complete. Review diagnostic artefacts." >&2
+          exit 1
