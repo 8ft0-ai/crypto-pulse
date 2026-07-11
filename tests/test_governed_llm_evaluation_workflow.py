@@ -42,8 +42,9 @@ class GovernedLlmEvaluationWorkflowTests(unittest.TestCase):
         self.assertNotIn("reports/crypto", self.text)
         self.assertNotIn("analysis/crypto", self.text)
 
-    def test_exact_source_controlled_plan_and_viability_policy_are_used(self) -> None:
-        self.assertIn("--config config/llm-evaluation.yml", self.text)
+    def test_exact_free_proof_plan_and_viability_policy_are_used(self) -> None:
+        self.assertEqual(self.text.count("--config config/llm-evaluation-free-proof.yml"), 2)
+        self.assertNotIn("--config config/llm-evaluation.yml", self.text)
         self.assertIn("--viability-config config/llm-evaluation-viability.yml", self.text)
         self.assertIn("python -m llm_analysis.evaluation prepare", self.text)
         self.assertIn("python -m llm_analysis.evaluation_runner", self.text)

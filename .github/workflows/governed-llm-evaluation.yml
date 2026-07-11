@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           python -m llm_analysis.evaluation prepare \
             --repository-root . \
-            --config config/llm-evaluation.yml \
+            --config config/llm-evaluation-free-proof.yml \
             --output-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared"
 
       - name: Upload prepared corpus
@@ -113,7 +113,7 @@ jobs:
           set -euo pipefail
           python -m llm_analysis.evaluation_runner \
             --repository-root . \
-            --config config/llm-evaluation.yml \
+            --config config/llm-evaluation-free-proof.yml \
             --viability-config config/llm-evaluation-viability.yml \
             --prepared-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared" \
             --output-dir "$RUNNER_TEMP/governed-llm-evaluation" \
