@@ -1,0 +1,106 @@
+version: 1
+status: paid-proof-no-go
+reviewed_at: '2026-07-11'
+planning_issue: 199
+execution_issue: 206
+implementation:
+  issue: 205
+  pull_request: 208
+  merge_commit: 475b56d5b547d30439428379585005d621632255
+source_run:
+  workflow: Governed GPT-4o mini benchmark
+  run_id: 29146222273
+  comparison_job_id: 86528132043
+  trusted_main_sha: 475b56d5b547d30439428379585005d621632255
+artifact:
+  id: 8246809348
+  name: governed-gpt4o-mini-benchmark-29146222273-1
+  digest: sha256:2ecd45dbe33e21132f3594817f66a1781b6c1ebb2c9b6818a893948a6f3916f1
+  expires_at: '2026-08-10T08:30:55Z'
+  reviewed_file_sha256:
+    actions-summary.md: c860c597d0ea3851f0a09641149a5b692eac4fe7d0485da1d93589345ea5d2f5
+    attempt-records.json: 0f1ea2fab9233f4d8078415e822b19e56234eaa195955073ba059ed8f06ec255
+    decision-candidate.md: 0e64d0c5580052707a3a09701f38c4704cf1d25ff019161ab79f03cd855e29a3
+    evaluation-summary.json: bf2fb5cded5f8d22ba6fd1ce10cf793e2e0ee2862ff2bb6d0a5c48927d6c8841
+    key-status.json: a86e4d3c627fb58361b6c520c7bc5eb0769b09d3eff798eca84e30edbec18afc
+    model-availability.json: 847d3e2e378dce8d079e905c44506075687a6ff812bfe8efb003ca5ef119058c
+    paid-pricing.json: 34b82bb3b71c018a8f4938fadc52fab83ed585a3427485859307e0cf726f0bf2
+    reviewer-scorecard.csv: 82fc121557de602f1c60a4a2b9f587d3dd655245943a44e7f48f96db9a8d3c2f
+    viability-stages.json: 73408513bc142d64dd193fdea1331e01fc63fdc6b0e8ad06d761f96045d9dc68
+model:
+  requested: openai/gpt-4o-mini
+  selected: null
+  catalogue_available: true
+  catalogue_eligible: true
+  expiration_date: null
+  supported_parameters:
+    - response_format
+    - structured_outputs
+  catalogue_pricing:
+    prompt_per_million_usd: 0.15
+    completion_per_million_usd: 0.60
+approved_cost_boundary:
+  per_generation_usd: 0.01
+  whole_benchmark_usd: 0.15
+quota_preflight:
+  is_free_tier: false
+  account_limit_usd: 10
+  remaining_usd: 9.9860193
+  usage_usd: 0.0139807
+  request_budget_assessment: appears_sufficient
+execution:
+  maximum_logical_calls: 12
+  completed_logical_calls: 1
+  http_attempts: 1
+  route_preflight:
+    status: failed
+    failure_code: ineligible_routing
+    http_status: 404
+    attempts: 1
+    actual_model: null
+    actual_provider: null
+  contract_smoke:
+    status: not_run
+  full_corpus:
+    status: not_run
+    required_runs: 10
+    hard_passes: 0
+  cost:
+    route_usd: null
+    smoke_usd: null
+    corpus_usd: 0
+    total_recorded_usd: 0
+    cost_metadata_complete_for_qualification: false
+quality_evidence:
+  availability: unavailable
+  reason: No provider completion was produced because the strict ZDR route probe failed.
+  readability: null
+  usefulness: null
+  reproducibility: null
+  latency_ms: null
+  input_tokens: null
+  output_tokens: null
+boundaries:
+  zero_data_retention_required: true
+  data_collection_denied: true
+  required_parameters_enforced: true
+  same_model_provider_fallback_allowed: true
+  cross_model_fallback_enabled: false
+  automatic_generation_enabled: false
+  rolling_report_generation_enabled: false
+  evaluation_output_reused_as_evidence: false
+  raw_provider_output_committed: false
+  secrets_committed: false
+  generated_site_committed: false
+planning_effect:
+  issue_206: close_on_merge
+  issue_189: remains_blocked
+  issue_181: remains_open
+  openrouter_gpt4o_mini_path: closed_for_phase_5
+  recommendation: park-and-close unless a separately approved provider or policy path is justified
+rationale: >-
+  GPT-4o mini met the live catalogue, price, structured-output and account-quota
+  gates, but the first strict request returned HTTP 404 because no endpoint was
+  eligible under the required Zero Data Retention and data-collection policy.
+  The model never produced an output, so quality cannot be scored. The exact
+  OpenRouter GPT-4o mini configuration therefore does not qualify for Phase 5.
