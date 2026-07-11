@@ -1,0 +1,214 @@
+{
+  "bundle_id": "sha256:d86d7a2ee02a06f2c1d3225019f239a46478e85a7d6c4c531ed9371230689971",
+  "schema_version": "crypto-market-evidence-bundle/v1",
+  "source_snapshot": {
+    "path": "data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json",
+    "sha256": "8e3a016884ceaac860ae2457e1e35762a039e2a04568230950cb69fd05b5327e",
+    "schema_version": "0.2",
+    "quality_status": "valid-ok",
+    "generated_at_utc": "2026-07-08T07:42:09Z"
+  },
+  "product_boundaries": [
+    "AI-generated public demonstration content.",
+    "Not financial advice, investment research, a recommendation, or a trading signal.",
+    "Repository code owns validation, rendering, review, and publication."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "market.asset.bitcoin.price_usd",
+      "evidence_type": "number",
+      "subject": {
+        "type": "asset",
+        "id": "bitcoin",
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "field": "price_usd",
+      "value": 62739,
+      "unit": "usd",
+      "observed_at": "2026-07-08T07:41:15.609Z",
+      "source": {
+        "name": "coingecko",
+        "source_path": "/market/assets/0/price_usd"
+      }
+    },
+    {
+      "evidence_id": "market.asset.bitcoin.change_24h_pct",
+      "evidence_type": "number",
+      "subject": {
+        "type": "asset",
+        "id": "bitcoin",
+        "symbol": "BTC",
+        "name": "Bitcoin"
+      },
+      "field": "change_24h_pct",
+      "value": -0.54516,
+      "unit": "percent",
+      "observed_at": "2026-07-08T07:41:15.609Z",
+      "source": {
+        "name": "coingecko",
+        "source_path": "/market/assets/0/change_24h_pct"
+      }
+    },
+    {
+      "evidence_id": "market.asset.ethereum.price_usd",
+      "evidence_type": "number",
+      "subject": {
+        "type": "asset",
+        "id": "ethereum",
+        "symbol": "ETH",
+        "name": "Ethereum"
+      },
+      "field": "price_usd",
+      "value": 1751.92,
+      "unit": "usd",
+      "observed_at": "2026-07-08T07:41:16.092Z",
+      "source": {
+        "name": "coingecko",
+        "source_path": "/market/assets/1/price_usd"
+      }
+    },
+    {
+      "evidence_id": "market.asset.ethereum.change_24h_pct",
+      "evidence_type": "number",
+      "subject": {
+        "type": "asset",
+        "id": "ethereum",
+        "symbol": "ETH",
+        "name": "Ethereum"
+      },
+      "field": "change_24h_pct",
+      "value": -1.07693,
+      "unit": "percent",
+      "observed_at": "2026-07-08T07:41:16.092Z",
+      "source": {
+        "name": "coingecko",
+        "source_path": "/market/assets/1/change_24h_pct"
+      }
+    },
+    {
+      "evidence_id": "market.asset.solana.change_24h_pct",
+      "evidence_type": "number",
+      "subject": {
+        "type": "asset",
+        "id": "solana",
+        "symbol": "SOL",
+        "name": "Solana"
+      },
+      "field": "change_24h_pct",
+      "value": -4.11829,
+      "unit": "percent",
+      "observed_at": "2026-07-08T07:41:17.282Z",
+      "source": {
+        "name": "coingecko",
+        "source_path": "/market/assets/2/change_24h_pct"
+      }
+    },
+    {
+      "evidence_id": "quality.snapshot.status",
+      "evidence_type": "status",
+      "subject": {
+        "type": "snapshot",
+        "id": "1742-aest"
+      },
+      "field": "status",
+      "value": "valid-ok",
+      "source": {
+        "name": "snapshot-validator",
+        "source_path": "/quality/status"
+      }
+    },
+    {
+      "evidence_id": "source.coingecko.status",
+      "evidence_type": "status",
+      "subject": {
+        "type": "source",
+        "id": "coingecko",
+        "name": "CoinGecko"
+      },
+      "field": "status",
+      "value": "ok",
+      "source": {
+        "name": "source-snapshot",
+        "source_path": "/sources/coingecko/status"
+      }
+    },
+    {
+      "evidence_id": "source.defillama.status",
+      "evidence_type": "status",
+      "subject": {
+        "type": "source",
+        "id": "defillama",
+        "name": "DefiLlama"
+      },
+      "field": "status",
+      "value": "ok",
+      "source": {
+        "name": "source-snapshot",
+        "source_path": "/sources/defillama/status"
+      }
+    },
+    {
+      "evidence_id": "source.coinbase_exchange.status",
+      "evidence_type": "status",
+      "subject": {
+        "type": "source",
+        "id": "coinbase_exchange",
+        "name": "Coinbase Exchange"
+      },
+      "field": "status",
+      "value": "ok",
+      "source": {
+        "name": "source-snapshot",
+        "source_path": "/sources/coinbase_exchange/status"
+      }
+    },
+    {
+      "evidence_id": "exchange.coinbase_exchange.btc-usd.price",
+      "evidence_type": "number",
+      "subject": {
+        "type": "exchange_pair",
+        "id": "btc-usd",
+        "symbol": "BTC"
+      },
+      "field": "price",
+      "value": 62738.02,
+      "unit": "usd",
+      "observed_at": "2026-07-08T07:42:07.810893635Z",
+      "source": {
+        "name": "coinbase_exchange",
+        "source_path": "/exchange_crosscheck/sources/coinbase_exchange/0/price"
+      }
+    },
+    {
+      "evidence_id": "source.binance.status",
+      "evidence_type": "status",
+      "subject": {
+        "type": "source",
+        "id": "binance",
+        "name": "Binance"
+      },
+      "field": "status",
+      "value": "skipped",
+      "source": {
+        "name": "source-snapshot",
+        "source_path": "/sources/binance/status"
+      }
+    },
+    {
+      "evidence_id": "source.binance.reason",
+      "evidence_type": "string",
+      "subject": {
+        "type": "source",
+        "id": "binance",
+        "name": "Binance"
+      },
+      "field": "reason",
+      "value": "GitHub-hosted runners returned HTTP 451",
+      "source": {
+        "name": "source-snapshot",
+        "source_path": "/sources/binance/reason"
+      }
+    }
+  ]
+}
