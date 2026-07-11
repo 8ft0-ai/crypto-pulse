@@ -7,13 +7,19 @@ from pathlib import Path
 
 import yaml
 
-from llm_analysis.evaluation import prepare_evaluation
+from llm_analysis.evaluation import load_evaluation_plan, prepare_evaluation
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "evaluation/phase-05/corpus.yml"
 
 
 class EvaluationCorpusLockTests(unittest.TestCase):
+    def test_model_availability_dates_remain_canonical_strings(self) -> None:
+        plan = load_evaluation_plan(ROOT, "config/llm-evaluation.yml")
+        self.assertEqual(plan.models[0].availability_checked_at, "2026-07-11")
+        self.assertEqual(plan.models[1].availability_checked_at, "2026-07-11")
+        self.assertEqual(plan.models[1].known_expiration_date, "2026-07-19")
+
     def test_historical_snapshot_sha256_locks_match_repository_bytes(self) -> None:
         if not (ROOT / "data/crypto/hourly/2026/07/08/1434_AEST_source_snapshot.json").exists():
             self.skipTest("focused local reconstruction does not contain archived snapshots")
