@@ -1,0 +1,41 @@
+version: 1
+provider: openrouter
+
+api:
+  endpoint: https://openrouter.ai/api/v1/chat/completions
+  timeout_seconds: 60
+  retry_limit: 1
+  retry_backoff_seconds: 1.0
+  router_metadata: true
+
+generation:
+  model: nvidia/nemotron-3-super-120b-a12b:free
+  prompt_path: prompts/crypto-market-analysis-v1.md
+  analysis_schema_path: schemas/crypto-market-analysis-v1.json
+  prompt_version: crypto-market-analysis/v1
+  analysis_schema_version: crypto-market-analysis/v1
+  evidence_schema_version: crypto-market-evidence-bundle/v1
+  temperature: 0.2
+  max_output_tokens: 4000
+  max_request_bytes: 262144
+  max_cost_usd: 0.01
+  structured_output: true
+  cross_model_fallback: false
+
+provider_policy:
+  require_parameters: true
+  data_collection: deny
+  zdr: true
+  allow_fallbacks: true
+  order: []
+  only: []
+  ignore: []
+  sort: price
+  max_price:
+    prompt: 0
+    completion: 0
+    request: 0
+
+app_attribution:
+  referer: https://github.com/8ft0-ai/crypto-pulse
+  title: CryptoPulse
