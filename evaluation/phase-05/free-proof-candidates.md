@@ -3,10 +3,14 @@
 Issue: #201  
 Parent planning decision: #199  
 Evaluator implementation: #200 / PR #202  
+Experiment configuration: `config/llm-evaluation-free-proof.yml`  
+Historical evaluation configuration: `config/llm-evaluation.yml` — unchanged  
 Catalogue endpoint: `https://openrouter.ai/api/v1/models`  
 Catalogue checked at: `2026-07-11T07:14:28Z`
 
 This record selects the exact candidates for the final bounded free-model viability experiment. It is a catalogue-screening record only. It does not claim that any candidate has a Zero Data Retention-compatible route, can satisfy the governed analysis contract, or is approved for the Phase 5 production-proof path.
+
+The final experiment uses a dedicated configuration so that the original #188 evaluation plan and the no-go evidence recorded by PR #198 remain immutable and reproducible.
 
 ## Selection constraints
 
