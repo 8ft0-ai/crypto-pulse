@@ -1,0 +1,84 @@
+{
+  "schema_version": "crypto-market-analysis/v1",
+  "prompt_version": "crypto-market-analysis/v1",
+  "evidence_bundle_id": "sha256:d86d7a2ee02a06f2c1d3225019f239a46478e85a7d6c4c531ed9371230689971",
+  "headline": {
+    "claim_type": "comparison",
+    "text": "Bitcoin declined less than Ethereum over the observed 24-hour period.",
+    "evidence_ids": [
+      "market.asset.bitcoin.change_24h_pct",
+      "market.asset.ethereum.change_24h_pct"
+    ],
+    "confidence": "high",
+    "comparison": {
+      "left_evidence_id": "market.asset.bitcoin.change_24h_pct",
+      "relation": "greater_than",
+      "right_evidence_id": "market.asset.ethereum.change_24h_pct"
+    }
+  },
+  "market_summary": [
+    {
+      "claim_type": "absolute_observation",
+      "text": "Bitcoin was recorded at US$62,739.",
+      "evidence_ids": [
+        "market.asset.bitcoin.price_usd"
+      ],
+      "confidence": "high",
+      "quoted_values": [
+        {
+          "evidence_id": "market.asset.bitcoin.price_usd",
+          "value": 62739,
+          "unit": "usd"
+        }
+      ]
+    }
+  ],
+  "key_observations": [
+    {
+      "claim_type": "directional_observation",
+      "text": "Solana's observed 24-hour change was -4.11829%.",
+      "evidence_ids": [
+        "market.asset.solana.change_24h_pct"
+      ],
+      "confidence": "high",
+      "quoted_values": [
+        {
+          "evidence_id": "market.asset.solana.change_24h_pct",
+          "value": -4.11829,
+          "unit": "percent"
+        }
+      ]
+    }
+  ],
+  "risks_and_limitations": [
+    {
+      "claim_type": "data_quality_limitation",
+      "text": "Binance was skipped; the recorded reason was GitHub-hosted runners returned HTTP 451.",
+      "evidence_ids": [
+        "source.binance.status",
+        "source.binance.reason"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "data_quality_notes": [
+    {
+      "claim_type": "absolute_observation",
+      "text": "The selected snapshot passed with valid-ok quality.",
+      "evidence_ids": [
+        "quality.snapshot.status"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "source_evidence_note": {
+    "claim_type": "qualitative_interpretation",
+    "text": "The bundle includes validated market-source status and an exchange cross-check status.",
+    "evidence_ids": [
+      "source.coingecko.status",
+      "source.defillama.status",
+      "source.coinbase_exchange.status"
+    ],
+    "confidence": "high"
+  }
+}
