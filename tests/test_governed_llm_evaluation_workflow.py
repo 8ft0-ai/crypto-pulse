@@ -45,7 +45,8 @@ class GovernedLlmEvaluationWorkflowTests(unittest.TestCase):
     def test_exact_source_controlled_plan_is_used(self) -> None:
         self.assertIn("--config config/llm-evaluation.yml", self.text)
         self.assertIn("python -m llm_analysis.evaluation prepare", self.text)
-        self.assertIn("python -m llm_analysis.evaluation run", self.text)
+        self.assertIn("python -m llm_analysis.evaluation_runner", self.text)
+        self.assertNotIn("python -m llm_analysis.evaluation run", self.text)
         self.assertNotIn("openrouter/free", self.text)
         self.assertNotIn("openrouter/auto", self.text)
 
