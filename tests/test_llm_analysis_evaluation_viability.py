@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -74,6 +73,7 @@ class ViabilityTests(unittest.TestCase):
         self.assertEqual(policy.maximum_jitter_seconds, 3)
         self.assertEqual(policy.maximum_attempts, 3)
         self.assertEqual(policy.fallback_backoff_seconds, (15.0, 30.0, 60.0))
+        self.assertEqual(policy.smoke_case_key, "historical-normal-crosschecked")
         self.assertEqual(policy.maximum_full_corpus_candidates, 2)
 
     def test_retry_after_and_rate_limit_reset_are_honoured(self) -> None:
@@ -149,7 +149,9 @@ class ViabilityTests(unittest.TestCase):
 
     def _fixture(self, root: Path, prepared: Path) -> None:
         sha = fixture_repo(root)
-        shutil.copy(ROOT / "config/llm-evaluation-viability.yml", root / "config/llm-evaluation-viability.yml")
+        policy = (ROOT / "config/llm-evaluation-viability.yml").read_text(encoding="utf-8")
+        policy = policy.replace("historical-normal-crosschecked", "normal")
+        (root / "config/llm-evaluation-viability.yml").write_text(policy, encoding="utf-8")
         prepare_evaluation(
             repository_root=root,
             config_path="config/llm-evaluation.yml",
