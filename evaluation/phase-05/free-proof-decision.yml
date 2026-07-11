@@ -1,0 +1,176 @@
+version: 1
+decision_id: phase-05-free-proof-no-go-2026-07-11
+status: free-proof-no-go
+reviewed_on: "2026-07-11"
+parent_issue: 199
+issue: 201
+
+source_run:
+  workflow: Governed LLM model evaluation
+  run_id: 29144514292
+  run_url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29144514292
+  comparison_job_id: 86523647793
+  comparison_job_url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29144514292/job/86523647793
+  trusted_main_sha: bf25c6c4ff2924f18bd28050d5b6016676045192
+  completed_at_utc: "2026-07-11T07:28:54.950968Z"
+  artifact:
+    name: governed-llm-evaluation-29144514292-1
+    artifact_id: 8246302011
+    digest: sha256:a51f829291bf823c7c4d7b5c626b24cacd856986c9841db07552811a8fc066a8
+    retained_until: "2026-08-10T07:28:55Z"
+  reviewed_file_hashes:
+    actions_summary_sha256: cf0f2f0f4c1d284f37698412a2bc828ea131613aea7a1c9d28c24632926e8904
+    attempt_records_sha256: 6888e4748e44e1a634597950aa24ebdbff6da21e2405018b0a6e93f48a66b6e0
+    decision_candidate_sha256: e55512a5521ab8b4d86fc61ec72e71c803f77a6b4f214e98ded617ae2a025230
+    evaluation_summary_sha256: 4085459fe372828f7d8ee5d272c366e539609677e80d29c9258b98554fc1de1a
+    key_status_sha256: 1839315e5ed25cd51e42078ea1f214ae7138618e2c7fc6747aed2f1b8ecd1f59
+    model_availability_sha256: 44e9a5af95f33adb597b86e0b974d68e0521af1af9b9649b5743ec81a5482d70
+    reviewer_scorecard_sha256: 4b2652247b23ac75300bf021fae7e9c8d7eaa89377146ab86dfe4dc306bcdde0
+    viability_stages_sha256: 572978bfdc576cca9eb5392b7ef37891d3ce66f68a6eebbe971a87369e12a039
+
+provenance:
+  evaluator_implementation_issue: 200
+  evaluator_implementation_pr: 202
+  candidate_configuration_pr: 203
+  candidate_config: config/llm-evaluation-free-proof.yml
+  historical_no_go_pr: 198
+  historical_decision: evaluation/phase-05/decision.yml
+
+experiment:
+  maximum_logical_calls: 26
+  completed_logical_calls: 3
+  http_attempts: 5
+  route_preflight_candidates: 3
+  route_preflight_passes: 0
+  smoke_test_passes: 0
+  full_corpus_finalists: []
+  full_corpus_runs: 0
+  accepted_model_outputs: 0
+  estimated_cost_usd_total: 0
+
+key_status:
+  is_free_tier: false
+  monetary_limit: 10
+  monetary_usage: 0.0139807
+  monetary_limit_remaining: 9.9860193
+  request_budget_assessment: appears_sufficient
+  rate_limit_headroom_known: false
+  interpretation: Monetary quota appeared sufficient, but the key endpoint did not establish model-route rate-limit headroom.
+
+pacing_evidence:
+  minimum_interval_seconds: 10
+  maximum_attempts: 3
+  attempts:
+    - logical_id: route-preflight/nemotron-nano-9b-v2
+      attempt: 1
+      delay_before_seconds: 0.0
+      delay_source: none
+      response_status: 404
+      classification: ineligible_routing
+    - logical_id: route-preflight/gpt-oss-20b
+      attempt: 1
+      delay_before_seconds: 11.456758
+      delay_source: minimum_interval+jitter
+      response_status: 404
+      classification: ineligible_routing
+    - logical_id: route-preflight/venice-dolphin-mistral-24b
+      attempt: 1
+      delay_before_seconds: 10.604907
+      delay_source: minimum_interval+jitter
+      response_status: 429
+      classification: rate_limited
+    - logical_id: route-preflight/venice-dolphin-mistral-24b
+      attempt: 2
+      delay_before_seconds: 22.225381
+      delay_source: retry_after+jitter
+      response_status: 429
+      classification: rate_limited
+    - logical_id: route-preflight/venice-dolphin-mistral-24b
+      attempt: 3
+      delay_before_seconds: 31.077794
+      delay_source: retry_after+jitter
+      response_status: 429
+      classification: rate_limited
+
+models:
+  - key: nemotron-nano-9b-v2
+    requested_model: nvidia/nemotron-nano-9b-v2:free
+    catalogue_available: true
+    catalogue_eligible: true
+    catalogue_expiration_date: null
+    route_preflight: failed
+    failure_code: ineligible_routing
+    http_attempts: 1
+    smoke_test: not_run
+    full_corpus: not_run
+    actual_model: null
+    actual_provider: null
+    provider_fallback_used: null
+    cross_model_fallback_used: null
+    reason: No endpoint for the exact model satisfied the required Zero Data Retention and provider-policy constraints.
+
+  - key: gpt-oss-20b
+    requested_model: openai/gpt-oss-20b:free
+    catalogue_available: true
+    catalogue_eligible: true
+    catalogue_expiration_date: null
+    route_preflight: failed
+    failure_code: ineligible_routing
+    http_attempts: 1
+    smoke_test: not_run
+    full_corpus: not_run
+    actual_model: null
+    actual_provider: null
+    provider_fallback_used: null
+    cross_model_fallback_used: null
+    reason: No endpoint for the exact model satisfied the required Zero Data Retention and provider-policy constraints.
+
+  - key: venice-dolphin-mistral-24b
+    requested_model: cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+    catalogue_available: true
+    catalogue_eligible: true
+    catalogue_expiration_date: "2026-07-19"
+    route_preflight: failed
+    failure_code: rate_limited
+    http_attempts: 3
+    smoke_test: not_run
+    full_corpus: not_run
+    actual_model: null
+    actual_provider: null
+    provider_fallback_used: null
+    cross_model_fallback_used: null
+    reason: The route returned HTTP 429 on all three bounded attempts despite minimum spacing and Retry-After-aware delays.
+
+results:
+  selected_model: null
+  model_quality_evidence: unavailable
+  usefulness_readability_results: unavailable
+  latency_token_results: unavailable
+  reproducibility_results: unavailable
+  actual_providers_observed: []
+  recommendation: Close the free-model option for Phase 5. Do not test further free candidates under this phase.
+
+boundaries:
+  zero_data_retention_required: true
+  data_collection_denied: true
+  required_parameters_enforced: true
+  same_model_provider_fallback_allowed: true
+  cross_model_fallback_enabled: false
+  paid_model_approved: false
+  automatic_generation_after_snapshot_merge_approved: false
+  rolling_report_generation_approved: false
+  evaluation_output_reused_as_evidence: false
+  raw_provider_output_committed: false
+  secrets_committed: false
+  generated_site_output_committed: false
+
+planning_effect:
+  issue_201_status_after_merge: completed
+  free_model_option: closed
+  further_free_model_testing_in_phase_5: prohibited
+  issue_199_remaining_choices:
+    - paid-proof
+    - park-and-close
+  issue_189_status: blocked
+  issue_181_status: pending planning decision
+  rationale: No selected free candidate obtained a viable route and no candidate reached the governed contract smoke test.
