@@ -1,6 +1,14 @@
 # Phase 5 historical model evaluation
 
-This directory defines the fixed inputs and scoring rules for issue #188. It does not contain provider output and does not make a model-selection claim before controlled runs exist.
+## Reviewed status
+
+The protected comparison completed on 11 July 2026 and produced a reviewed **no-go** decision. Neither evaluated free-model configuration completed a single governed generation under the required provider-policy and reliability constraints.
+
+- Reviewer-visible decision: [`decision.md`](decision.md)
+- Machine-readable decision: [`decision.yml`](decision.yml)
+- Source workflow run: [29142348720](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29142348720)
+
+The decision does not weaken zero-data retention, enable cross-model fallback, approve a paid model, or authorise automatic or rolling report generation. Issue #189 remains blocked until a separately approved routable configuration or product-direction decision exists.
 
 ## Fixed corpus
 
