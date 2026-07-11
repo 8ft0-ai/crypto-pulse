@@ -6,14 +6,15 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-EVALUATION_CONFIG = ROOT / "config" / "llm-evaluation.yml"
+FREE_PROOF_CONFIG = ROOT / "config" / "llm-evaluation-free-proof.yml"
+HISTORICAL_CONFIG = ROOT / "config" / "llm-evaluation.yml"
 CANDIDATE_RECORD = ROOT / "evaluation" / "phase-05" / "free-proof-candidates.md"
 HISTORICAL_DECISION = ROOT / "evaluation" / "phase-05" / "decision.yml"
 
 
 class FinalFreeModelCandidateTests(unittest.TestCase):
     def test_exact_bounded_candidate_set_is_source_controlled(self) -> None:
-        config = yaml.safe_load(EVALUATION_CONFIG.read_text(encoding="utf-8"))
+        config = yaml.safe_load(FREE_PROOF_CONFIG.read_text(encoding="utf-8"))
         models = config["models"]
 
         self.assertEqual(len(models), 3)
@@ -38,9 +39,21 @@ class FinalFreeModelCandidateTests(unittest.TestCase):
             "2026-07-19",
         )
 
+    def test_historical_evaluation_plan_remains_immutable(self) -> None:
+        config = yaml.safe_load(HISTORICAL_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(
+            [item["model"] for item in config["models"]],
+            [
+                "nvidia/nemotron-3-super-120b-a12b:free",
+                "qwen/qwen3-next-80b-a3b-instruct:free",
+            ],
+        )
+        self.assertEqual(config["runs_per_case"], 2)
+
     def test_candidate_record_explains_qwen_exclusion_and_preserves_boundaries(self) -> None:
         text = CANDIDATE_RECORD.read_text(encoding="utf-8")
 
+        self.assertIn("config/llm-evaluation-free-proof.yml", text)
         for slug in (
             "nvidia/nemotron-nano-9b-v2:free",
             "openai/gpt-oss-20b:free",
