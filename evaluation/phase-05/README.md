@@ -10,6 +10,19 @@ The protected comparison completed on 11 July 2026 and produced a reviewed **no-
 
 The decision does not weaken zero-data retention, enable cross-model fallback, approve a paid model, or authorise automatic or rolling report generation. Issue #189 remains blocked until a separately approved routable configuration or product-direction decision exists.
 
+## Final bounded free-model follow-up
+
+A separate paced viability experiment was subsequently run under #201 after the evaluator improvements from #200. It screened three new explicit free candidates through route preflight before allowing smoke-test or full-corpus calls.
+
+- Reviewer-visible follow-up decision: [`free-proof-decision.md`](free-proof-decision.md)
+- Machine-readable follow-up decision: [`free-proof-decision.yml`](free-proof-decision.yml)
+- Candidate record: [`free-proof-candidates.md`](free-proof-candidates.md)
+- Source workflow run: [29144514292](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29144514292)
+
+The follow-up outcome is **`free-proof-no-go`**. Two candidates had no ZDR-compatible route, while the third exhausted its bounded rate-limit retry budget despite minimum request spacing and `Retry-After` handling. No candidate reached contract smoke testing or the full corpus.
+
+The free-model option is therefore closed for Phase 5. The remaining planning choice in #199 is a separately approved paid proof or park-and-close. ZDR, data-collection denial, disabled cross-model fallback and disabled automatic generation remain unchanged.
+
 ## Fixed corpus
 
 The corpus contains three immutable historical snapshots and two deterministic evaluation-only mutations:
@@ -24,7 +37,9 @@ The two mutations are deliberately labelled `evaluation-only`. They are not hist
 
 ## Bounded comparison
 
-The source-controlled comparison contains exactly two explicit free model slugs: the current Nemotron candidate and one Qwen alternative. `openrouter/free`, `openrouter/auto`, paid models and cross-model fallback are prohibited.
+The original source-controlled comparison contains exactly two explicit free model slugs: the current Nemotron candidate and one Qwen alternative. `openrouter/free`, `openrouter/auto`, paid models and cross-model fallback are prohibited.
+
+The final follow-up uses a separate immutable configuration, `config/llm-evaluation-free-proof.yml`, so the original two-model plan and its reviewed no-go remain independently reproducible.
 
 At execution time the workflow checks the public OpenRouter catalogue again. A disappeared, expired, non-zero-price or structured-output-ineligible model is recorded as ineligible rather than silently replaced.
 
