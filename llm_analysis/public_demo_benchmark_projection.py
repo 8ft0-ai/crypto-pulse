@@ -7,21 +7,26 @@ import json
 import os
 from typing import Any
 
+from . import evaluation_execution
 from . import public_demo_benchmark as base
 from . import public_demo_benchmark_compat as compat
 from .evaluation import EvaluationConfigurationError, EvaluationIntegrityError
 from .generation_config import ConfigurationError
 from .openai_schema_projection import OpenAICompatibleSchemaClient
+from .public_demo_validation import process_public_demo_analysis
 
 
 def execute_public_demo_projection(**kwargs: Any) -> dict[str, Any]:
-    """Run the existing compatible demo with a provider-only schema adapter."""
+    """Run the existing compatible demo with provider and validation adapters."""
 
     original_client = base.OpenRouterClient
+    original_process = evaluation_execution.process_analysis
     base.OpenRouterClient = OpenAICompatibleSchemaClient
+    evaluation_execution.process_analysis = process_public_demo_analysis
     try:
         return compat.execute_public_demo_compat(**kwargs)
     finally:
+        evaluation_execution.process_analysis = original_process
         base.OpenRouterClient = original_client
 
 
