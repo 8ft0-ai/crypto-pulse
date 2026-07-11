@@ -1,0 +1,20 @@
+version: 1
+base_generation_config: config/llm-generation.yml
+corpus_manifest: evaluation/phase-05/corpus.yml
+runs_per_case: 2
+models:
+  - key: nemotron-nano-9b-v2
+    model: nvidia/nemotron-nano-9b-v2:free
+    role: current_candidate
+    availability_checked_at: "2026-07-11"
+    known_expiration_date: null
+  - key: gpt-oss-20b
+    model: openai/gpt-oss-20b:free
+    role: eligible_alternative
+    availability_checked_at: "2026-07-11"
+    known_expiration_date: null
+  - key: venice-dolphin-mistral-24b
+    model: cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+    role: eligible_alternative
+    availability_checked_at: "2026-07-11"
+    known_expiration_date: "2026-07-19"
