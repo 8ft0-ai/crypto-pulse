@@ -13,7 +13,9 @@ from . import public_demo_benchmark_compat as compat
 from .evaluation import EvaluationConfigurationError, EvaluationIntegrityError
 from .generation_config import ConfigurationError
 from .openai_schema_projection import OpenAICompatibleSchemaClient
-from .public_demo_validation import process_public_demo_analysis
+from .public_demo_negative_magnitude import (
+    process_public_demo_analysis_with_negative_magnitude,
+)
 
 
 def execute_public_demo_projection(**kwargs: Any) -> dict[str, Any]:
@@ -22,7 +24,9 @@ def execute_public_demo_projection(**kwargs: Any) -> dict[str, Any]:
     original_client = base.OpenRouterClient
     original_process = evaluation_execution.process_analysis
     base.OpenRouterClient = OpenAICompatibleSchemaClient
-    evaluation_execution.process_analysis = process_public_demo_analysis
+    evaluation_execution.process_analysis = (
+        process_public_demo_analysis_with_negative_magnitude
+    )
     try:
         return compat.execute_public_demo_compat(**kwargs)
     finally:
