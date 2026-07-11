@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8ft0-ai.github.io/crypto-pulse/schemas/crypto-market-analysis-v1.json",
+  "title": "CryptoPulse governed structured analysis v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "prompt_version",
+    "evidence_bundle_id",
+    "headline",
+    "market_summary",
+    "key_observations",
+    "risks_and_limitations",
+    "data_quality_notes",
+    "source_evidence_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "crypto-market-analysis/v1"
+    },
+    "prompt_version": {
+      "const": "crypto-market-analysis/v1"
+    },
+    "evidence_bundle_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "headline": {
+      "$ref": "#/$defs/claim"
+    },
+    "market_summary": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/claim"}
+    },
+    "key_observations": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/claim"}
+    },
+    "risks_and_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {"$ref": "#/$defs/claim"}
+    },
+    "data_quality_notes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {"$ref": "#/$defs/claim"}
+    },
+    "source_evidence_note": {
+      "$ref": "#/$defs/claim"
+    }
+  },
+  "$defs": {
+    "quoted_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "value"],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._/-]*$"
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left_evidence_id", "relation", "right_evidence_id"],
+      "properties": {
+        "left_evidence_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+        },
+        "relation": {
+          "enum": ["greater_than", "less_than", "approximately_equal", "not_equal", "opposite_direction"]
+        },
+        "right_evidence_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_type", "text", "evidence_ids", "confidence"],
+      "properties": {
+        "claim_type": {
+          "enum": [
+            "absolute_observation",
+            "directional_observation",
+            "comparison",
+            "data_quality_limitation",
+            "source_disagreement",
+            "qualitative_interpretation"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+          }
+        },
+        "confidence": {
+          "enum": ["high", "medium", "low"]
+        },
+        "quoted_values": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/quoted_value"}
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "claim_type": {"enum": ["comparison", "source_disagreement"]}
+            },
+            "required": ["claim_type"]
+          },
+          "then": {
+            "required": ["comparison"],
+            "properties": {
+              "evidence_ids": {"minItems": 2}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "claim_type": {"const": "qualitative_interpretation"}
+            },
+            "required": ["claim_type"]
+          },
+          "then": {
+            "properties": {
+              "evidence_ids": {"minItems": 2}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
