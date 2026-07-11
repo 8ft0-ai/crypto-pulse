@@ -22,7 +22,13 @@
     "source_snapshot": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256", "schema_version", "quality_status", "generated_at_utc"],
+      "required": [
+        "path",
+        "sha256",
+        "schema_version",
+        "quality_status",
+        "generated_at_utc"
+      ],
       "properties": {
         "path": {
           "type": "string",
@@ -37,7 +43,10 @@
           "minLength": 1
         },
         "quality_status": {
-          "enum": ["valid-ok", "valid-degraded"]
+          "enum": [
+            "valid-ok",
+            "valid-degraded"
+          ]
         },
         "generated_at_utc": {
           "type": "string",
@@ -66,10 +75,20 @@
     "subject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "id"],
+      "required": [
+        "type",
+        "id"
+      ],
       "properties": {
         "type": {
-          "enum": ["asset", "market", "snapshot", "source", "exchange_pair", "defi_metric"]
+          "enum": [
+            "asset",
+            "market",
+            "snapshot",
+            "source",
+            "exchange_pair",
+            "defi_metric"
+          ]
         },
         "id": {
           "type": "string",
@@ -88,7 +107,10 @@
     "source_reference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source_path"],
+      "required": [
+        "name",
+        "source_path"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -103,14 +125,28 @@
     "evidence_item": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["evidence_id", "evidence_type", "subject", "field", "value", "source"],
+      "required": [
+        "evidence_id",
+        "evidence_type",
+        "subject",
+        "field",
+        "value",
+        "source"
+      ],
       "properties": {
         "evidence_id": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
         },
         "evidence_type": {
-          "enum": ["number", "string", "timestamp", "status", "boolean", "set"]
+          "enum": [
+            "number",
+            "string",
+            "timestamp",
+            "status",
+            "boolean",
+            "set"
+          ]
         },
         "subject": {
           "$ref": "#/$defs/subject"
@@ -121,12 +157,24 @@
         },
         "value": {
           "oneOf": [
-            {"type": "number"},
-            {"type": "string"},
-            {"type": "boolean"},
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
             {
               "type": "array",
-              "items": {"type": ["string", "number", "boolean"]}
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
             }
           ]
         },
@@ -141,7 +189,109 @@
         "source": {
           "$ref": "#/$defs/source_reference"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_type": {
+                "const": "number"
+              }
+            },
+            "required": [
+              "evidence_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_type": {
+                "enum": [
+                  "string",
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "evidence_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_type": {
+                "const": "timestamp"
+              }
+            },
+            "required": [
+              "evidence_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_type": {
+                "const": "boolean"
+              }
+            },
+            "required": [
+              "evidence_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_type": {
+                "const": "set"
+              }
+            },
+            "required": [
+              "evidence_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
