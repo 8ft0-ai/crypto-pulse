@@ -28,6 +28,7 @@ SENTENCE_OPENERS = frozenset(
         "in",
         "over",
         "several",
+        "multiple",
         "during",
         "across",
         "while",
