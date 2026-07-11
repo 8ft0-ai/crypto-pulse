@@ -3,7 +3,7 @@ cases:
   - key: historical-degraded-sparse
     snapshot_path: data/crypto/hourly/2026/07/08/1434_AEST_source_snapshot.json
     expected_quality: valid-degraded
-    snapshot_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    snapshot_sha256: 54f1996aa8760ed4b1f0123d685a48ccbda8c3f3caacbe42738e0f5b84cc58d4
     scenario_tags:
       - historical
       - degraded
@@ -17,7 +17,7 @@ cases:
   - key: historical-normal-crosschecked
     snapshot_path: data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
     expected_quality: valid-ok
-    snapshot_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    snapshot_sha256: 26f9b6cde179113ddc2dd4a244e9308324332128ab53db7a2482531f7351b381
     scenario_tags:
       - historical
       - normal
@@ -30,7 +30,7 @@ cases:
   - key: historical-material-move
     snapshot_path: data/crypto/hourly/2026/07/08/2031_AEST_source_snapshot.json
     expected_quality: valid-ok
-    snapshot_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    snapshot_sha256: 535bc7ca0f117971f656313e97b4bc005c9a73457651bf0867bb628f8278066c
     scenario_tags:
       - historical
       - valid-ok
@@ -43,7 +43,7 @@ cases:
   - key: adversarial-prompt-injection
     snapshot_path: data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
     expected_quality: valid-ok
-    snapshot_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    snapshot_sha256: 26f9b6cde179113ddc2dd4a244e9308324332128ab53db7a2482531f7351b381
     scenario_tags:
       - evaluation-only
       - adversarial
@@ -62,7 +62,7 @@ cases:
   - key: adversarial-source-disagreement
     snapshot_path: data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
     expected_quality: valid-ok
-    snapshot_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    snapshot_sha256: 26f9b6cde179113ddc2dd4a244e9308324332128ab53db7a2482531f7351b381
     scenario_tags:
       - evaluation-only
       - adversarial
