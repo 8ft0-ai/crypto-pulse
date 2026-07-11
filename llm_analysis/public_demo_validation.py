@@ -2,8 +2,9 @@
 
 The canonical validator remains authoritative. This module removes only diagnostics
 that can be independently re-proven from the claim's cited evidence: supported ISO
-dates, bounded decimal rounding with exact quoted values, source-label aliases, and
-common sentence-opening function words. No output is repaired or inferred.
+dates, bounded decimal rounding with exact quoted values, source-label aliases,
+deterministic set-member aliases, and common sentence-opening function words. No
+output is repaired or inferred.
 """
 
 from __future__ import annotations
@@ -86,6 +87,10 @@ def _decimal_places(value: str) -> int:
     return len(text.partition(".")[2]) if "." in text else 0
 
 
+def _normalised_label(value: str) -> str:
+    return re.sub(r"[_-]+", " ", value.strip().casefold())
+
+
 def _referenced_evidence(
     claim: Mapping[str, Any], evidence_by_id: Mapping[str, Mapping[str, Any]]
 ) -> dict[str, Mapping[str, Any]]:
@@ -112,9 +117,47 @@ def _label_aliases(item: Mapping[str, Any]) -> set[str]:
     for label in labels:
         if not isinstance(label, str) or len(label.strip()) < 2:
             continue
-        folded = label.strip().casefold()
-        aliases.add(folded)
-        aliases.add(re.sub(r"[_-]+", " ", folded))
+        aliases.add(_normalised_label(label))
+    return aliases
+
+
+def _bundle_names_by_symbol(
+    evidence_by_id: Mapping[str, Mapping[str, Any]],
+) -> dict[str, set[str]]:
+    names_by_symbol: dict[str, set[str]] = {}
+    for item in evidence_by_id.values():
+        subject = _subject(item)
+        symbol = subject.get("symbol")
+        name = subject.get("name")
+        if not isinstance(symbol, str) or not symbol.strip():
+            continue
+        if not isinstance(name, str) or not name.strip():
+            continue
+        names_by_symbol.setdefault(symbol.strip().casefold(), set()).add(
+            _normalised_label(name)
+        )
+    return names_by_symbol
+
+
+def _set_member_aliases(
+    claim: Mapping[str, Any],
+    evidence_by_id: Mapping[str, Mapping[str, Any]],
+) -> set[str]:
+    """Return exact cited set members plus unique bundle-local subject names."""
+
+    names_by_symbol = _bundle_names_by_symbol(evidence_by_id)
+    aliases: set[str] = set()
+    for item in _referenced_evidence(claim, evidence_by_id).values():
+        if item.get("evidence_type") != "set":
+            continue
+        for member in _list(item.get("value")):
+            if not isinstance(member, str) or not member.strip():
+                continue
+            symbol = member.strip().casefold()
+            aliases.add(_normalised_label(member))
+            mapped_names = names_by_symbol.get(symbol, set())
+            if len(mapped_names) == 1:
+                aliases.update(mapped_names)
     return aliases
 
 
@@ -123,13 +166,10 @@ def _safe_entity_alias(
     claim: Mapping[str, Any],
     evidence_by_id: Mapping[str, Mapping[str, Any]],
 ) -> bool:
-    supported = set().union(
-        *(
-            _label_aliases(item)
-            for item in _referenced_evidence(claim, evidence_by_id).values()
-        )
-    )
-    return re.sub(r"[_-]+", " ", token.casefold()) in supported
+    referenced = _referenced_evidence(claim, evidence_by_id)
+    supported = set().union(*(_label_aliases(item) for item in referenced.values()))
+    supported.update(_set_member_aliases(claim, evidence_by_id))
+    return _normalised_label(token) in supported
 
 
 def _safe_iso_date(
