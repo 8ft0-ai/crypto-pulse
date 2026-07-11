@@ -28,6 +28,8 @@ UNSUPPORTED = {
     "then",
     "else",
     "uniqueItems",
+    "minLength",
+    "maxLength",
     "const",
 }
 
@@ -102,7 +104,9 @@ class OpenAISchemaProjectionTests(unittest.TestCase):
         self.assertFalse(UNSUPPORTED.intersection(serialized_keys))
         self.assertNotIn("$schema", self.projected)
         self.assertNotIn("$id", self.projected)
-        self.assertEqual(self.projected["properties"]["schema_version"]["enum"], ["crypto-market-analysis/v1"])
+        schema_version = self.projected["properties"]["schema_version"]
+        self.assertEqual(schema_version["type"], "string")
+        self.assertEqual(schema_version["enum"], ["crypto-market-analysis/v1"])
 
     def test_every_projected_object_requires_every_property(self) -> None:
         objects = [
