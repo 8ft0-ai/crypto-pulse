@@ -1,0 +1,14 @@
+version: 1
+base_generation_config: config/llm-generation-gpt-4o-mini-benchmark.yml
+corpus_source_config: config/llm-evaluation.yml
+model:
+  key: gpt-4o-mini
+  model: openai/gpt-4o-mini
+  availability_checked_at: "2026-07-11"
+  known_expiration_date: null
+pricing:
+  mode: paid
+  maximum_prompt_price_per_million: 0.15
+  maximum_completion_price_per_million: 0.60
+  maximum_generation_cost_usd: 0.01
+  maximum_experiment_cost_usd: 0.15
