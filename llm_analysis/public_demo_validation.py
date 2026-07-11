@@ -18,7 +18,7 @@ from .pipeline import PipelineResult
 from .render import render_markdown
 from .validate import iter_claims, validate_analysis
 
-ISO_DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+ISO_DATE_RE = re.compile(r"(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)")
 APPROXIMATION_RE = re.compile(r"\b(?:approximately|approx\.?|about|around|roughly)\b", re.I)
 NEGATIVE_DIRECTION_RE = re.compile(r"\b(?:decreased|declined|fell|fallen|down|dropped|lower)\b", re.I)
 SENTENCE_OPENERS = frozenset(
@@ -44,7 +44,7 @@ SENTENCE_OPENERS = frozenset(
         "based",
     }
 )
-_QUOTED_TOKEN_RE = re.compile(r"'([^']+)'" )
+_QUOTED_TOKEN_RE = re.compile(r"'([^']+)'")
 
 
 def _list(value: Any) -> list[Any]:
