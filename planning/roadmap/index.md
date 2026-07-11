@@ -43,6 +43,17 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 | Phase | Status | Planning record | Delivery record |
 | --- | --- | --- | --- |
 | Phase 4 — Live-site provenance UX | Shaping | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | Pending |
+| Phase 5 — Governed LLM analysis | Shaping | [phase-05-governed-llm-analysis.md](phase-05-governed-llm-analysis.md) | Pending |
+
+## Backlog
+
+Ideas that are useful but not ready for an active phase are parked in:
+
+```text
+backlog.md
+```
+
+Use the backlog to preserve follow-on ideas without expanding the active phase scope.
 
 ## Retrospective roadmap specs
 
