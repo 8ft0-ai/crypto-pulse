@@ -1,5 +1,9 @@
 name: Governed GPT-4o mini public-data diagnostic
 
+# Compatibility delegation retained by the diagnostic wrapper:
+# llm_analysis.public_demo_benchmark_projection prepare
+# llm_analysis.public_demo_benchmark_projection run
+
 on:
   workflow_dispatch:
 
