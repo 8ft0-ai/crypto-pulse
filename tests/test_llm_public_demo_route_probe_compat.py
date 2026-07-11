@@ -105,10 +105,10 @@ class PublicDemoRouteProbeCompatibilityTests(unittest.TestCase):
             self.assertNotIn("request_body", serialized)
             self.assertIn("Raw response body and request secrets retained: `false`", (output / DECISION_MARKDOWN).read_text(encoding="utf-8"))
 
-    def test_workflow_uses_compatibility_runner_without_changing_boundaries(self) -> None:
+    def test_workflow_uses_projection_runner_without_changing_boundaries(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("llm_analysis.public_demo_benchmark_compat prepare", text)
-        self.assertIn("llm_analysis.public_demo_benchmark_compat run", text)
+        self.assertIn("llm_analysis.public_demo_benchmark_projection prepare", text)
+        self.assertIn("llm_analysis.public_demo_benchmark_projection run", text)
         self.assertIn("workflow_dispatch:", text)
         self.assertIn("contents: read", text)
         self.assertIn("governed-llm-dry-run", text)
