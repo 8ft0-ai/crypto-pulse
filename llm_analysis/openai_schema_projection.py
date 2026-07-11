@@ -46,6 +46,32 @@ def _json_type(value: Any) -> str:
     raise TypeError("provider schema projection supports only scalar enum values")
 
 
+def _list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def source_disagreement_supported(evidence_bundle: Mapping[str, Any]) -> bool:
+    """Return whether the bundle contains a canonical source-disagreement pair."""
+
+    sources_by_measure: dict[tuple[str, str, str], set[str]] = {}
+    for item in _list(evidence_bundle.get("evidence")):
+        if not isinstance(item, Mapping) or item.get("evidence_type") != "number":
+            continue
+        subject_id = _mapping(item.get("subject")).get("id")
+        field = item.get("field")
+        unit = item.get("unit")
+        source_name = _mapping(item.get("source")).get("name")
+        if not all(isinstance(value, str) and value for value in (subject_id, field, unit, source_name)):
+            continue
+        key = (subject_id, field, unit)
+        sources_by_measure.setdefault(key, set()).add(source_name)
+    return any(len(sources) > 1 for sources in sources_by_measure.values())
+
+
 def _nullable(schema: Mapping[str, Any]) -> dict[str, Any]:
     """Represent a canonically optional property as a required nullable union."""
 
@@ -59,12 +85,31 @@ def _nullable(schema: Mapping[str, Any]) -> dict[str, Any]:
     return {"anyOf": [projected, {"type": "null"}]}
 
 
-def project_openai_strict_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+def _restrict_evidence_aware_claim_types(
+    projected: dict[str, Any], evidence_bundle: Mapping[str, Any]
+) -> None:
+    if source_disagreement_supported(evidence_bundle):
+        return
+    definitions = projected.get("$defs")
+    claim = definitions.get("claim") if isinstance(definitions, Mapping) else None
+    properties = claim.get("properties") if isinstance(claim, Mapping) else None
+    claim_type = properties.get("claim_type") if isinstance(properties, Mapping) else None
+    enum_values = claim_type.get("enum") if isinstance(claim_type, Mapping) else None
+    if not isinstance(enum_values, list):
+        raise ValueError("projected claim_type enum is missing")
+    claim_type["enum"] = [value for value in enum_values if value != "source_disagreement"]
+
+
+def project_openai_strict_schema(
+    schema: Mapping[str, Any], *, evidence_bundle: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     """Return a deterministic OpenAI-compatible projection of a canonical schema.
 
     The projection deliberately removes constraints that OpenAI cannot enforce.
     Those constraints remain in the unchanged canonical schema and are applied by
-    the repository's offline validators after generation.
+    the repository's offline validators after generation. When a bundle is supplied,
+    claim types that cannot be supported by that evidence are removed from the
+    provider-only enum before constrained decoding.
     """
 
     def project(value: Any) -> Any:
@@ -121,6 +166,8 @@ def project_openai_strict_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
         raise TypeError("analysis schema projection must produce an object")
     if projected.get("type") != "object":
         raise ValueError("OpenAI strict-output root schema must be an object")
+    if evidence_bundle is not None:
+        _restrict_evidence_aware_claim_types(projected, evidence_bundle)
     return projected
 
 
@@ -158,7 +205,10 @@ class OpenAICompatibleSchemaClient:
         api_key: str | None = None,
         environment: Mapping[str, str] | None = None,
     ) -> GenerationResult:
-        projected = project_openai_strict_schema(analysis_schema)
+        projected = project_openai_strict_schema(
+            analysis_schema,
+            evidence_bundle=evidence_bundle,
+        )
         result = self._delegate.generate(
             evidence_bundle=evidence_bundle,
             prompt_template=prompt_template,

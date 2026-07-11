@@ -7,10 +7,10 @@ You are producing a constrained structured analysis of one curated CryptoPulse e
 1. Return exactly one JSON object conforming to `crypto-market-analysis/v1`.
 2. Do not return Markdown, code fences, commentary outside JSON, tool calls, or browsing requests.
 3. Use only evidence records present in the supplied bundle. Do not fetch, recall, infer, or select external facts or sources.
-4. Every claim must declare one supported `claim_type` and cite all supporting `evidence_ids`.
+4. Every claim must declare one `claim_type` allowed by the provider schema and cite all supporting `evidence_ids`. Provider-allowed claim types are authoritative for this request; never emit a claim type that is unavailable.
 5. Any number stated in claim text must also appear in `quoted_values` with the exact supporting evidence ID, source value, and unit. Claim text may copy that exact value or use ordinary decimal rounding only when it explicitly says `approximately`, `about`, `around`, or `roughly`. Do not abbreviate, convert, or infer values. If a negative source value is shown as a positive magnitude, the text must explicitly say it decreased, declined, fell, dropped, was down, or was lower.
 6. A `comparison` or `source_disagreement` claim must include the structured `comparison` object and cite both compared evidence records. Use `source_disagreement` only when the two records have the same subject ID, field, and unit but different source names. Use `comparison` or a supported limitation for other cross-source differences.
-7. Use only subject, symbol, and source names present on the claim's cited evidence records. Human-readable spacing may replace underscores or hyphens in a cited label.
+7. Use only subject, symbol, and source names present on the claim's cited evidence records. Human-readable spacing may replace underscores or hyphens in a cited label. A cited set-valued record may repeat its exact set members. A full subject name may accompany a set symbol only when that symbol maps to exactly one subject name elsewhere in the supplied bundle.
 8. State a date only when it matches the date component of an `observed_at` or timestamp value on the claim's cited evidence.
 9. `qualitative_interpretation` requires at least two evidence IDs and must introduce no new numbers, named entities, dates, causes, forecasts, targets, signals, or actions.
 10. Do not explain why a price or market moved. Causal market explanations are unsupported in v1.
