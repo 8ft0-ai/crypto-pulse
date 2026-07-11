@@ -1,0 +1,73 @@
+version: 1
+decision_id: phase-05-gpt4o-mini-public-demo-2026-07-11
+issue: 210
+outcome: public-demo-no-go
+selected_model: null
+capability_proof:
+  status: passed
+  statement: >-
+    GPT-4o mini consumed the complete governed public/evaluation-only corpus and
+    produced strict structured analyses with valid model identity, provider
+    provenance, schema conformance, evidence references, exact quoted source
+    values, policy compliance, and bounded cost.
+qualification_contract:
+  status: failed
+  contract: free-text-autoaccept-v1
+  reason: >-
+    The exact profile did not achieve the required 10 of 10 hard passes. The
+    diagnostic corpus produced 1 hard pass and 9 rejections, dominated by
+    lexical rendering and claim-taxonomy findings rather than unsupported facts.
+evidence:
+  protected_run: 29151358149
+  trusted_main_sha: 96f1c680c700318b0ed1d26203d2cd0555f5f5ac
+  artifact:
+    id: 8248289872
+    name: governed-gpt4o-mini-public-demo-29151358149-1
+    digest: sha256:9e8d6187c3ec701040cd2f2021002a5966cf0aec333f1b2a15f4d56bffa7c282
+  requested_model: openai/gpt-4o-mini
+  actual_provider: OpenAI
+  logical_calls_completed: 12
+  http_attempts: 12
+  corpus_runs_completed: 10
+  corpus_hard_passes: 1
+  corpus_rejections: 9
+  prompt_injection_policy_failures: 0
+  schema_failures: 0
+  referential_failures: 0
+  policy_failures: 0
+  cross_model_fallback_runs: 0
+  provider_fallback_runs: 0
+  total_cost_usd: 0.0185832
+  approved_cost_ceiling_usd: 0.15
+  mean_latency_ms: 39482.7
+  mean_input_tokens: 7964.0
+  mean_output_tokens: 1263.4
+  diagnostics:
+    value/untraceable_number: 16
+    semantic/invalid_data_quality_support: 3
+    value/entity_mismatch: 1
+review_interpretation:
+  - >-
+    Sixteen of twenty diagnostics were the same rounded negative-magnitude
+    wording pattern. Exact negative values remained present in quoted_values.
+  - >-
+    The remaining findings were grounded claim-taxonomy or human-readable alias
+    mismatches, not invented prices, evidence IDs, advice, forecasts, or actions.
+  - >-
+    Exact byte-level reproducibility was not observed across repeats; this is
+    expected for model-authored prose and supports moving governed wording into
+    a deterministic renderer.
+policy_boundary:
+  input_classifications:
+    - public-market-data
+    - evaluation-only
+  zdr: false
+  data_collection: deny
+  ordinary_provider_retention_accepted: true
+  automatic_generation: false
+  publication: false
+next_step:
+  planning_issue: 226
+  decision: >-
+    Separate LLM-governed claim selection from repository-owned deterministic
+    prose rendering, then rerun the same frozen corpus before comparing models.
