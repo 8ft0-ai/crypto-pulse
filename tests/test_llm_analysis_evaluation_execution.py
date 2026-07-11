@@ -89,18 +89,14 @@ class EvaluationExecutionTests(unittest.TestCase):
             records = sorted(output.glob("runs/**/run-record.json"))
             self.assertEqual(len(records), 12)
             failed = json.loads(
-                (
-                    output
-                    / "runs/current/historical-degraded-sparse/repeat-1/run-record.json"
-                ).read_text(encoding="utf-8")
+                (output / "runs/current/normal/repeat-1/run-record.json").read_text(
+                    encoding="utf-8"
+                )
             )
             self.assertEqual(failed["status"], "failed")
             self.assertEqual(failed["failure_code"], "ineligible_routing")
             self.assertIsNone(failed["evidence_reference_count"])
-            self.assertEqual(
-                failed["output_dir"],
-                "runs/current/historical-degraded-sparse/repeat-1",
-            )
+            self.assertEqual(failed["output_dir"], "runs/current/normal/repeat-1")
 
     def test_catalogue_ineligibility_produces_complete_no_go_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
