@@ -1,0 +1,15 @@
+version: 1
+base_generation_config: config/llm-generation.yml
+corpus_manifest: evaluation/phase-05/corpus.yml
+runs_per_case: 2
+models:
+  - key: current-nemotron
+    model: nvidia/nemotron-3-super-120b-a12b:free
+    role: current_candidate
+    availability_checked_at: "2026-07-11"
+    known_expiration_date: null
+  - key: alternative-qwen
+    model: qwen/qwen3-next-80b-a3b-instruct:free
+    role: eligible_alternative
+    availability_checked_at: "2026-07-11"
+    known_expiration_date: "2026-07-19"
