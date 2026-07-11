@@ -1,0 +1,182 @@
+name: Governed LLM dry run
+
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_path:
+        description: "Repository-relative validated snapshot path under data/crypto/hourly/"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-llm-dry-run-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from the main branch." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Validate snapshot and prepare evidence
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Validate snapshot input path
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import PurePosixPath
+
+          value = os.environ["SNAPSHOT_PATH"]
+          path = PurePosixPath(value)
+          if path.is_absolute() or ".." in path.parts:
+              raise SystemExit("snapshot_path must be repository-relative and must not contain '..'")
+          if not value.startswith("data/crypto/hourly/") or not value.endswith("_source_snapshot.json"):
+              raise SystemExit("snapshot_path must match data/crypto/hourly/**/*_source_snapshot.json")
+          PY
+
+      - name: Validate selected snapshot before provider access
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_snapshot.py "$SNAPSHOT_PATH"
+
+      - name: Build and schema-check evidence bundle
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/governed-llm-prepared"
+          python -m llm_analysis.evidence_bundle "$SNAPSHOT_PATH" \
+            --repository-root . \
+            --source-config config/crypto_sources.yml \
+            --evidence-schema schemas/crypto-market-evidence-bundle-v1.json \
+            --output "$RUNNER_TEMP/governed-llm-prepared/evidence-bundle.json" \
+            --metadata-output "$RUNNER_TEMP/governed-llm-prepared/preparation-metadata.json"
+
+      - name: Upload prepared evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  generate:
+    name: Generate, validate and render artefacts
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Download prepared evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: governed-llm-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-prepared
+
+      - name: Run governed dry run
+        id: dry_run
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.dry_run \
+            --repository-root . \
+            --snapshot "$SNAPSHOT_PATH" \
+            --prepared-evidence-bundle "$RUNNER_TEMP/governed-llm-prepared/evidence-bundle.json" \
+            --output-dir "$RUNNER_TEMP/governed-llm-dry-run" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Publish Actions summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/governed-llm-dry-run/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/governed-llm-dry-run/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Governed LLM dry run" >> "$GITHUB_STEP_SUMMARY"
+            echo "The run failed before a diagnostic summary could be produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload dry-run review artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-dry-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-dry-run/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail closed when generation or validation was rejected
+        if: steps.dry_run.outcome != 'success'
+        shell: bash
+        run: |
+          echo "Governed LLM dry run did not produce accepted analysis." >&2
+          exit 1
