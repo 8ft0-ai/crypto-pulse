@@ -43,7 +43,7 @@ def _json_type(value: Any) -> str:
         return "number"
     if isinstance(value, str):
         return "string"
-    raise TypeError("const projection supports only scalar JSON values")
+    raise TypeError("provider schema projection supports only scalar enum values")
 
 
 def _nullable(schema: Mapping[str, Any]) -> dict[str, Any]:
@@ -91,6 +91,13 @@ def project_openai_strict_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
             if key in {"properties", "required", "additionalProperties"} and isinstance(properties, Mapping):
                 continue
             result[key] = project(item)
+
+        enum_values = result.get("enum")
+        if "type" not in result and isinstance(enum_values, list) and enum_values:
+            enum_types = {_json_type(item) for item in enum_values}
+            if len(enum_types) != 1:
+                raise TypeError("provider enum values must have one scalar JSON type")
+            result["type"] = next(iter(enum_types))
 
         if isinstance(properties, Mapping):
             projected_properties: dict[str, Any] = {}
