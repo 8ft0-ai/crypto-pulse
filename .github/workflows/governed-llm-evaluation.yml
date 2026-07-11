@@ -110,7 +110,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.evaluation run \
+          python -m llm_analysis.evaluation_runner \
             --repository-root . \
             --config config/llm-evaluation.yml \
             --prepared-dir "$RUNNER_TEMP/governed-llm-evaluation-prepared" \
