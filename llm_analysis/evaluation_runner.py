@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from .evaluation import execute_evaluation
+from .evaluation_execution import execute_evaluation
 from .evidence_bundle import EvidenceBundleError
 from .generation_config import ConfigurationError
 
