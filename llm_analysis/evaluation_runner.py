@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from .evaluation_execution import execute_evaluation
+from .evaluation_viability import execute_viability_evaluation
 from .evidence_bundle import EvidenceBundleError
 from .generation_config import ConfigurationError
 
@@ -16,6 +16,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-root", default=".")
     parser.add_argument("--config", default="config/llm-evaluation.yml")
+    parser.add_argument("--viability-config", default="config/llm-evaluation-viability.yml")
     parser.add_argument("--prepared-dir", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--trusted-main-sha")
@@ -23,9 +24,10 @@ def main() -> int:
 
     secret = os.environ.get("OPENROUTER_API_KEY")
     try:
-        summary = execute_evaluation(
+        summary = execute_viability_evaluation(
             repository_root=Path(args.repository_root),
             config_path=args.config,
+            viability_config_path=args.viability_config,
             prepared_dir=Path(args.prepared_dir),
             output_dir=Path(args.output_dir),
             api_key=secret,
