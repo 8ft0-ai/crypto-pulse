@@ -1,4 +1,4 @@
-"""Governed, offline CryptoPulse LLM analysis contracts and pipeline."""
+"""Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
 
 from .contracts import (
     ANALYSIS_SCHEMA_VERSION,
@@ -12,13 +12,72 @@ from .contracts import (
     evidence_id,
 )
 from .diagnostics import Diagnostic, ValidationReport
+from .generation_config import (
+    ConfigurationError,
+    GenerationConfig,
+    ProviderPolicy,
+    load_generation_config,
+    model_matches,
+)
+from .openrouter_client import (
+    AuthenticationGenerationError,
+    BillingGenerationError,
+    CostLimitError,
+    GenerationError,
+    GenerationMetadata,
+    GenerationResult,
+    GenerationTimeoutError,
+    IneligibleRoutingError,
+    InputLimitError,
+    InvalidResponseError,
+    MissingSecretError,
+    OpenRouterClient,
+    ProviderGenerationError,
+    TransportGenerationError,
+    build_request_body,
+    render_prompt,
+)
 from .pipeline import PipelineResult, load_json, process_analysis
 from .render import InvalidAnalysisError, render_markdown
 from .validate import validate_analysis
 
 __all__ = [
-    "ANALYSIS_SCHEMA_VERSION", "CLAIM_TYPES", "EVIDENCE_ID_PATTERN", "EVIDENCE_SCHEMA_VERSION",
-    "PROMPT_VERSION", "PROVENANCE_SCHEMA_VERSION", "Diagnostic", "ValidationReport", "PipelineResult",
-    "InvalidAnalysisError", "canonical_json_bytes", "content_sha256", "evidence_id", "load_json",
-    "process_analysis", "render_markdown", "validate_analysis",
+    "ANALYSIS_SCHEMA_VERSION",
+    "CLAIM_TYPES",
+    "EVIDENCE_ID_PATTERN",
+    "EVIDENCE_SCHEMA_VERSION",
+    "PROMPT_VERSION",
+    "PROVENANCE_SCHEMA_VERSION",
+    "AuthenticationGenerationError",
+    "BillingGenerationError",
+    "ConfigurationError",
+    "CostLimitError",
+    "Diagnostic",
+    "GenerationConfig",
+    "GenerationError",
+    "GenerationMetadata",
+    "GenerationResult",
+    "GenerationTimeoutError",
+    "IneligibleRoutingError",
+    "InputLimitError",
+    "InvalidAnalysisError",
+    "InvalidResponseError",
+    "MissingSecretError",
+    "OpenRouterClient",
+    "PipelineResult",
+    "ProviderGenerationError",
+    "ProviderPolicy",
+    "TransportGenerationError",
+    "ValidationReport",
+    "build_request_body",
+    "canonical_json_bytes",
+    "content_sha256",
+    "evidence_id",
+    "load_generation_config",
+    "load_json",
+    "model_matches",
+    "process_analysis",
+    "render_markdown",
+    "render_prompt",
+    "validate_analysis",
 ]
