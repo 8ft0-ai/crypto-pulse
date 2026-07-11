@@ -25,9 +25,25 @@ _UNSUPPORTED_PROVIDER_KEYWORDS = frozenset(
         "then",
         "else",
         "uniqueItems",
+        "minLength",
+        "maxLength",
     }
 )
 _DOCUMENT_METADATA_KEYWORDS = frozenset({"$schema", "$id"})
+
+
+def _json_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    raise TypeError("const projection supports only scalar JSON values")
 
 
 def _nullable(schema: Mapping[str, Any]) -> dict[str, Any]:
@@ -69,6 +85,7 @@ def project_openai_strict_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
             if key in _DOCUMENT_METADATA_KEYWORDS or key in _UNSUPPORTED_PROVIDER_KEYWORDS:
                 continue
             if key == "const":
+                result["type"] = _json_type(item)
                 result["enum"] = [deepcopy(item)]
                 continue
             if key in {"properties", "required", "additionalProperties"} and isinstance(properties, Mapping):
