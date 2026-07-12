@@ -45,9 +45,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml markdown
 
+      - name: Run semantic-plan benchmark integration tests
+        run: |
+          python -m unittest tests.test_semantic_plan_benchmark -v
+
+      - name: Run public-data policy compatibility tests
+        run: |
+          python -m unittest \
+            tests.test_llm_public_data_demo \
+            tests.test_llm_public_demo_diagnostic \
+            -v
+
       - name: Run unit tests
         run: |
-          python -m unittest discover -s tests
+          set -o pipefail
+          python -m unittest discover -s tests 2>&1 | tee unit-test-output.txt
+
+      - name: Upload unit-test failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: unit-test-output.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Validate documentation
         run: |

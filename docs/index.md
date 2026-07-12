@@ -47,6 +47,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 - [Look up the governed analysis contract](reference/governed-analysis-contract.md) for the historical evidence, claim, provenance and policy rules.
 - [Look up the semantic claim-plan contract](reference/semantic-claim-plan-contract.md) for the bounded model-owned plan and deterministic-rendering responsibility split.
 - [Look up semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md) for exact repository-owned values, formatting, templates and fail-closed rules.
+- [Look up the semantic claim-plan benchmark](reference/semantic-plan-benchmark.md) for protected workflow boundaries, retained artefacts and qualification fields.
 - [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
 - [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
@@ -90,6 +91,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Governed analysis contract](reference/governed-analysis-contract.md)
 - [Semantic claim-plan contract](reference/semantic-claim-plan-contract.md)
 - [Semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md)
+- [Semantic claim-plan benchmark](reference/semantic-plan-benchmark.md)
 - [Governed LLM workflows](reference/governed-llm-workflows.md)
 - [Offline validation pipeline](reference/offline-validation-pipeline.md)
 - [Governed OpenRouter client](reference/governed-openrouter-client.md)
