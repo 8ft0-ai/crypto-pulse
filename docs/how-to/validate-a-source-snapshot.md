@@ -68,4 +68,4 @@ Run source validation before:
 
 The validation command performs no network collection and does not modify the snapshot.
 
-For the complete repository layout, see [Repository layout](../reference/repository-layout.md). The detailed source-quality contract will be migrated to `docs/reference/` in issue #236; until then, see the [current snapshot quality contract](../crypto-snapshot-quality-contract.md).
+For the complete repository layout, see [Repository layout](../reference/repository-layout.md). For the detailed quality states and source-criticality rules, see [Source snapshot quality](../reference/source-snapshot-quality.md).
