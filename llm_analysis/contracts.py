@@ -19,6 +19,7 @@ PROVENANCE_SCHEMA_VERSION = "crypto-market-generation-provenance/v1"
 PROMPT_VERSION = "crypto-market-analysis/v1"
 CLAIM_PLAN_SCHEMA_VERSION = "crypto-market-claim-plan/v1"
 CLAIM_PLAN_PROMPT_VERSION = "crypto-market-claim-plan/v1"
+CLAIM_PLAN_RENDERER_VERSION = "crypto-market-claim-plan-renderer/v1"
 
 CLAIM_TYPES = (
     "absolute_observation",
