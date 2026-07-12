@@ -187,8 +187,9 @@ class DeterministicClaimPlanRenderTests(unittest.TestCase):
     def test_renderer_fails_closed_on_unsupported_unit_and_absent_alias(self) -> None:
         unsupported_bundle = copy.deepcopy(self.bundle)
         unsupported_plan = copy.deepcopy(self.plan)
-        price = next(item for item in unsupported_bundle["evidence"] if item["evidence_id"] == "market.asset.bitcoin.price_usd")
-        price["unit"] = "eur"
+        for evidence_id in ("market.asset.bitcoin.price_usd", "market.asset.ethereum.price_usd"):
+            price = next(item for item in unsupported_bundle["evidence"] if item["evidence_id"] == evidence_id)
+            price["unit"] = "eur"
         rehash_bundle(unsupported_bundle, unsupported_plan)
         report = self.report(unsupported_bundle, unsupported_plan)
         self.assertTrue(report.is_valid, report.diagnostics)
