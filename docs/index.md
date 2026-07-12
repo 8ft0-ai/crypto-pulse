@@ -11,7 +11,7 @@ Use this index to find documentation by what you are trying to achieve. Planning
 | New contributor | [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) |
 | Project operator | [Build the static site](how-to/build-the-static-site.md), [publish it](how-to/publish-the-static-site.md) or [verify the live site](how-to/verify-the-live-site.md) |
 | Contract reviewer | [Source snapshot quality](reference/source-snapshot-quality.md), [deterministic report schema](reference/deterministic-report-schema.md) or [governed analysis contract](reference/governed-analysis-contract.md) |
-| Architect | [Deterministic site generation](explanation/deterministic-site-generation.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
+| Architect | [How CryptoPulse works](explanation/how-cryptopulse-works.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
 | Contributor or coding agent | [Deliver a repository slice](how-to/deliver-a-repository-slice.md) and [choose an agent write strategy](how-to/choose-agent-write-strategy.md) |
 
 ## Start by task
@@ -19,6 +19,10 @@ Use this index to find documentation by what you are trying to achieve. Planning
 ### Learn CryptoPulse locally
 
 Follow [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) to generate the site from checked-in report data, serve it locally and trace a Markdown source report to its rendered HTML page.
+
+### Understand the complete system
+
+Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow source evidence through validation, deterministic or governed reporting, repository review, site generation, deployment and live verification.
 
 ### Build, publish and verify the site
 
@@ -88,6 +92,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 
 ### Explanation
 
+- [How CryptoPulse works](explanation/how-cryptopulse-works.md)
 - [Deterministic site generation](explanation/deterministic-site-generation.md)
 - [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
 - [Fail-closed analysis validation](explanation/fail-closed-analysis-validation.md)
