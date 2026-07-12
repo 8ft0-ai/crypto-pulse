@@ -52,7 +52,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 ### Contribute and administer the repository
 
 - [Contribute documentation](how-to/contribute-documentation.md).
-- [Deliver a repository slice](how-to/deliver-repository-slice.md).
+- [Deliver a repository slice](how-to/deliver-a-repository-slice.md).
 - [Choose an agent write strategy](how-to/choose-agent-write-strategy.md).
 - [Configure main branch protection](how-to/configure-main-branch-protection.md).
 - [Look up the repository layout](reference/repository-layout.md).
