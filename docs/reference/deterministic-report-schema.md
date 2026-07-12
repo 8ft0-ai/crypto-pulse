@@ -84,6 +84,7 @@ The generator:
 ```text
 Title
 Product boundary and non-investment-advice notice
+Snapshot at a glance
 Snapshot quality
 Market summary
 DeFi and stablecoin summary
@@ -91,6 +92,10 @@ Exchange cross-check summary
 Evidence and source status
 Scope limitations
 ```
+
+## Snapshot at a glance
+
+The review-aid table records the source snapshot path, computed quality, required-source status, selected exchange cross-check, optional-source status, market-asset count and stablecoin count before the detailed numeric sections.
 
 ## Snapshot quality section
 
