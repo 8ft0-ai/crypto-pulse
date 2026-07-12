@@ -51,7 +51,7 @@ The build uses checked-in report data. It does not require a market-data credent
 | [`planning/`](planning/) | Planning, delivery and decision records. |
 | [`evaluation/`](evaluation/) | Evaluation evidence and reviewed decisions. |
 
-The generated `_site/` directory is disposable output. It is ignored by Git, rebuilt by CI and deployment workflows, and must not be committed.
+The generated `_site/` directory is disposable output. It may appear as untracked content locally, is rebuilt by CI and deployment workflows, and must not be staged or committed.
 
 ## Validation
 
