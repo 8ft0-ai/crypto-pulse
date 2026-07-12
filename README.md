@@ -4,6 +4,10 @@ CryptoPulse is an AI-generated crypto market report demo and archive.
 
 The repository stores raw generated market report examples as Markdown and publishes them as a static GitHub Pages site. The reports are demonstration content only. They are AI-created, may contain errors or stale information, and must not be treated as financial advice, investment research, recommendations, or trading signals.
 
+## Documentation
+
+Start with the [CryptoPulse documentation index](docs/index.md) to find learning material, operating guides, contracts and architectural explanations. The documentation is being migrated incrementally so the current README remains usable until the new destination is complete.
+
 ## Report archive
 
 Hourly crypto reports are archived under:
