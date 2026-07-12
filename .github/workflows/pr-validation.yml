@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "**/*.md"
       - "reports/crypto/hourly/**/*.md"
       - "site/**"
       - "site_generator/**"
@@ -47,6 +48,10 @@ jobs:
       - name: Run unit tests
         run: |
           python -m unittest discover -s tests
+
+      - name: Validate documentation
+        run: |
+          python scripts/validate_documentation.py
 
       - name: Reject committed generated site output
         run: |
