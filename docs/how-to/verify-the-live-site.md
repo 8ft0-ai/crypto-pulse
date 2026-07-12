@@ -77,8 +77,8 @@ Confirm that the evidence shows:
 2. Compare the visible-text, HTML, screenshot and accessibility evidence for that page.
 3. Determine whether the problem is in source content, generator output, CSS/JavaScript or deployment state.
 4. Correct the source through a scoped pull request.
-5. run local and pull-request validation;
-6. publish again and rerun live verification.
+5. Run local and pull-request validation.
+6. Publish again and rerun live verification.
 
 Do not edit the deployed HTML or commit `_site/` to repair the public site.
 

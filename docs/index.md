@@ -111,4 +111,4 @@ Reference and explanation pages link to these canonical artefacts rather than co
 
 Former flat documentation paths remain as short pointers where historical issues and pull requests are likely to link to them. They are not canonical and contain no duplicated procedure or contract body.
 
-The authoritative migration plan is [`planning/documentation/diataxis-migration.md`](../planning/documentation/diataxis-migration.md). Parent issue #232 tracks execution status.
+The migration history is recorded in the [`Diátaxis migration plan`](../planning/documentation/diataxis-migration.md) and [`post-implementation review`](../planning/documentation/diataxis-post-implementation-review.md).

@@ -68,6 +68,7 @@ The generated site includes repository-owned CSS and JavaScript under `_site/ass
 | `assets/cryptopulse-brief-glance.css` | Brief-at-a-glance presentation. |
 | `assets/cryptopulse-structured-sources.css` | Structured source-card presentation. |
 | `assets/cryptopulse-search-filters.css` | Archive search and filter presentation. |
+| `assets/cryptopulse-accessibility.css` | Skip-link and reader-navigation accessibility refinements. |
 
 The checked-in source assets remain under `site/` and the site-build implementation under `scripts/` and `site_generator/`.
 
@@ -84,6 +85,7 @@ _site/search-index.json
 _site/assets/cryptopulse.css
 _site/assets/cryptopulse-report-ux.js
 _site/assets/cryptopulse-search-filters.css
+_site/assets/cryptopulse-accessibility.css
 ```
 
 A successful build should also contain the manifest, RSS feed and one HTML page for every matching source report.

@@ -8,7 +8,7 @@
 
 | Path | Responsibility | Source-of-truth status |
 | --- | --- | --- |
-| `README.md` | Concise repository entry point and transition-era quick start. | Human front door; detailed guidance belongs under `docs/`. |
+| `README.md` | Concise repository entry point and quick start. | Human front door; detailed guidance belongs under `docs/`. |
 | `AGENTS.md` | Repository-wide operating rules for coding agents and maintainers. | Canonical machine-oriented instruction file. |
 | `.agents/` | Specialised agent skills and runbooks. | Machine-oriented guidance retained beside agent tooling. |
 | `.github/` | GitHub Actions workflows and contribution templates. | Canonical automation configuration. |
@@ -49,10 +49,18 @@ Checked-in source snapshots use:
 data/crypto/hourly/YYYY/MM/DD/<time>_<timezone>_source_snapshot.json
 ```
 
-Archived deterministic or demonstration reports use:
+The report archive contains three path families with different owners.
+
+Legacy or demonstration reports may retain descriptive historical filenames such as:
 
 ```text
 reports/crypto/hourly/YYYY/MM/DD/<time>_<timezone>_crypto_market_intelligence.md
+```
+
+Deterministic snapshot reports produced by [`scripts/generate_crypto_report.py`](../../scripts/generate_crypto_report.py) use:
+
+```text
+reports/crypto/hourly/YYYY/MM/DD/<time>_<timezone>.md
 ```
 
 Accepted governed-analysis source files use:
@@ -62,6 +70,8 @@ analysis/crypto/hourly/YYYY/MM/DD/governed/<time>_<timezone>_analysis.json
 analysis/crypto/hourly/YYYY/MM/DD/governed/<time>_<timezone>_provenance.json
 reports/crypto/hourly/YYYY/MM/DD/governed/<time>_<timezone>_crypto_market_intelligence.md
 ```
+
+The complete deterministic report contract is [Deterministic report schema](deterministic-report-schema.md). The governed output contract is [Governed analysis contract](governed-analysis-contract.md).
 
 ## Site-generation paths
 
@@ -90,6 +100,7 @@ For the complete generated output catalogue, see [Generated site artefacts](gene
 | Goal | Command or path |
 | --- | --- |
 | Run all unit tests | `python -m unittest discover -s tests` |
+| Validate documentation | `python scripts/validate_documentation.py` |
 | Build the static site | `python -m site_generator` |
 | Validate source snapshots | `python scripts/validate_crypto_snapshot.py <path>` |
 | Validate pull requests | [`.github/workflows/pr-validation.yml`](../../.github/workflows/pr-validation.yml) |
