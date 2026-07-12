@@ -6,6 +6,8 @@
 
 This tutorial uses only files already committed to the repository. It does not collect live market data, call an LLM provider, require a secret or publish anything.
 
+The complete command sequence assumes Bash or a compatible POSIX shell on macOS, Linux or Windows Subsystem for Linux. Native PowerShell users must translate the shell-specific `source`, `test` and `rm` commands before following the sequence.
+
 ## 1. Prepare the local environment
 
 Start from a clean checkout of the repository with Python 3.11 or later available:
@@ -17,12 +19,6 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install pyyaml markdown
-```
-
-On Windows PowerShell, activate the environment with:
-
-```powershell
-.venv\Scripts\Activate.ps1
 ```
 
 Confirm that the checked-in example report used later in this tutorial exists:
