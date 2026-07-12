@@ -19,20 +19,17 @@ Current operating details remain in the README while the migration is in progres
 - [Post-deployment live-site evidence](../README.md#post-deployment-live-site-evidence)
 - [Pull-request validation](../README.md#pull-request-validation)
 
-### Work with governed analysis
+### Run and review governed analysis
 
-The governed-analysis documents remain available at their current paths until the pilot migration in issue #234:
-
-- [Governed analysis contract](governed-llm-analysis-contract.md)
-- [Governed dry run](governed-llm-dry-run.md)
-- [Governed rolling review](governed-llm-rolling-review.md)
-- [Offline governed analysis pipeline](offline-governed-analysis-pipeline.md)
-- [Governed OpenRouter client](governed-openrouter-client.md)
-- [Optional LLM narrative boundary](optional-llm-narrative-boundary.md)
+- [Run a governed LLM dry run](how-to/run-governed-llm-dry-run.md) to produce and inspect an artefact-only accepted or rejected result.
+- [Create a governed rolling-review pull request](how-to/create-governed-rolling-review-pr.md) when an approved configuration may promote accepted structured analysis into controlled source files.
+- [Look up the governed analysis contract](reference/governed-analysis-contract.md) for evidence, claim, provenance and policy rules.
+- [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
+- [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
 ### Look up current contracts
 
-These documents remain canonical at their current paths until their assigned migration issues land:
+The governed-analysis reference set is now organised under `docs/reference/`. These remaining flat documents stay canonical until their assigned migration issues land:
 
 - [Crypto snapshot quality contract](crypto-snapshot-quality-contract.md)
 - [Deterministic crypto report schema](deterministic-crypto-report-schema.md)
@@ -40,7 +37,7 @@ These documents remain canonical at their current paths until their assigned mig
 
 ### Contribute documentation
 
-Follow [How to contribute documentation](how-to/contribute-documentation.md) for page purpose, metadata, links and review requirements.
+Follow [Contribute documentation](how-to/contribute-documentation.md) for page purpose, metadata, links and review requirements.
 
 ## Documentation modes
 
@@ -56,21 +53,26 @@ No tutorial directory is created until the first complete local learning journey
 
 How-to guides solve one concrete problem for a reader who already understands the context. They contain the steps required to achieve the goal and link to reference for exhaustive detail.
 
-Current guides:
-
 - [Contribute documentation](how-to/contribute-documentation.md)
+- [Run a governed LLM dry run](how-to/run-governed-llm-dry-run.md)
+- [Create a governed rolling-review pull request](how-to/create-governed-rolling-review-pr.md)
 
 ### Reference
 
 Reference pages describe contracts, commands, paths, configuration, workflows and artefact formats precisely and neutrally.
 
-The first populated reference set will land with the governed-analysis pilot in issue #234.
+- [Governed analysis contract](reference/governed-analysis-contract.md)
+- [Governed LLM workflows](reference/governed-llm-workflows.md)
+- [Offline validation pipeline](reference/offline-validation-pipeline.md)
+- [Governed OpenRouter client](reference/governed-openrouter-client.md)
 
 ### Explanation
 
 Explanation pages describe architecture, rationale, trade-offs, provenance, deterministic generation, fail-closed validation, trust boundaries and governance decisions.
 
-The first populated explanation set will land with the governed-analysis pilot in issue #234.
+- [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
+- [Fail-closed analysis validation](explanation/fail-closed-analysis-validation.md)
+- [Trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md)
 
 ## Records outside the documentation system
 
@@ -88,4 +90,4 @@ Reference and explanation pages link to these canonical artefacts rather than co
 
 ## Migration status
 
-The authoritative migration plan is [`planning/documentation/diataxis-migration.md`](../planning/documentation/diataxis-migration.md). Parent issue #232 tracks execution status. Existing flat documents remain available during the staged migration so the README and current operational paths stay usable until their replacements are merged.
+The authoritative migration plan is [`planning/documentation/diataxis-migration.md`](../planning/documentation/diataxis-migration.md). Parent issue #232 tracks execution status. The governed-analysis pilot is complete in the new structure; other flat documents remain available during the staged migration until their replacements are merged.
