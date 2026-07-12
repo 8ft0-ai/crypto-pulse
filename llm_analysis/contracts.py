@@ -17,6 +17,8 @@ EVIDENCE_SCHEMA_VERSION = "crypto-market-evidence-bundle/v1"
 ANALYSIS_SCHEMA_VERSION = "crypto-market-analysis/v1"
 PROVENANCE_SCHEMA_VERSION = "crypto-market-generation-provenance/v1"
 PROMPT_VERSION = "crypto-market-analysis/v1"
+CLAIM_PLAN_SCHEMA_VERSION = "crypto-market-claim-plan/v1"
+CLAIM_PLAN_PROMPT_VERSION = "crypto-market-claim-plan/v1"
 
 CLAIM_TYPES = (
     "absolute_observation",
@@ -26,6 +28,34 @@ CLAIM_TYPES = (
     "source_disagreement",
     "qualitative_interpretation",
 )
+
+CLAIM_PLAN_INTENTS = (
+    "absolute_observation",
+    "directional_observation",
+    "comparison",
+    "source_status",
+    "data_quality_limitation",
+    "snapshot_status",
+)
+
+CLAIM_PLAN_SECTION_KINDS = (
+    "market_summary",
+    "key_observations",
+    "risks_and_limitations",
+    "data_quality",
+    "source_status",
+)
+
+CLAIM_PLAN_COMPARISON_RELATIONS = (
+    "none",
+    "greater_than",
+    "less_than",
+    "approximately_equal",
+    "not_equal",
+    "opposite_direction",
+)
+
+CLAIM_PLAN_CONFIDENCE_LEVELS = ("high", "medium", "low")
 
 EVIDENCE_TYPES = (
     "number",
