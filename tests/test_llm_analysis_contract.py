@@ -22,7 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMAS = ROOT / "schemas"
 FIXTURES = ROOT / "tests" / "fixtures" / "llm_analysis"
 PROMPT = ROOT / "prompts" / "crypto-market-analysis-v1.md"
-CONTRACT = ROOT / "docs" / "governed-llm-analysis-contract.md"
+CONTRACT = ROOT / "docs" / "reference" / "governed-analysis-contract.md"
+LEGACY_CONTRACT = ROOT / "docs" / "governed-llm-analysis-contract.md"
 
 PROHIBITED_FIELDS = {"recommendation", "position", "target", "entry", "exit", "trade", "signal"}
 CAUSAL_RE = re.compile(r"\b(?:because|caused by|due to|drove|driven by)\b", re.IGNORECASE)
@@ -265,17 +266,22 @@ class GovernedLlmContractTests(unittest.TestCase):
     def test_contract_document_records_layered_validation_and_feedback_loop_boundary(self) -> None:
         text = CONTRACT.read_text(encoding="utf-8")
         for marker in (
-            "Schema validity",
-            "Referential validity",
-            "Value consistency",
-            "Permitted claim semantics",
-            "Policy validity",
-            "previous LLM analysis or generated narrative",
-            "No OpenRouter API call is introduced",
-            "No generated `_site/` output is committed",
+            "schema validity",
+            "evidence-reference validity",
+            "value consistency",
+            "permitted claim semantics",
+            "policy validity",
+            "previous generated analysis or narrative",
+            "The provider receives no browsing tools",
+            "No fixture authorises a provider call or publication",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, text)
+
+    def test_legacy_contract_path_points_to_canonical_reference(self) -> None:
+        text = LEGACY_CONTRACT.read_text(encoding="utf-8")
+        self.assertIn("reference/governed-analysis-contract.md", text)
+        self.assertNotIn("Status: Phase 5 contract", text)
 
 
 if __name__ == "__main__":
