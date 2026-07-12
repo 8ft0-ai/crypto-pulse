@@ -1,5 +1,11 @@
 """Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
 
+from .claim_plan_validation import (
+    claim_source_disagreement_eligible,
+    is_source_disagreement_pair,
+    iter_plan_claims,
+    validate_claim_plan,
+)
 from .contracts import (
     ANALYSIS_SCHEMA_VERSION,
     CLAIM_PLAN_COMPARISON_RELATIONS,
@@ -83,8 +89,11 @@ __all__ = [
     "ValidationReport",
     "build_request_body",
     "canonical_json_bytes",
+    "claim_source_disagreement_eligible",
     "content_sha256",
     "evidence_id",
+    "is_source_disagreement_pair",
+    "iter_plan_claims",
     "load_generation_config",
     "load_json",
     "model_matches",
@@ -92,4 +101,5 @@ __all__ = [
     "render_markdown",
     "render_prompt",
     "validate_analysis",
+    "validate_claim_plan",
 ]
