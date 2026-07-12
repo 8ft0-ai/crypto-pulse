@@ -51,7 +51,10 @@ jobs:
 
       - name: Run public-data policy compatibility tests
         run: |
-          python -m unittest tests.test_llm_public_data_demo -v
+          python -m unittest \
+            tests.test_llm_public_data_demo \
+            tests.test_llm_public_demo_diagnostic \
+            -v
 
       - name: Run unit tests
         run: |
