@@ -4,6 +4,8 @@ name: Governed GPT-4o mini semantic claim-plan proof
 # These modules and their reviewed evidence remain source-controlled but are not
 # invoked by this redesigned workflow:
 # llm_analysis.public_demo_benchmark
+# llm_analysis.public_demo_benchmark_projection prepare
+# llm_analysis.public_demo_benchmark_projection run
 # llm_analysis.public_demo_diagnostic prepare
 # llm_analysis.public_demo_diagnostic run
 
