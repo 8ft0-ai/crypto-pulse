@@ -47,6 +47,7 @@ Run the smallest focused checks first, then the repository baseline:
 
 ```bash
 python -m unittest discover -s tests
+python scripts/validate_documentation.py
 python -m site_generator
 ```
 
