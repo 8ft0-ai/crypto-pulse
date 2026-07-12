@@ -1,8 +1,7 @@
-name: Governed GPT-4o mini public-data diagnostic
+name: Governed GPT-4o mini semantic claim-plan proof
 
-# Compatibility delegation retained by the diagnostic wrapper:
-# llm_analysis.public_demo_benchmark_projection prepare
-# llm_analysis.public_demo_benchmark_projection run
+# Historical compatibility reference retained for the bounded public-data policy:
+# llm_analysis.public_demo_benchmark
 
 on:
   workflow_dispatch:
@@ -11,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: governed-gpt4o-mini-public-data-diagnostic-${{ github.run_id }}
+  group: governed-gpt4o-mini-semantic-plan-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +28,7 @@ jobs:
           fi
 
   prepare:
-    name: Freeze and classify public-data diagnostic corpus
+    name: Freeze and classify semantic-plan corpus
     needs: guard
     runs-on: ubuntu-latest
     outputs:
@@ -55,25 +54,25 @@ jobs:
       - name: Install runtime dependency
         run: pip install pyyaml
 
-      - name: Validate public input boundary and build deterministic bundles
+      - name: Validate public boundary and build deterministic evidence bundles
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_diagnostic prepare \
+          python -m llm_analysis.semantic_plan_benchmark prepare \
             --repository-root . \
-            --profile config/llm-public-data-demo.yml \
-            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo-prepared"
+            --profile config/llm-public-data-semantic-plan.yml \
+            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan-prepared"
 
-      - name: Upload prepared public-data corpus
+      - name: Upload prepared semantic-plan corpus
         uses: actions/upload-artifact@v4
         with:
-          name: governed-gpt4o-mini-public-demo-prepared-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/governed-gpt4o-mini-public-demo-prepared/
+          name: governed-gpt4o-mini-semantic-plan-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan-prepared/
           if-no-files-found: error
           retention-days: 7
 
   evaluate:
-    name: Run bounded protected GPT-4o mini diagnostic corpus
+    name: Run bounded protected semantic claim-plan corpus
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -100,13 +99,13 @@ jobs:
       - name: Install runtime dependency
         run: pip install pyyaml
 
-      - name: Download prepared public-data corpus
+      - name: Download prepared semantic-plan corpus
         uses: actions/download-artifact@v4
         with:
-          name: governed-gpt4o-mini-public-demo-prepared-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/governed-gpt4o-mini-public-demo-prepared
+          name: governed-gpt4o-mini-semantic-plan-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan-prepared
 
-      - name: Run controlled public-data diagnostic corpus
+      - name: Run controlled semantic claim-plan corpus
         id: benchmark
         continue-on-error: true
         env:
@@ -115,37 +114,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.public_demo_diagnostic run \
+          python -m llm_analysis.semantic_plan_benchmark run \
             --repository-root . \
-            --profile config/llm-public-data-demo.yml \
+            --profile config/llm-public-data-semantic-plan.yml \
             --viability-config config/llm-evaluation-viability.yml \
-            --prepared-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo-prepared" \
-            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-public-demo" \
+            --prepared-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan-prepared" \
+            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan" \
             --trusted-main-sha "$TRUSTED_SHA"
 
-      - name: Publish diagnostic summary
+      - name: Publish semantic-plan summary
         if: always()
         shell: bash
         run: |
-          if [[ -f "$RUNNER_TEMP/governed-gpt4o-mini-public-demo/actions-summary.md" ]]; then
-            cat "$RUNNER_TEMP/governed-gpt4o-mini-public-demo/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "# Governed GPT-4o mini public-data diagnostic" >> "$GITHUB_STEP_SUMMARY"
-            echo "The diagnostic run failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
+            echo "# Governed GPT-4o mini semantic claim-plan proof" >> "$GITHUB_STEP_SUMMARY"
+            echo "The protected run failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload non-published diagnostic artefacts
+      - name: Upload non-published semantic-plan artefacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: governed-gpt4o-mini-public-demo-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/governed-gpt4o-mini-public-demo/
+          name: governed-gpt4o-mini-semantic-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan/
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Fail when diagnostic infrastructure failed
+      - name: Fail when protected infrastructure failed
         if: steps.benchmark.outcome != 'success'
         shell: bash
         run: |
-          echo "The controlled public-data diagnostic did not complete. Review retained artefacts." >&2
+          echo "The controlled semantic-plan benchmark did not complete. Review retained artefacts." >&2
           exit 1
