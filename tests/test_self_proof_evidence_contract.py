@@ -50,7 +50,7 @@ class SelfProofEvidenceContractTests(unittest.TestCase):
             "static-site build",
             "rendered archive path",
             "changed-file scope",
-            "`_site` exclusion",
+            "_site exclusion",
         ]
         for marker in required_markers:
             with self.subTest(marker=marker):
