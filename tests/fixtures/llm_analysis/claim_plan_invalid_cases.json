@@ -1,0 +1,107 @@
+{
+  "free_form_report_prose": {
+    "operation": "set",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "text"
+    ],
+    "value": "Bitcoin was worth 62,739 dollars.",
+    "expected_code": "additional_property"
+  },
+  "copied_numeric_value": {
+    "operation": "set",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "value"
+    ],
+    "value": 62739,
+    "expected_code": "additional_property"
+  },
+  "copied_date": {
+    "operation": "set",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "date"
+    ],
+    "value": "2026-07-08",
+    "expected_code": "additional_property"
+  },
+  "unsupported_intent": {
+    "operation": "set",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "intent"
+    ],
+    "value": "forecast",
+    "expected_code": "enum"
+  },
+  "unsupported_relation": {
+    "operation": "set",
+    "path": [
+      "sections",
+      1,
+      "claims",
+      0,
+      "comparison_relation"
+    ],
+    "value": "caused_by",
+    "expected_code": "enum"
+  },
+  "unknown_root_field": {
+    "operation": "set",
+    "path": [
+      "headline"
+    ],
+    "value": "Market update",
+    "expected_code": "additional_property"
+  },
+  "duplicate_analysis_order": {
+    "operation": "set",
+    "path": [
+      "analysis_order"
+    ],
+    "value": [
+      "market_summary",
+      "market_summary"
+    ],
+    "expected_code": "unique_items"
+  },
+  "duplicate_evidence_reference": {
+    "operation": "set",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "evidence_ids"
+    ],
+    "value": [
+      "market.asset.bitcoin.price_usd",
+      "market.asset.bitcoin.price_usd"
+    ],
+    "expected_code": "unique_items"
+  },
+  "missing_required_claim_field": {
+    "operation": "delete",
+    "path": [
+      "sections",
+      0,
+      "claims",
+      0,
+      "confidence"
+    ],
+    "expected_code": "required"
+  }
+}
