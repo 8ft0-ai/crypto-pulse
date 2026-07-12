@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACT = ROOT / "docs" / "report-self-proof-evidence-contract.md"
+CONTRACT = ROOT / "docs" / "reference" / "generated-report-pr-evidence.md"
+LEGACY_CONTRACT = ROOT / "docs" / "report-self-proof-evidence-contract.md"
 
 
 class SelfProofEvidenceContractTests(unittest.TestCase):
@@ -23,7 +24,7 @@ class SelfProofEvidenceContractTests(unittest.TestCase):
             "Report validation",
             "Advice-language check",
             "Unit tests",
-            "Static site build",
+            "Static-site build",
             "Rendered archive path",
             "Changed files",
             "`_site` committed",
@@ -41,16 +42,15 @@ class SelfProofEvidenceContractTests(unittest.TestCase):
 
     def test_contract_defines_required_failure_semantics(self) -> None:
         required_markers = [
-            "must not be opened if any required pre-PR proof is `failed` or `not run`",
-            "The generating workflow must fail before opening a PR",
-            "source snapshot resolution or validation",
-            "generated report validation",
-            "advice-language check",
-            "relevant unit tests",
-            "static site build",
-            "rendered archive path proof",
-            "changed-file scope validation",
-            "`_site` exclusion proof",
+            "must stop before branch or pull-request creation",
+            "snapshot resolution or validation",
+            "report validation",
+            "advice-language validation",
+            "unit tests",
+            "static-site build",
+            "rendered archive path",
+            "changed-file scope",
+            "_site exclusion",
         ]
         for marker in required_markers:
             with self.subTest(marker=marker):
@@ -58,17 +58,22 @@ class SelfProofEvidenceContractTests(unittest.TestCase):
 
     def test_contract_defines_required_scope_limitations(self) -> None:
         required_limitations = [
-            "This PR adds a deterministic Markdown report only.",
-            "This PR does not call an LLM.",
-            "This PR does not provide investment advice or trading recommendations.",
-            "This PR does not publish or deploy the report.",
-            "This PR does not auto-merge.",
-            "This PR does not introduce secrets or paid API keys.",
-            "This PR does not commit generated `_site/` output.",
+            "adds deterministic Markdown report source only",
+            "does not call an LLM",
+            "does not provide investment advice or trading recommendations",
+            "does not publish or deploy the report",
+            "does not auto-merge",
+            "introduces no secret or paid API key",
+            "does not commit generated `_site/` output",
         ]
         for limitation in required_limitations:
             with self.subTest(limitation=limitation):
                 self.assertIn(limitation, self.body)
+
+    def test_legacy_contract_path_points_to_canonical_reference(self) -> None:
+        text = LEGACY_CONTRACT.read_text(encoding="utf-8")
+        self.assertIn("reference/generated-report-pr-evidence.md", text)
+        self.assertNotIn("Status: implementation record", text)
 
 
 if __name__ == "__main__":
