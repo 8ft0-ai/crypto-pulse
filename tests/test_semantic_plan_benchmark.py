@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from llm_analysis.contracts import canonical_json_bytes
+from llm_analysis.evaluation import PREPARED_MANIFEST
 from llm_analysis.generation_config import GenerationConfig
 from llm_analysis.openrouter_client import GenerationMetadata, GenerationResult
 from llm_analysis.semantic_plan_benchmark import (
@@ -157,7 +158,7 @@ class SemanticPlanBenchmarkTests(unittest.TestCase):
                 profile_path=PROFILE,
                 output_dir=tmp,
             )
-            manifest = json.loads((Path(tmp) / "prepared-corpus-manifest.json").read_text())
+            manifest = json.loads((Path(tmp) / PREPARED_MANIFEST).read_text())
 
         self.assertEqual(plan.model.model, "openai/gpt-4o-mini")
         self.assertEqual(len(cases), 5)
