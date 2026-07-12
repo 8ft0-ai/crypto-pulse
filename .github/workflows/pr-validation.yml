@@ -58,7 +58,17 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m unittest discover -s tests
+          set -o pipefail
+          python -m unittest discover -s tests 2>&1 | tee unit-test-output.txt
+
+      - name: Upload unit-test failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: unit-test-output.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Validate documentation
         run: |
