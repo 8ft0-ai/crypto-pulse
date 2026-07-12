@@ -126,7 +126,7 @@ Each claim object contains:
 
 ```text
 claim_type
-txt or text according to the canonical schema
+text
 evidence_ids[]
 confidence
 quoted_values[]
