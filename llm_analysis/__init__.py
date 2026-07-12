@@ -1,5 +1,11 @@
 """Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
 
+from .claim_plan_render import (
+    ClaimPlanRender,
+    ClaimPlanRenderError,
+    RenderedClaim,
+    render_claim_plan,
+)
 from .claim_plan_validation import (
     claim_source_disagreement_eligible,
     is_source_disagreement_pair,
@@ -12,6 +18,7 @@ from .contracts import (
     CLAIM_PLAN_CONFIDENCE_LEVELS,
     CLAIM_PLAN_INTENTS,
     CLAIM_PLAN_PROMPT_VERSION,
+    CLAIM_PLAN_RENDERER_VERSION,
     CLAIM_PLAN_SCHEMA_VERSION,
     CLAIM_PLAN_SECTION_KINDS,
     CLAIM_TYPES,
@@ -59,6 +66,7 @@ __all__ = [
     "CLAIM_PLAN_CONFIDENCE_LEVELS",
     "CLAIM_PLAN_INTENTS",
     "CLAIM_PLAN_PROMPT_VERSION",
+    "CLAIM_PLAN_RENDERER_VERSION",
     "CLAIM_PLAN_SCHEMA_VERSION",
     "CLAIM_PLAN_SECTION_KINDS",
     "CLAIM_TYPES",
@@ -68,6 +76,8 @@ __all__ = [
     "PROVENANCE_SCHEMA_VERSION",
     "AuthenticationGenerationError",
     "BillingGenerationError",
+    "ClaimPlanRender",
+    "ClaimPlanRenderError",
     "ConfigurationError",
     "CostLimitError",
     "Diagnostic",
@@ -85,6 +95,7 @@ __all__ = [
     "PipelineResult",
     "ProviderGenerationError",
     "ProviderPolicy",
+    "RenderedClaim",
     "TransportGenerationError",
     "ValidationReport",
     "build_request_body",
@@ -98,6 +109,7 @@ __all__ = [
     "load_json",
     "model_matches",
     "process_analysis",
+    "render_claim_plan",
     "render_markdown",
     "render_prompt",
     "validate_analysis",
