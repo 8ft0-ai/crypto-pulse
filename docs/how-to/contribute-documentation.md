@@ -102,7 +102,7 @@ Link to canonical repository artefacts instead of copying them. For example, a r
 
 Add the new page to [`docs/index.md`](../index.md) under the reader task and documentation mode that best match its purpose. Do not add links to pages that are planned but do not yet exist.
 
-Avoid duplicate mode-catalogue entries. A page may appear once in the primary mode list and be linked contextually from another section where useful.
+Every Markdown page under the four canonical mode directories must appear exactly once in its matching mode catalogue. A page may also be linked contextually from a reader-task section.
 
 ## Validate the change
 
@@ -116,14 +116,19 @@ python -m site_generator
 
 The documentation validator objectively checks:
 
-- tracked internal Markdown targets and heading anchors;
+- tracked internal Markdown links, local image targets and heading anchors;
 - repository-relative path safety;
 - references to declared removed document paths;
-- the existence and mode placement of `docs/index.md` catalogue entries;
-- duplicate entries in the four mode catalogues;
+- that every mode-catalogue destination is a tracked canonical page in the expected directory;
+- that every canonical page appears exactly once in the matching `docs/index.md` mode catalogue;
+- exactly one H1 and visible `Mode`, `Audience` and `Outcome` metadata on canonical pages;
+- agreement between a canonical page's declared mode and its directory;
+- lower-case, hyphenated canonical page filenames;
 - accidental tracked `_site/` output.
 
-It does not assess writing style or decide whether a page has been classified correctly.
+These structural requirements apply only to canonical pages under `docs/tutorials/`, `docs/how-to/`, `docs/reference/` and `docs/explanation/`. Compatibility pointers, planning records, evaluation evidence, READMEs and fixture notes are not required to use canonical page metadata.
+
+The validator does not assess prose quality, test whether the selected mode is editorially appropriate or decide whether an architectural explanation is correct.
 
 Also confirm that commands match current repository behaviour, historical evidence remains preserved, no product boundary changed and `_site/` was not staged or committed.
 

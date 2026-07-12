@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import subprocess
 import sys
@@ -15,13 +16,24 @@ from urllib.parse import unquote, urlsplit
 INLINE_LINK_RE = re.compile(
     r"(?<!!)\[[^\]]*\]\(\s*(<[^>]+>|[^\s)]+)(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^)]*\)))?\s*\)"
 )
+IMAGE_LINK_RE = re.compile(
+    r"!\[[^\]]*\]\(\s*(<[^>]+>|[^\s)]+)(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^)]*\)))?\s*\)"
+)
 REFERENCE_LINK_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(<[^>]+>|\S+)", re.MULTILINE)
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+METADATA_RE = re.compile(r"^\s*>\s*\*\*(Mode|Audience|Outcome):\*\*\s*(.*?)\s*$")
+CANONICAL_FILENAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 MODE_CATALOGUES = {
     "Tutorials": "tutorials/",
     "How-to guides": "how-to/",
     "Reference": "reference/",
     "Explanation": "explanation/",
+}
+DECLARED_MODE_BY_DIRECTORY = {
+    "tutorials": "Tutorial",
+    "how-to": "How-to",
+    "reference": "Reference",
+    "explanation": "Explanation",
 }
 EXTERNAL_SCHEMES = {"http", "https", "mailto", "tel", "ftp", "data"}
 
@@ -43,7 +55,10 @@ class Diagnostic:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate internal Markdown links, documentation navigation and _site exclusion."
+        description=(
+            "Validate internal Markdown links, canonical documentation structure, "
+            "navigation and _site exclusion."
+        )
     )
     parser.add_argument(
         "--root",
@@ -83,7 +98,7 @@ def strip_fenced_code(text: str) -> str:
 def markdown_links(text: str) -> list[tuple[int, str]]:
     stripped = strip_fenced_code(text)
     links: list[tuple[int, str]] = []
-    for pattern in (INLINE_LINK_RE, REFERENCE_LINK_RE):
+    for pattern in (INLINE_LINK_RE, IMAGE_LINK_RE, REFERENCE_LINK_RE):
         for match in pattern.finditer(stripped):
             target = match.group(1).strip()
             if target.startswith("<") and target.endswith(">"):
@@ -116,6 +131,23 @@ def heading_anchors(text: str) -> set[str]:
 
 def repository_relative(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
+
+
+def canonical_mode_for_path(relative_path: str) -> str | None:
+    parts = Path(relative_path).parts
+    if len(parts) < 3 or parts[0] != "docs" or parts[1] not in DECLARED_MODE_BY_DIRECTORY:
+        return None
+    if not relative_path.lower().endswith(".md"):
+        return None
+    return DECLARED_MODE_BY_DIRECTORY[parts[1]]
+
+
+def canonical_pages(paths: Iterable[str]) -> dict[str, str]:
+    return {
+        path: mode
+        for path in paths
+        if (mode := canonical_mode_for_path(path)) is not None
+    }
 
 
 def validate_link(
@@ -193,13 +225,17 @@ def mode_catalogue_links(index_text: str) -> list[tuple[str, int, str]]:
     return results
 
 
-def validate_index(root: Path) -> list[Diagnostic]:
+def validate_index(root: Path, paths: Sequence[str]) -> list[Diagnostic]:
     index_path = root / "docs" / "index.md"
     if not index_path.is_file():
         return [Diagnostic("docs/index.md", 1, "missing-index", "docs/index.md does not exist")]
 
     diagnostics: list[Diagnostic] = []
+    tracked = set(paths)
+    canonical = canonical_pages(paths)
     seen: dict[str, tuple[str, int]] = {}
+    counts: dict[str, int] = {}
+
     for mode, line, target in mode_catalogue_links(index_path.read_text(encoding="utf-8")):
         parsed = urlsplit(target)
         expected_prefix = MODE_CATALOGUES[mode]
@@ -208,7 +244,11 @@ def validate_index(root: Path) -> list[Diagnostic]:
                 Diagnostic("docs/index.md", line, "invalid-navigation", f"{mode} entry must be a relative docs path: {target}")
             )
             continue
-        normalised = unquote(parsed.path)
+
+        normalised = posixpath.normpath(unquote(parsed.path))
+        repository_target = posixpath.normpath(posixpath.join("docs", normalised))
+        target_mode = canonical_mode_for_path(repository_target)
+
         if not normalised.startswith(expected_prefix):
             diagnostics.append(
                 Diagnostic(
@@ -218,7 +258,26 @@ def validate_index(root: Path) -> list[Diagnostic]:
                     f"{mode} entry must target {expected_prefix}: {target}",
                 )
             )
-        previous = seen.get(normalised)
+        if target_mode is None:
+            diagnostics.append(
+                Diagnostic(
+                    "docs/index.md",
+                    line,
+                    "noncanonical-navigation",
+                    f"{mode} entry must target a canonical Diátaxis page: {target}",
+                )
+            )
+        if repository_target not in tracked:
+            diagnostics.append(
+                Diagnostic(
+                    "docs/index.md",
+                    line,
+                    "untracked-navigation",
+                    f"catalogue target is not a tracked file: {repository_target}",
+                )
+            )
+
+        previous = seen.get(repository_target)
         if previous:
             previous_mode, previous_line = previous
             diagnostics.append(
@@ -230,7 +289,94 @@ def validate_index(root: Path) -> list[Diagnostic]:
                 )
             )
         else:
-            seen[normalised] = (mode, line)
+            seen[repository_target] = (mode, line)
+        counts[repository_target] = counts.get(repository_target, 0) + 1
+
+    for path, declared_mode in sorted(canonical.items()):
+        if counts.get(path, 0) == 0:
+            diagnostics.append(
+                Diagnostic(
+                    path,
+                    1,
+                    "unindexed-canonical-page",
+                    f"{declared_mode} page is absent from the matching docs/index.md mode catalogue",
+                )
+            )
+    return diagnostics
+
+
+def validate_canonical_page(root: Path, relative_path: str, expected_mode: str) -> list[Diagnostic]:
+    path = root / relative_path
+    diagnostics: list[Diagnostic] = []
+
+    if not CANONICAL_FILENAME_RE.fullmatch(path.name):
+        diagnostics.append(
+            Diagnostic(
+                relative_path,
+                1,
+                "invalid-document-filename",
+                "canonical documentation filenames must be lower-case and hyphenated",
+            )
+        )
+
+    text = path.read_text(encoding="utf-8")
+    stripped = strip_fenced_code(text)
+    h1_lines = [
+        line_number
+        for line_number, line in enumerate(stripped.splitlines(), start=1)
+        if (match := HEADING_RE.match(line)) and len(match.group(1)) == 1
+    ]
+    if not h1_lines:
+        diagnostics.append(Diagnostic(relative_path, 1, "missing-h1", "canonical page must contain exactly one H1"))
+    elif len(h1_lines) > 1:
+        diagnostics.append(
+            Diagnostic(
+                relative_path,
+                h1_lines[1],
+                "multiple-h1",
+                f"canonical page contains {len(h1_lines)} H1 headings; exactly one is required",
+            )
+        )
+
+    metadata: dict[str, list[tuple[int, str]]] = {"Mode": [], "Audience": [], "Outcome": []}
+    for line_number, line in enumerate(text.splitlines()[:15], start=1):
+        match = METADATA_RE.match(line)
+        if match:
+            metadata[match.group(1)].append((line_number, match.group(2).strip()))
+
+    for field in ("Mode", "Audience", "Outcome"):
+        values = metadata[field]
+        if not values:
+            diagnostics.append(
+                Diagnostic(
+                    relative_path,
+                    1,
+                    "missing-page-metadata",
+                    f"canonical page must declare {field} in the visible metadata block near the top",
+                )
+            )
+        elif len(values) > 1:
+            diagnostics.append(
+                Diagnostic(
+                    relative_path,
+                    values[1][0],
+                    "duplicate-page-metadata",
+                    f"canonical page declares {field} more than once near the top",
+                )
+            )
+
+    if metadata["Mode"]:
+        line, actual_mode = metadata["Mode"][0]
+        if actual_mode != expected_mode:
+            diagnostics.append(
+                Diagnostic(
+                    relative_path,
+                    line,
+                    "declared-mode-mismatch",
+                    f"declared mode {actual_mode!r} does not match directory mode {expected_mode!r}",
+                )
+            )
+
     return diagnostics
 
 
@@ -251,6 +397,7 @@ def validate_repository(
     root = root.resolve()
     paths = list(tracked if tracked is not None else tracked_files(root))
     diagnostics = validate_tracked_site(paths)
+    canonical = canonical_pages(paths)
 
     for relative_path in sorted(path for path in paths if path.lower().endswith(".md")):
         source_path = (root / relative_path).resolve()
@@ -269,7 +416,12 @@ def validate_repository(
                 )
             )
 
-    diagnostics.extend(validate_index(root))
+    for relative_path, expected_mode in sorted(canonical.items()):
+        path = root / relative_path
+        if path.is_file():
+            diagnostics.extend(validate_canonical_page(root, relative_path, expected_mode))
+
+    diagnostics.extend(validate_index(root, paths))
     return sorted(set(diagnostics))
 
 
