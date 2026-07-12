@@ -32,7 +32,7 @@ Enable **Require status checks to pass before merging** and select the check:
 Build site and check generated output
 ```
 
-The check is produced by [`.github/workflows/pr-validation.yml`](../../.github/workflows/pr-validation.yml). It installs the required Python dependencies, runs the unit-test suite, rejects tracked `_site/` output, builds the static site and checks expected artefacts.
+The check is produced by [`.github/workflows/pr-validation.yml`](../../.github/workflows/pr-validation.yml). It installs the required Python dependencies, runs the unit-test suite, validates repository documentation, rejects tracked `_site/` output, builds the static site and checks expected artefacts.
 
 Enable **Require branches to be up to date before merging** when the resulting update frequency is acceptable for the repository.
 
@@ -53,7 +53,7 @@ Open or inspect a pull request that changes a path covered by the validation wor
 
 1. the `Build site and check generated output` check appears;
 2. the pull request cannot merge while the check is pending or failing;
-3. a successful check reports the unit-test and site-build evidence;
+3. a successful check reports unit-test, documentation-validation and site-build evidence;
 4. tracked `_site/` content causes failure;
 5. normal branch deletion or squash behaviour matches repository policy.
 
