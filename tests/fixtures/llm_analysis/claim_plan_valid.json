@@ -1,0 +1,95 @@
+{
+  "claim_plan_version": "crypto-market-claim-plan/v1",
+  "prompt_version": "crypto-market-claim-plan/v1",
+  "evidence_bundle_id": "sha256:d86d7a2ee02a06f2c1d3225019f239a46478e85a7d6c4c531ed9371230689971",
+  "analysis_order": [
+    "market_summary",
+    "key_observations",
+    "source_status",
+    "data_quality",
+    "risks_and_limitations"
+  ],
+  "sections": [
+    {
+      "section_kind": "market_summary",
+      "claims": [
+        {
+          "claim_id": "claim-btc-price",
+          "intent": "absolute_observation",
+          "evidence_ids": [
+            "market.asset.bitcoin.price_usd"
+          ],
+          "comparison_relation": "none",
+          "confidence": "high"
+        },
+        {
+          "claim_id": "claim-btc-direction",
+          "intent": "directional_observation",
+          "evidence_ids": [
+            "market.asset.bitcoin.change_24h_pct"
+          ],
+          "comparison_relation": "none",
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "section_kind": "key_observations",
+      "claims": [
+        {
+          "claim_id": "claim-btc-eth-price-comparison",
+          "intent": "comparison",
+          "evidence_ids": [
+            "market.asset.bitcoin.price_usd",
+            "market.asset.ethereum.price_usd"
+          ],
+          "comparison_relation": "greater_than",
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "section_kind": "source_status",
+      "claims": [
+        {
+          "claim_id": "claim-coingecko-status",
+          "intent": "source_status",
+          "evidence_ids": [
+            "source.coingecko.status"
+          ],
+          "comparison_relation": "none",
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "section_kind": "data_quality",
+      "claims": [
+        {
+          "claim_id": "claim-binance-limitation",
+          "intent": "data_quality_limitation",
+          "evidence_ids": [
+            "source.binance.status",
+            "source.binance.reason"
+          ],
+          "comparison_relation": "none",
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "section_kind": "risks_and_limitations",
+      "claims": [
+        {
+          "claim_id": "claim-snapshot-status",
+          "intent": "snapshot_status",
+          "evidence_ids": [
+            "quality.snapshot.status"
+          ],
+          "comparison_relation": "none",
+          "confidence": "high"
+        }
+      ]
+    }
+  ]
+}

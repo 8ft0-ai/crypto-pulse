@@ -10,7 +10,7 @@ Use this index to find documentation by what you are trying to achieve. Planning
 | --- | --- |
 | New contributor | [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) |
 | Project operator | [Build the static site](how-to/build-the-static-site.md), [publish it](how-to/publish-the-static-site.md) or [verify the live site](how-to/verify-the-live-site.md) |
-| Contract reviewer | [Source snapshot quality](reference/source-snapshot-quality.md), [deterministic report schema](reference/deterministic-report-schema.md) or [governed analysis contract](reference/governed-analysis-contract.md) |
+| Contract reviewer | [Source snapshot quality](reference/source-snapshot-quality.md), [deterministic report schema](reference/deterministic-report-schema.md), [governed analysis contract](reference/governed-analysis-contract.md) or [semantic claim-plan contract](reference/semantic-claim-plan-contract.md) |
 | Architect | [How CryptoPulse works](explanation/how-cryptopulse-works.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
 | Contributor or coding agent | [Deliver a repository slice](how-to/deliver-a-repository-slice.md) and [choose an agent write strategy](how-to/choose-agent-write-strategy.md) |
 
@@ -45,6 +45,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 - [Run a governed LLM dry run](how-to/run-governed-llm-dry-run.md) to produce and inspect an artefact-only accepted or rejected result.
 - [Create a governed rolling-review pull request](how-to/create-governed-rolling-review-pr.md) when an approved configuration may promote accepted structured analysis into controlled source files.
 - [Look up the governed analysis contract](reference/governed-analysis-contract.md) for evidence, claim, provenance and policy rules.
+- [Look up the semantic claim-plan contract](reference/semantic-claim-plan-contract.md) for the bounded model-owned plan and deterministic-rendering responsibility split.
 - [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
 - [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
@@ -86,6 +87,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Deterministic report schema](reference/deterministic-report-schema.md)
 - [Generated report PR evidence](reference/generated-report-pr-evidence.md)
 - [Governed analysis contract](reference/governed-analysis-contract.md)
+- [Semantic claim-plan contract](reference/semantic-claim-plan-contract.md)
 - [Governed LLM workflows](reference/governed-llm-workflows.md)
 - [Offline validation pipeline](reference/offline-validation-pipeline.md)
 - [Governed OpenRouter client](reference/governed-openrouter-client.md)
