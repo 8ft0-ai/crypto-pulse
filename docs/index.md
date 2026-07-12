@@ -9,9 +9,10 @@ Use this index to find documentation by what you are trying to achieve. Planning
 | Reader | Start here |
 | --- | --- |
 | New contributor | [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) |
-| Project operator | [Build the static site](how-to/build-the-static-site.md) or [Validate a source snapshot](how-to/validate-a-source-snapshot.md) |
-| Contract reviewer | [Governed analysis contract](reference/governed-analysis-contract.md) or [Generated site artefacts](reference/generated-site-artefacts.md) |
-| Architect | [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [Deterministic site generation](explanation/deterministic-site-generation.md) |
+| Project operator | [Build the static site](how-to/build-the-static-site.md), [publish it](how-to/publish-the-static-site.md) or [verify the live site](how-to/verify-the-live-site.md) |
+| Contract reviewer | [Source snapshot quality](reference/source-snapshot-quality.md), [deterministic report schema](reference/deterministic-report-schema.md) or [governed analysis contract](reference/governed-analysis-contract.md) |
+| Architect | [Deterministic site generation](explanation/deterministic-site-generation.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
+| Contributor or coding agent | [Deliver a repository slice](how-to/deliver-a-repository-slice.md) and [choose an agent write strategy](how-to/choose-agent-write-strategy.md) |
 
 ## Start by task
 
@@ -19,15 +20,21 @@ Use this index to find documentation by what you are trying to achieve. Planning
 
 Follow [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) to generate the site from checked-in report data, serve it locally and trace a Markdown source report to its rendered HTML page.
 
-### Build and validate local artefacts
+### Build, publish and verify the site
 
 - [Build the static site](how-to/build-the-static-site.md).
-- [Validate a source snapshot](how-to/validate-a-source-snapshot.md).
-- [Look up the repository layout](reference/repository-layout.md).
+- [Publish the static site](how-to/publish-the-static-site.md).
+- [Verify the live site](how-to/verify-the-live-site.md).
 - [Look up generated site artefacts](reference/generated-site-artefacts.md).
+- [Look up the live-site evidence artefact](reference/live-site-evidence-artefact.md).
 - [Understand deterministic site generation](explanation/deterministic-site-generation.md).
 
-Publication, post-deployment verification and detailed workflow operation remain in the README or their current flat documents until issue #236 migrates them.
+### Work with source snapshots and deterministic reports
+
+- [Validate a source snapshot](how-to/validate-a-source-snapshot.md).
+- [Look up source snapshot quality](reference/source-snapshot-quality.md).
+- [Look up the deterministic report schema](reference/deterministic-report-schema.md).
+- [Look up generated report PR evidence](reference/generated-report-pr-evidence.md).
 
 ### Run and review governed analysis
 
@@ -37,17 +44,13 @@ Publication, post-deployment verification and detailed workflow operation remain
 - [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
 - [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
-### Look up current contracts
+### Contribute and administer the repository
 
-The governed-analysis reference set is organised under `docs/reference/`. These remaining flat documents stay canonical until issue #236 lands:
-
-- [Crypto snapshot quality contract](crypto-snapshot-quality-contract.md)
-- [Deterministic crypto report schema](deterministic-crypto-report-schema.md)
-- [Report self-proof evidence contract](report-self-proof-evidence-contract.md)
-
-### Contribute documentation
-
-Follow [Contribute documentation](how-to/contribute-documentation.md) for page purpose, metadata, links and review requirements.
+- [Contribute documentation](how-to/contribute-documentation.md).
+- [Deliver a repository slice](how-to/deliver-a-repository-slice.md).
+- [Choose an agent write strategy](how-to/choose-agent-write-strategy.md).
+- [Configure main branch protection](how-to/configure-main-branch-protection.md).
+- [Look up the repository layout](reference/repository-layout.md).
 
 ## Documentation modes
 
@@ -55,34 +58,35 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 
 ### Tutorials
 
-Tutorials guide a new reader through a safe sequence that produces an observable result. They minimise choices and link to deeper material after the reader succeeds.
-
 - [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md)
 
 ### How-to guides
 
-How-to guides solve one concrete problem for a reader who already understands the context. They contain the steps required to achieve the goal and link to reference for exhaustive detail.
-
 - [Build the static site](how-to/build-the-static-site.md)
+- [Publish the static site](how-to/publish-the-static-site.md)
+- [Verify the live site](how-to/verify-the-live-site.md)
 - [Validate a source snapshot](how-to/validate-a-source-snapshot.md)
-- [Contribute documentation](how-to/contribute-documentation.md)
 - [Run a governed LLM dry run](how-to/run-governed-llm-dry-run.md)
 - [Create a governed rolling-review pull request](how-to/create-governed-rolling-review-pr.md)
+- [Contribute documentation](how-to/contribute-documentation.md)
+- [Deliver a repository slice](how-to/deliver-a-repository-slice.md)
+- [Choose an agent write strategy](how-to/choose-agent-write-strategy.md)
+- [Configure main branch protection](how-to/configure-main-branch-protection.md)
 
 ### Reference
 
-Reference pages describe contracts, commands, paths, configuration, workflows and artefact formats precisely and neutrally.
-
 - [Repository layout](reference/repository-layout.md)
 - [Generated site artefacts](reference/generated-site-artefacts.md)
+- [Live-site evidence artefact](reference/live-site-evidence-artefact.md)
+- [Source snapshot quality](reference/source-snapshot-quality.md)
+- [Deterministic report schema](reference/deterministic-report-schema.md)
+- [Generated report PR evidence](reference/generated-report-pr-evidence.md)
 - [Governed analysis contract](reference/governed-analysis-contract.md)
 - [Governed LLM workflows](reference/governed-llm-workflows.md)
 - [Offline validation pipeline](reference/offline-validation-pipeline.md)
 - [Governed OpenRouter client](reference/governed-openrouter-client.md)
 
 ### Explanation
-
-Explanation pages describe architecture, rationale, trade-offs, provenance, deterministic generation, fail-closed validation, trust boundaries and governance decisions.
 
 - [Deterministic site generation](explanation/deterministic-site-generation.md)
 - [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
@@ -94,7 +98,7 @@ Explanation pages describe architecture, rationale, trade-offs, provenance, dete
 These paths are intentionally separate from Diátaxis documentation:
 
 - [`planning/`](../planning/README.md) — roadmap intent, delivery records and close-out evidence;
-- [`evaluation/`](../evaluation/phase-05/README.md) — model evaluation evidence and decisions;
+- [`evaluation/`](../evaluation/phase-05/README.md) — discovery evidence, model evaluation and reviewed decisions;
 - [`tests/`](../tests/) — tests, fixtures and fixture-specific notes;
 - [`schemas/`](../schemas/) — machine-readable contracts;
 - [`prompts/`](../prompts/) — versioned prompt artefacts;
@@ -103,6 +107,8 @@ These paths are intentionally separate from Diátaxis documentation:
 
 Reference and explanation pages link to these canonical artefacts rather than copying them into `docs/`.
 
-## Migration status
+## Compatibility paths
 
-The authoritative migration plan is [`planning/documentation/diataxis-migration.md`](../planning/documentation/diataxis-migration.md). Parent issue #232 tracks execution status. The governed-analysis pilot and local learning journey are complete in the new structure; other flat documents remain available until issue #236 migrates or preserves them deliberately.
+Former flat documentation paths remain as short pointers where historical issues and pull requests are likely to link to them. They are not canonical and contain no duplicated procedure or contract body.
+
+The authoritative migration plan is [`planning/documentation/diataxis-migration.md`](../planning/documentation/diataxis-migration.md). Parent issue #232 tracks execution status.
