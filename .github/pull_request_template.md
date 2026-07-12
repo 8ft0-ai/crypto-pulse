@@ -4,7 +4,7 @@ Closes #
 
 ## Summary
 
-Describe the slice or fix implemented in this PR.
+Describe the bounded outcome delivered by this pull request.
 
 ## Scope
 
@@ -27,8 +27,9 @@ Describe the slice or fix implemented in this PR.
 Commands run or expected:
 
 ```bash
-python scripts/build_pages_site.py
-python -m http.server 8000 --directory _site
+python -m unittest discover -s tests
+python scripts/validate_documentation.py
+python -m site_generator
 ```
 
 Verification notes:
@@ -46,8 +47,10 @@ Add screenshots or describe the local preview where relevant.
 ## Checklist
 
 - [ ] I worked on a branch, not directly on `main`.
-- [ ] The linked issue remains open until this PR is merged.
+- [ ] The linked issue remains open until this pull request is merged.
+- [ ] The changed-file scope matches the linked issue.
+- [ ] Internal Markdown links and documentation navigation validate.
 - [ ] `_site/` generated output has not been committed.
-- [ ] Existing demo / not-financial-advice warnings remain visible.
+- [ ] Existing demo and non-financial-advice warnings remain visible.
 - [ ] Missing or partial data degrades gracefully.
-- [ ] Verification notes are included above.
+- [ ] Verification evidence and limitations are included above.
