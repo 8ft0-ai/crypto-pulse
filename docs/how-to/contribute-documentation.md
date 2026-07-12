@@ -52,7 +52,7 @@ Begin with one H1 title followed by a visible metadata block:
 
 Use lower-case, hyphenated filenames. Use Australian English and the repository term `artefact`.
 
-Do not put issue status, implementation-record wording or PR close conditions in a current documentation page. Preserve that history in planning, evaluation, issues, pull requests and Git history.
+Do not put issue status, implementation-record wording or pull-request close conditions in a current documentation page. Preserve that history in planning, evaluation, issues, pull requests and Git history.
 
 ## Write for the selected mode
 
@@ -102,27 +102,32 @@ Link to canonical repository artefacts instead of copying them. For example, a r
 
 Add the new page to [`docs/index.md`](../index.md) under the reader task and documentation mode that best match its purpose. Do not add links to pages that are planned but do not yet exist.
 
-Avoid duplicate top-level navigation entries. A page may appear once in the primary mode list and be linked contextually from another page where useful.
+Avoid duplicate mode-catalogue entries. A page may appear once in the primary mode list and be linked contextually from another section where useful.
 
 ## Validate the change
 
-Run the existing repository validation:
+Run the repository baseline:
 
 ```bash
 python -m unittest discover -s tests
+python scripts/validate_documentation.py
 python -m site_generator
 ```
 
-Also check that:
+The documentation validator objectively checks:
 
-- every changed internal Markdown link resolves;
-- every referenced repository path exists;
-- commands match current repository behaviour;
-- no historical evidence was deleted or rewritten;
-- no product, data, provider, schema, prompt, report or publication behaviour changed;
-- `_site/` was generated only as disposable output and was not staged or committed.
+- tracked internal Markdown targets and heading anchors;
+- repository-relative path safety;
+- references to declared removed document paths;
+- the existence and mode placement of `docs/index.md` catalogue entries;
+- duplicate entries in the four mode catalogues;
+- accidental tracked `_site/` output.
 
-Record the validation evidence and old-to-new path mapping in the pull-request body.
+It does not assess writing style or decide whether a page has been classified correctly.
+
+Also confirm that commands match current repository behaviour, historical evidence remains preserved, no product boundary changed and `_site/` was not staged or committed.
+
+Record validation evidence and old-to-new path mappings in the pull-request body.
 
 ## Review the page as a reader
 
