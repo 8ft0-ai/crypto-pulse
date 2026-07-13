@@ -62,25 +62,33 @@ Current status:
 - MiniMax M3 does not advance;
 - North Mini Code remains catalogue-ineligible;
 - automatic generation and publication remain disabled;
-- issue #269 remains open until the correct final two-call artefact is reviewed.
+- issue #269 remains open until the prompt-v2 final two-call artefact is reviewed.
 
-The only active final calibration workflow should be visibly named **Semantic plan calibration — GPT-5.6 + Nex only**. A successful calibration would prove compatibility, not complete production selection. Repeated multi-case evidence and a separately reviewed decision would still be required.
+The active final calibration workflow is **Semantic plan calibration — GPT-5.6 + Nex only** and now uses `crypto-market-claim-plan/v2`. A successful calibration would prove compatibility, not complete production selection. Repeated multi-case evidence and a separately reviewed decision would still be required.
 
 ## Five-model catalogue expansion screen
 
-Issue #273 records a separate screen for five additional OpenRouter candidates discovered after the retrospective:
+Issue #273 introduced a separate screen for DeepSeek V4 Flash, GPT-5.6 Luna, Qwen3.6 Flash, MiMo V2.5 Pro and Seed 2.0 Mini. Protected run [`29246391801`](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29246391801) completed against trusted `main` SHA `5bb4c8a8c9816353fee6487eb39f7906333ffada` for USD 0.0200591105.
 
-```text
-deepseek/deepseek-v4-flash
-openai/gpt-5.6-luna
-qwen/qwen3.6-flash
-xiaomi/mimo-v2.5-pro
-bytedance-seed/seed-2.0-mini
-```
+The reviewed outcome is recorded in [`catalogue-screen-29246391801.md`](catalogue-screen-29246391801.md):
 
-The screen gives each exact model one representative route probe and one real full-contract call over the same normalised `historical-normal-crosschecked` evidence bundle. It has a USD 0.15 hard whole-run ceiling, checks live structured-output, pricing and reasoning compatibility, retains per-model request transforms, and reports rejected or missing plans as unscored.
+- Luna completed a compact plan but exposed an unstated validator rule for one source subject per `source_status` claim;
+- DeepSeek reached a provider route but exhausted an unrepresentative 16-token reasoning probe;
+- Qwen exhausted its 4,000-token full-contract allowance;
+- MiMo had no endpoint eligible for the complete governed request and policy;
+- Seed completed fairly but failed multiple semantic taxonomy rules.
 
-This experiment is deliberately independent of #269. It does not rank candidates, select a deployment model, enable automatic generation or authorise publication. Only a model that passes the route, canonical validator, expectation, identity and cost gates may be proposed for a separately reviewed repeated multi-case evaluation.
+The original five-model workflow is removed from the Actions UI. Its runner, configuration, documentation, Git history and protected artefacts remain available for audit.
+
+## Prompt-v2 corrective screen
+
+Issue #275 adds the immutable `crypto-market-claim-plan/v2` prompt. It preserves prompt v1 and makes the validator's source grouping rule explicit:
+
+> A `source_status` claim must describe exactly one source subject. Every cited evidence record in that claim must belong to that same source subject. Use separate claims for separate sources.
+
+The corrective workflow **Semantic plan correction — Luna + DeepSeek + Qwen** gives Luna, DeepSeek and Qwen one corrected route probe and one full-contract call over the same normalised `historical-normal-crosschecked` evidence. It has a USD 0.10 hard ceiling, no leaderboard, no deployment selection, no automatic generation and no publication.
+
+MiMo and Seed remain excluded from that corrective run for the reviewed reasons above.
 
 ## Fixed corpus
 
