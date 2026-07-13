@@ -8,6 +8,7 @@ name: Governed GPT-4o mini semantic claim-plan proof
 # llm_analysis.public_demo_benchmark_projection run
 # llm_analysis.public_demo_diagnostic prepare
 # llm_analysis.public_demo_diagnostic run
+# llm_analysis.semantic_plan_benchmark run
 
 on:
   workflow_dispatch:
