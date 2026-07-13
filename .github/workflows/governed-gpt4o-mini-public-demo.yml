@@ -120,7 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.semantic_plan_benchmark run \
+          python -m llm_analysis.semantic_plan_protected_runner run \
             --repository-root . \
             --profile config/llm-public-data-semantic-plan.yml \
             --viability-config config/llm-evaluation-viability.yml \
