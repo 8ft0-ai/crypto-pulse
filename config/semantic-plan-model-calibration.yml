@@ -1,0 +1,17 @@
+version: 1
+base_selection_config: config/semantic-plan-model-selection.yml
+smoke_case_key: historical-normal-crosschecked
+maximum_total_cost_usd: 0.50
+candidates:
+  gpt-5-6-sol:
+    maximum_generation_cost_usd: 0.15
+    maximum_model_cost_usd: 0.30
+    max_output_tokens: 4000
+  nex-n2-mini:
+    maximum_generation_cost_usd: 0.02
+    maximum_model_cost_usd: 0.04
+    max_output_tokens: 4000
+  minimax-m3:
+    maximum_generation_cost_usd: 0.03
+    maximum_model_cost_usd: 0.06
+    max_output_tokens: 8000
