@@ -43,7 +43,9 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 | Phase | Status | Planning record | Delivery record |
 | --- | --- | --- | --- |
 | Phase 4 — Live-site provenance UX | Shaping | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | Pending |
-| Phase 5 — Governed LLM analysis | Shaping | [phase-05-governed-llm-analysis.md](phase-05-governed-llm-analysis.md) | Pending |
+| Phase 5 — Governed LLM analysis | Evaluation hardening; final GPT-5.6/Nex calibration pending | [phase-05-governed-llm-analysis.md](phase-05-governed-llm-analysis.md) | Pending |
+
+Phase 5 has implemented the semantic claim-plan contract, deterministic rendering and protected evaluation machinery, but has not selected a model or authorised automatic generation. The model-selection chronology and lessons are recorded in [`../../evaluation/phase-05/semantic-model-evaluation-retrospective.md`](../../evaluation/phase-05/semantic-model-evaluation-retrospective.md).
 
 ## Backlog
 
@@ -63,7 +65,7 @@ Phases 1–3 were reconstructed after delivery to preserve the intended roadmap 
 | --- | --- | --- | --- |
 | Phase 1 — Source evidence spine | Delivered; retrospective roadmap spec | [phase-01-source-evidence-spine.md](phase-01-source-evidence-spine.md) | [../delivery/phase-01-source-evidence-spine.md](../delivery/phase-01-source-evidence-spine.md) |
 | Phase 2 — Deterministic report review loop | Delivered; retrospective roadmap spec | [phase-02-deterministic-report-review-loop.md](phase-02-deterministic-report-review-loop.md) | [../delivery/phase-02-deterministic-report-review-loop.md](../delivery/phase-02-deterministic-report-review-loop.md) |
-| Phase 3 — Self-proving generated report PRs | Delivered; retrospective roadmap spec | [phase-03-self-proving-generated-report-prs.md](phase-03-self-proving-generated-report-prs.md) | [../delivery/phase-03-self-proving-generated-report-prs.md](../delivery/phase-03-self-proving-generated-report-prs.md) |
+| Phase 3 — Self-proving generated report PRs | Delivered; retrospective roadmap spec | [phase-03-self-proving-generated-report-prs.md](phase-03-self-proving-generated-report-prs.md) | [../delivery/phase-03-self-proving-generated-report-pr-review-loop.md](../delivery/phase-03-self-proving-generated-report-prs.md) |
 
 ## Delivery records
 
