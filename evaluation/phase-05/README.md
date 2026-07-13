@@ -66,6 +66,22 @@ Current status:
 
 The only active final calibration workflow should be visibly named **Semantic plan calibration — GPT-5.6 + Nex only**. A successful calibration would prove compatibility, not complete production selection. Repeated multi-case evidence and a separately reviewed decision would still be required.
 
+## Five-model catalogue expansion screen
+
+Issue #273 records a separate screen for five additional OpenRouter candidates discovered after the retrospective:
+
+```text
+deepseek/deepseek-v4-flash
+openai/gpt-5.6-luna
+qwen/qwen3.6-flash
+xiaomi/mimo-v2.5-pro
+bytedance-seed/seed-2.0-mini
+```
+
+The screen gives each exact model one representative route probe and one real full-contract call over the same normalised `historical-normal-crosschecked` evidence bundle. It has a USD 0.15 hard whole-run ceiling, checks live structured-output, pricing and reasoning compatibility, retains per-model request transforms, and reports rejected or missing plans as unscored.
+
+This experiment is deliberately independent of #269. It does not rank candidates, select a deployment model, enable automatic generation or authorise publication. Only a model that passes the route, canonical validator, expectation, identity and cost gates may be proposed for a separately reviewed repeated multi-case evaluation.
+
 ## Fixed corpus
 
 The corpus contains three immutable historical snapshots and two deterministic evaluation-only mutations:
