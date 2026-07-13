@@ -35,26 +35,35 @@ class GovernedFinalSemanticPlanModelCalibrationWorkflowTests(unittest.TestCase):
             "name: Semantic plan calibration — GPT-5.6 + Nex only", self.text
         )
         self.assertIn("Publish final calibration preflight", self.text)
-        self.assertIn("semantic-plan-model-final-calibration/v1", self.text)
+        self.assertIn("semantic-plan-model-final-calibration/v2", self.text)
+        self.assertIn("Prompt: crypto-market-claim-plan/v2", self.text)
         self.assertIn(
             "Candidates: openai/gpt-5.6-sol, nex-agi/nex-n2-mini", self.text
         )
+        self.assertIn("Maximum route probes: 2", self.text)
         self.assertIn("Maximum substantive generations: 2", self.text)
         self.assertIn("Whole-run cost ceiling: USD 0.25", self.text)
+        self.assertIn("One-source-subject-per-source_status rule: explicit", self.text)
         self.assertIn("MiniMax M3 included: false", self.text)
 
     def test_superseded_three_model_workflow_is_not_dispatchable(self) -> None:
         self.assertFalse(self.old_path.exists())
 
-    def test_workflow_runs_final_two_call_calibration_and_only_uploads_artefacts(self) -> None:
+    def test_workflow_runs_prompt_v2_calibration_and_only_uploads_artefacts(self) -> None:
         self.assertIn("semantic_plan_model_evaluation prepare", self.text)
-        self.assertIn("semantic_plan_model_final_calibration", self.text)
-        self.assertIn("Run final two-call model calibration", self.text)
+        self.assertIn("semantic_plan_model_prompt_v2_screen", self.text)
+        self.assertIn("config/semantic-plan-model-final-calibration-v2.yml", self.text)
+        self.assertIn("Run final two-call prompt-v2 calibration", self.text)
         self.assertIn("timeout-minutes: 20", self.text)
         self.assertIn("actions/upload-artifact@v4", self.text)
-        self.assertNotIn("git push", self.text)
-        self.assertNotIn("gh pr", self.text)
-        self.assertNotIn("deploy", self.text.lower())
+        for prohibited in (
+            "git push",
+            "gh pr",
+            "actions/deploy-pages",
+            "pages: write",
+            "id-token: write",
+        ):
+            self.assertNotIn(prohibited, self.text)
 
 
 if __name__ == "__main__":
