@@ -1,4 +1,4 @@
-name: Governed final semantic plan model calibration
+name: Semantic plan calibration — GPT-5.6 + Nex only
 
 on:
   workflow_dispatch:
@@ -42,6 +42,28 @@ jobs:
         id: trusted
         shell: bash
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish final calibration preflight
+        env:
+          TRUSTED_SHA: ${{ steps.trusted.outputs.sha }}
+        shell: bash
+        run: |
+          {
+            echo "# Semantic plan calibration preflight"
+            echo ""
+            echo "- Plan: semantic-plan-model-final-calibration/v1"
+            echo "- Trusted main SHA: $TRUSTED_SHA"
+            echo "- Candidates: openai/gpt-5.6-sol, nex-agi/nex-n2-mini"
+            echo "- Smoke case: historical-normal-crosschecked"
+            echo "- Maximum substantive generations: 2"
+            echo "- Whole-run cost ceiling: USD 0.25"
+            echo "- Evidence transform: Coinbase USD spot price -> price_usd"
+            echo "- Nex user-role compatibility message: enabled"
+            echo "- Validator-gated quality scoring: enabled"
+            echo "- MiniMax M3 included: false"
+            echo "- Automatic generation: false"
+            echo "- Publication: false"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Python
         uses: actions/setup-python@v5
