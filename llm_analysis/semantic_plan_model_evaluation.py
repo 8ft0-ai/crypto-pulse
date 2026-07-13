@@ -159,6 +159,22 @@ def _excluded_records(selection: SelectionPlan, catalogue: Mapping[str, Any]) ->
     return result
 
 
+def _validated_classification_map(value: Mapping[str, str]) -> dict[str, str]:
+    """Preserve the validated case-to-classification mapping without re-parsing rows."""
+    if not isinstance(value, Mapping) or not value:
+        raise EvaluationIntegrityError("semantic classification map must be a non-empty mapping")
+    result: dict[str, str] = {}
+    for case_key, classification in value.items():
+        if not isinstance(case_key, str) or not case_key.strip():
+            raise EvaluationIntegrityError("semantic classification map contains an invalid case key")
+        if not isinstance(classification, str) or not classification.strip():
+            raise EvaluationIntegrityError(
+                f"semantic classification map contains an invalid classification for {case_key}"
+            )
+        result[case_key] = classification
+    return result
+
+
 def _runtime(root: Path, output: Path, public_profile: Any, base_profile: SemanticPlanProfile, base_plan: PaidBenchmarkPlan, candidate: Candidate) -> tuple[SemanticPlanProfile, PaidBenchmarkPlan, Any]:
     profile = _candidate_profile(base_profile, candidate)
     plan = _candidate_plan(base_plan, candidate)
@@ -271,7 +287,7 @@ def execute_model_selection(
     policy = load_viability_policy(root / selection.viability_config)
     pacer_args = {key: value for key, value in {"sleeper": sleeper, "monotonic": monotonic, "now": now, "jitter": jitter}.items() if value is not None}
     pacer = AttemptPacer(policy, **pacer_args)
-    classification_by_case = {str(row["case_key"]): str(row["classification"]) for row in classifications}
+    classification_by_case = _validated_classification_map(classifications)
     availability_rows: list[dict[str, Any]] = []
     route_rows: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
