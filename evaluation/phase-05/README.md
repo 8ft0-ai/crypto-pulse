@@ -35,7 +35,36 @@ The run completed route preflight, smoke generation and all ten frozen corpus ca
 
 The current model-authored natural-prose contract nevertheless received only `1/10` hard passes. The reviewed outcome is **`public-demo-no-go` for that contract**, not an intrinsic model no-go. Most failures came from stochastic numeric presentation and claim-taxonomy selection rather than unsupported facts.
 
-Issue #228 now shapes a semantic claim-plan contract with deterministic repository-owned prose rendering. Further wording-specific validator patches and model comparison are deferred until that contract is stable. #189 remains blocked, and automatic generation and publication remain disabled.
+Issue #228 then shaped a semantic claim-plan contract with deterministic repository-owned prose rendering.
+
+## Semantic claim-plan model selection and calibration
+
+The semantic contract moved model responsibility from final report prose to a bounded claim plan. Repository code owns evidence validation, claim support, deterministic rendering and publication authority.
+
+The subsequent model-selection work compared GPT-5.6 Sol, Nex N2 Mini and MiniMax M3, but the discovery process also exposed defects and assumptions in the evaluation machinery itself. Protected runs identified:
+
+- a classification-map setup defect before any model call;
+- an undersized GPT-5.6 per-call cost ceiling;
+- a weak route probe that did not represent the real message shape;
+- a Nex provider requirement for a user-role message;
+- MiniMax output-length exhaustion followed by a fair semantic-taxonomy failure;
+- cross-source price-field normalisation that was missing from the evidence contract;
+- invalid soft scoring for validator-rejected and missing plans;
+- workflow names similar enough to cause the superseded three-model calibration to be dispatched again.
+
+The full chronology, technical findings and self-reflection are recorded in [`semantic-model-evaluation-retrospective.md`](semantic-model-evaluation-retrospective.md).
+
+Current status:
+
+- no model has been selected;
+- GPT-5.6 Sol remains benchmark-only;
+- Nex N2 Mini remains the affordable candidate pending one fair corrected full-contract call;
+- MiniMax M3 does not advance;
+- North Mini Code remains catalogue-ineligible;
+- automatic generation and publication remain disabled;
+- issue #269 remains open until the correct final two-call artefact is reviewed.
+
+The only active final calibration workflow should be visibly named **Semantic plan calibration — GPT-5.6 + Nex only**. A successful calibration would prove compatibility, not complete production selection. Repeated multi-case evidence and a separately reviewed decision would still be required.
 
 ## Fixed corpus
 
@@ -57,6 +86,8 @@ The final free-model follow-up uses a separate immutable configuration, `config/
 
 The GPT-4o mini public-data path uses a separate profile and paid benchmark configuration so its public-input policy exception and reviewed evidence remain independently auditable.
 
+The later semantic model-selection and calibration configurations remain retained as historical evaluation artefacts. Obsolete manual workflow entry points may be removed without deleting their runners, configurations, Git history or protected run evidence.
+
 At execution time the workflows check the public OpenRouter catalogue again. A disappeared, expired, incorrectly priced or structured-output-ineligible model is recorded as ineligible rather than silently replaced.
 
 ## Operating sequence
@@ -66,6 +97,17 @@ merge evaluation harness
 manually dispatch protected evaluation from main
 review evaluation artefacts and reviewer worksheet
 commit the approved decision in a separate review PR
+```
+
+For future candidates, the evaluation sequence is now more explicit:
+
+```text
+catalogue eligibility
+representative route probe
+one real full-contract smoke call
+repeated single-case calibration
+multi-case evaluation
+reviewed decision
 ```
 
 The separate decision PR is required because pull-request code must not receive `OPENROUTER_API_KEY`, and workflow artefacts must be reviewed before a production-proof configuration is selected.
