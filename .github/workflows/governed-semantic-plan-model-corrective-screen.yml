@@ -1,4 +1,4 @@
-name: Semantic plan screen — 5 catalogue candidates
+name: Semantic plan correction — Luna + DeepSeek + Qwen
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: governed-semantic-plan-model-catalogue-screen-${{ github.run_id }}
+  group: governed-semantic-plan-model-corrective-screen-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           fi
 
   prepare:
-    name: Freeze catalogue screen corpus
+    name: Freeze corrective semantic screen corpus
     needs: guard
     runs-on: ubuntu-latest
     outputs:
@@ -43,24 +43,27 @@ jobs:
         shell: bash
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish catalogue screen preflight
+      - name: Publish corrective screen preflight
         env:
           TRUSTED_SHA: ${{ steps.trusted.outputs.sha }}
         shell: bash
         run: |
           {
-            echo "# Five-model semantic plan screen preflight"
+            echo "# Corrective semantic plan screen preflight"
             echo ""
-            echo "- Plan: semantic-plan-model-catalogue-screen/v1"
+            echo "- Plan: semantic-plan-model-corrective-screen/v1"
+            echo "- Prompt: crypto-market-claim-plan/v2"
             echo "- Trusted main SHA: $TRUSTED_SHA"
-            echo "- Candidates: deepseek/deepseek-v4-flash, openai/gpt-5.6-luna, qwen/qwen3.6-flash, xiaomi/mimo-v2.5-pro, bytedance-seed/seed-2.0-mini"
+            echo "- Candidates: openai/gpt-5.6-luna, deepseek/deepseek-v4-flash, qwen/qwen3.6-flash"
+            echo "- Excluded after reviewed evidence: xiaomi/mimo-v2.5-pro, bytedance-seed/seed-2.0-mini"
             echo "- Smoke case: historical-normal-crosschecked"
-            echo "- Maximum substantive generations: 5"
-            echo "- Maximum route probes: 5"
-            echo "- Whole-run cost ceiling: USD 0.15"
+            echo "- Maximum route probes: 3"
+            echo "- Maximum substantive generations: 3"
+            echo "- Whole-run cost ceiling: USD 0.10"
+            echo "- DeepSeek route probe output allowance: 256 tokens"
+            echo "- Qwen full-contract output allowance: 8000 tokens"
             echo "- Evidence transform: Coinbase USD spot price -> price_usd"
-            echo "- Request compatibility transforms: source-controlled per model"
-            echo "- Reasoning policy: source-controlled and live-catalogue checked"
+            echo "- One-source-subject-per-source_status rule: explicit"
             echo "- Validator-gated quality scoring: enabled"
             echo "- Quality leaderboard: disabled"
             echo "- Deployment selection: disabled"
@@ -84,18 +87,18 @@ jobs:
           python -m llm_analysis.semantic_plan_model_evaluation prepare \
             --repository-root . \
             --config config/semantic-plan-model-selection.yml \
-            --output-dir "$RUNNER_TEMP/semantic-plan-model-catalogue-screen-prepared"
+            --output-dir "$RUNNER_TEMP/semantic-plan-model-corrective-screen-prepared"
 
       - name: Upload prepared corpus
         uses: actions/upload-artifact@v4
         with:
-          name: semantic-plan-model-catalogue-screen-prepared-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/semantic-plan-model-catalogue-screen-prepared/
+          name: semantic-plan-model-corrective-screen-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semantic-plan-model-corrective-screen-prepared/
           if-no-files-found: error
           retention-days: 7
 
   screen:
-    name: Run protected five-model catalogue screen
+    name: Run protected prompt-v2 corrective screen
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -125,10 +128,10 @@ jobs:
       - name: Download prepared corpus
         uses: actions/download-artifact@v4
         with:
-          name: semantic-plan-model-catalogue-screen-prepared-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/semantic-plan-model-catalogue-screen-prepared
+          name: semantic-plan-model-corrective-screen-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semantic-plan-model-corrective-screen-prepared
 
-      - name: Run five-model catalogue screen
+      - name: Run corrective three-model screen
         id: screen
         continue-on-error: true
         env:
@@ -137,36 +140,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.semantic_plan_model_catalogue_screen \
+          python -m llm_analysis.semantic_plan_model_prompt_v2_screen \
             --repository-root . \
-            --config config/semantic-plan-model-catalogue-screen.yml \
-            --prepared-dir "$RUNNER_TEMP/semantic-plan-model-catalogue-screen-prepared" \
-            --output-dir "$RUNNER_TEMP/semantic-plan-model-catalogue-screen" \
+            --config config/semantic-plan-model-corrective-screen.yml \
+            --prepared-dir "$RUNNER_TEMP/semantic-plan-model-corrective-screen-prepared" \
+            --output-dir "$RUNNER_TEMP/semantic-plan-model-corrective-screen" \
             --trusted-main-sha "$TRUSTED_SHA"
 
-      - name: Publish catalogue screen summary
+      - name: Publish corrective screen summary
         if: always()
         shell: bash
         run: |
-          if [[ -f "$RUNNER_TEMP/semantic-plan-model-catalogue-screen/actions-summary.md" ]]; then
-            cat "$RUNNER_TEMP/semantic-plan-model-catalogue-screen/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$RUNNER_TEMP/semantic-plan-model-corrective-screen/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/semantic-plan-model-corrective-screen/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "# Five-model semantic claim-plan catalogue screen" >> "$GITHUB_STEP_SUMMARY"
+            echo "# Corrective semantic plan screen" >> "$GITHUB_STEP_SUMMARY"
             echo "The screen failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload protected catalogue screen artefacts
+      - name: Upload protected corrective screen artefacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: semantic-plan-model-catalogue-screen-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/semantic-plan-model-catalogue-screen/
+          name: semantic-plan-model-corrective-screen-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semantic-plan-model-corrective-screen/
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Fail when catalogue screen infrastructure failed
+      - name: Fail when corrective screen infrastructure failed
         if: steps.screen.outcome != 'success'
         shell: bash
         run: |
-          echo "The controlled catalogue screen did not complete. Review retained diagnostics." >&2
+          echo "The controlled corrective screen did not complete. Review retained diagnostics." >&2
           exit 1
