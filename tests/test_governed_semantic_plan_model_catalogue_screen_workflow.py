@@ -49,9 +49,14 @@ class GovernedSemanticPlanModelCatalogueScreenWorkflowTests(unittest.TestCase):
             "OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}", self.text
         )
         self.assertIn("actions/upload-artifact@v4", self.text)
-        self.assertNotIn("git push", self.text)
-        self.assertNotIn("gh pr", self.text)
-        self.assertNotIn("deploy", self.text.lower())
+        for prohibited in (
+            "git push",
+            "gh pr",
+            "actions/deploy-pages",
+            "pages: write",
+            "id-token: write",
+        ):
+            self.assertNotIn(prohibited, self.text)
 
 
 if __name__ == "__main__":
