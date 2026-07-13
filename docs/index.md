@@ -48,6 +48,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 - [Look up the semantic claim-plan contract](reference/semantic-claim-plan-contract.md) for the bounded model-owned plan and deterministic-rendering responsibility split.
 - [Look up semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md) for exact repository-owned values, formatting, templates and fail-closed rules.
 - [Look up the semantic claim-plan benchmark](reference/semantic-plan-benchmark.md) for protected workflow boundaries, retained artefacts and qualification fields.
+- [Review the five-model catalogue screen](governed-semantic-plan-model-catalogue-screen.md) for its candidates, request transforms, pass criteria and USD 0.15 boundary.
 - [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
 - [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
