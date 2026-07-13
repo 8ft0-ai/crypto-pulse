@@ -39,3 +39,7 @@ This preflight is part of the experiment contract. A reviewer should confirm it 
 The workflow is manual, trusted-main, read-only, protected-environment and artefact-only. It cannot publish analysis or update repository state.
 
 Dispatch **Semantic plan calibration — GPT-5.6 + Nex only** once from `main`. No similarly named three-model calibration workflow should remain available in the Actions UI.
+
+## Cleanup validation
+
+Issue #271 and PR #272 removed the obsolete manual workflow entry point and added the retrospective and preflight protections. PR validation run `29244079165` passed semantic integration, public-data policy compatibility, the full unit suite, documentation validation, generated-output protection, static-site build and artefact verification. No paid model calls were made by that PR.
