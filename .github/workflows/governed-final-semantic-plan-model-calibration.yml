@@ -51,16 +51,21 @@ jobs:
           {
             echo "# Semantic plan calibration preflight"
             echo ""
-            echo "- Plan: semantic-plan-model-final-calibration/v1"
+            echo "- Plan: semantic-plan-model-final-calibration/v2"
+            echo "- Prompt: crypto-market-claim-plan/v2"
             echo "- Trusted main SHA: $TRUSTED_SHA"
             echo "- Candidates: openai/gpt-5.6-sol, nex-agi/nex-n2-mini"
             echo "- Smoke case: historical-normal-crosschecked"
+            echo "- Maximum route probes: 2"
             echo "- Maximum substantive generations: 2"
             echo "- Whole-run cost ceiling: USD 0.25"
             echo "- Evidence transform: Coinbase USD spot price -> price_usd"
+            echo "- One-source-subject-per-source_status rule: explicit"
             echo "- Nex user-role compatibility message: enabled"
             echo "- Validator-gated quality scoring: enabled"
             echo "- MiniMax M3 included: false"
+            echo "- Quality leaderboard: disabled"
+            echo "- Deployment selection: disabled"
             echo "- Automatic generation: false"
             echo "- Publication: false"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -91,7 +96,7 @@ jobs:
           retention-days: 7
 
   calibrate:
-    name: Run protected final two-call calibration
+    name: Run protected prompt-v2 final calibration
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -124,7 +129,7 @@ jobs:
           name: semantic-plan-model-final-calibration-prepared-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/semantic-plan-model-final-calibration-prepared
 
-      - name: Run final two-call model calibration
+      - name: Run final two-call prompt-v2 calibration
         id: calibration
         continue-on-error: true
         env:
@@ -133,9 +138,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.semantic_plan_model_final_calibration \
+          python -m llm_analysis.semantic_plan_model_prompt_v2_screen \
             --repository-root . \
-            --config config/semantic-plan-model-final-calibration.yml \
+            --config config/semantic-plan-model-final-calibration-v2.yml \
             --prepared-dir "$RUNNER_TEMP/semantic-plan-model-final-calibration-prepared" \
             --output-dir "$RUNNER_TEMP/semantic-plan-model-final-calibration" \
             --trusted-main-sha "$TRUSTED_SHA"
