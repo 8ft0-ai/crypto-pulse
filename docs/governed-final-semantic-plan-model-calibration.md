@@ -42,4 +42,4 @@ Dispatch **Semantic plan calibration — GPT-5.6 + Nex only** once from `main`. 
 
 ## Cleanup validation
 
-Issue #271 and PR #272 removed the obsolete manual workflow entry point and added the retrospective and preflight protections. PR validation run `29244079165` passed semantic integration, public-data policy compatibility, the full unit suite, documentation validation, generated-output protection, static-site build and artefact verification. No paid model calls were made by that PR.
+Issue #271 and PR #272 removed the obsolete manual workflow entry point and added the retrospective and preflight protections. PR validation runs `29244079165` and `29244135867` passed semantic integration, public-data policy compatibility, the full unit suite, documentation validation, generated-output protection, static-site build and artefact verification. No paid model calls were made by that PR.
