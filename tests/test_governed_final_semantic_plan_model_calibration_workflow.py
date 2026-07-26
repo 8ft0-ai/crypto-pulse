@@ -5,65 +5,39 @@ from pathlib import Path
 
 
 class GovernedFinalSemanticPlanModelCalibrationWorkflowTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.path = Path(
+    def test_superseded_final_calibration_is_not_dispatchable(self) -> None:
+        workflow = Path(
             ".github/workflows/governed-final-semantic-plan-model-calibration.yml"
         )
-        cls.old_path = Path(
-            ".github/workflows/governed-semantic-plan-model-calibration.yml"
-        )
-        cls.text = cls.path.read_text(encoding="utf-8")
+        self.assertFalse(workflow.exists())
 
-    def test_manual_trusted_main_read_only_boundary(self) -> None:
-        self.assertIn("workflow_dispatch:", self.text)
-        self.assertIn("contents: read", self.text)
-        self.assertIn("refs/heads/main", self.text)
-        self.assertIn("persist-credentials: false", self.text)
-        self.assertNotIn("pull_request:", self.text)
-        self.assertNotIn("contents: write", self.text)
-
-    def test_exact_trusted_sha_and_protected_environment(self) -> None:
-        self.assertIn("ref: ${{ needs.prepare.outputs.trusted_sha }}", self.text)
-        self.assertIn("environment: governed-llm-dry-run", self.text)
-        self.assertIn(
-            "OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}", self.text
-        )
-
-    def test_workflow_name_and_preflight_make_the_experiment_unambiguous(self) -> None:
-        self.assertIn(
-            "name: Semantic plan calibration — GPT-5.6 + Nex only", self.text
-        )
-        self.assertIn("Publish final calibration preflight", self.text)
-        self.assertIn("semantic-plan-model-final-calibration/v2", self.text)
-        self.assertIn("Prompt: crypto-market-claim-plan/v2", self.text)
-        self.assertIn(
-            "Candidates: openai/gpt-5.6-sol, nex-agi/nex-n2-mini", self.text
-        )
-        self.assertIn("Maximum route probes: 2", self.text)
-        self.assertIn("Maximum substantive generations: 2", self.text)
-        self.assertIn("Whole-run cost ceiling: USD 0.25", self.text)
-        self.assertIn("One-source-subject-per-source_status rule: explicit", self.text)
-        self.assertIn("MiniMax M3 included: false", self.text)
-
-    def test_superseded_three_model_workflow_is_not_dispatchable(self) -> None:
-        self.assertFalse(self.old_path.exists())
-
-    def test_workflow_runs_prompt_v2_calibration_and_only_uploads_artefacts(self) -> None:
-        self.assertIn("semantic_plan_model_evaluation prepare", self.text)
-        self.assertIn("semantic_plan_model_prompt_v2_screen", self.text)
-        self.assertIn("config/semantic-plan-model-final-calibration-v2.yml", self.text)
-        self.assertIn("Run final two-call prompt-v2 calibration", self.text)
-        self.assertIn("timeout-minutes: 20", self.text)
-        self.assertIn("actions/upload-artifact@v4", self.text)
-        for prohibited in (
-            "git push",
-            "gh pr",
-            "actions/deploy-pages",
-            "pages: write",
-            "id-token: write",
+    def test_historical_final_calibration_assets_remain_auditable(self) -> None:
+        for path in (
+            Path("config/semantic-plan-model-final-calibration-v2.yml"),
+            Path("llm_analysis/semantic_plan_model_prompt_v2_screen.py"),
+            Path("prompts/crypto-market-claim-plan-v2.md"),
+            Path("docs/governed-final-semantic-plan-model-calibration.md"),
         ):
-            self.assertNotIn(prohibited, self.text)
+            with self.subTest(path=path):
+                self.assertTrue(path.is_file())
+
+    def test_documentation_marks_the_experiment_superseded(self) -> None:
+        text = Path(
+            "docs/governed-final-semantic-plan-model-calibration.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("superseded historical experiment; not dispatchable", text)
+        self.assertIn("Do not dispatch the GPT-5.6 Sol/Nex full-plan calibration", text)
+        self.assertIn("phase-06-deterministic-claim-selection.md", text)
+        self.assertIn("No model was selected", text)
+
+    def test_phase_6_replaces_full_plan_generation_with_candidate_selection(self) -> None:
+        text = Path(
+            "planning/roadmap/phase-06-deterministic-claim-selection.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("deterministic claim-candidate compiler", text)
+        self.assertIn("selected_candidate_ids", text)
+        self.assertIn("at most one semantic repair", text)
+        self.assertIn("deterministic baseline fallback", text)
 
 
 if __name__ == "__main__":
