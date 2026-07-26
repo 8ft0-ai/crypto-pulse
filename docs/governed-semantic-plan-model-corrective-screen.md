@@ -1,10 +1,16 @@
 # Corrective semantic claim-plan screen
 
-Issue #275 adds a bounded corrective compatibility screen after protected run `29246391801` identified three unresolved model configurations and one hidden prompt/validator rule.
+Status: **completed historical experiment; not dispatchable**.
 
-## Purpose
+Issue #275 added a bounded corrective compatibility screen after protected run `29246391801` identified three unresolved model configurations and one hidden prompt/validator rule.
 
-The screen tests exactly:
+The corrective screen ran as workflow run [`29285569716`](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29285569716). All three route probes and all three full-contract calls completed, but no model produced a validator-accepted full claim plan.
+
+The reviewed result is recorded in [`../evaluation/phase-05/corrective-screen-29285569716.md`](../evaluation/phase-05/corrective-screen-29285569716.md).
+
+## Historical purpose
+
+The screen tested exactly:
 
 ```text
 openai/gpt-5.6-luna
@@ -12,19 +18,17 @@ deepseek/deepseek-v4-flash
 qwen/qwen3.6-flash
 ```
 
-It asks whether each corrected configuration can route, complete and produce one validator-accepted claim plan over the same normalised `historical-normal-crosschecked` evidence bundle.
+It asked whether each corrected configuration could route, complete and produce one validator-accepted claim plan over the same normalised `historical-normal-crosschecked` evidence bundle.
 
-It is not a benchmark, leaderboard or deployment decision.
+It was not a benchmark, leaderboard or deployment decision.
 
 ## Prompt v2
 
-The historical `crypto-market-claim-plan/v1` prompt remains unchanged. The screen uses the separate immutable artefact `prompts/crypto-market-claim-plan-v2.md` with version `crypto-market-claim-plan/v2`.
+The historical `crypto-market-claim-plan/v1` prompt remains unchanged. The screen used the separate immutable artefact `prompts/crypto-market-claim-plan-v2.md` with version `crypto-market-claim-plan/v2`.
 
-Prompt v2 preserves every v1 rule and adds the canonical validator's source grouping rule:
+Prompt v2 preserved every v1 rule and added the canonical validator's source grouping rule:
 
 > A `source_status` claim must describe exactly one source subject. Every cited evidence record in that claim must belong to that same source subject. Use separate claims for separate sources.
-
-The prompt path and version are retained in runtime and summary artefacts.
 
 ## Corrective request envelopes
 
@@ -34,46 +38,39 @@ The prompt path and version are retained in runtime and summary artefacts.
 | DeepSeek V4 Flash | 256 tokens | 12,000 tokens | `high`; reasoning content excluded |
 | Qwen3.6 Flash | 64 tokens | 8,000 tokens | explicitly disabled |
 
-The DeepSeek route probe is deliberately larger than the historical 16-token probe. Qwen receives a complete 8,000-token opportunity after its earlier 4,000-token truncation.
+The run observed total cost USD 0.0191477293 against a USD 0.10 ceiling.
 
-## Cost boundary
+## Reviewed outcome
+
+- Luna followed the corrected source-status rule but selected a four-operand comparison and an unsupported data-quality limitation.
+- DeepSeek completed but ignored the required top-level claim-plan schema, produced 7,582 output tokens and required about 250 seconds.
+- Qwen completed within the corrected allowance but returned an invented wrapper and unsupported schema fields.
+- Rejected plans remained unscored.
+- No model, deployment, automatic generation or publication decision was produced.
+
+## Architectural conclusion
+
+The corrective experiment showed that another full-plan prompt revision would continue asking the model to reproduce deterministic repository semantics.
+
+Phase 6 instead uses:
 
 ```text
-Luna model ceiling:      USD 0.050
-DeepSeek model ceiling:  USD 0.015
-Qwen model ceiling:      USD 0.020
-Combined model ceilings: USD 0.085
-Whole-run ceiling:       USD 0.10
+canonical evidence
+  -> deterministic valid claim candidates
+  -> deterministic ranking baseline
+  -> optional model selection of candidate IDs only
+  -> repository-owned plan reconstruction
+  -> existing validator and renderer
 ```
 
-The runner fails closed on live price increases, missing structured-output support, incompatible reasoning metadata, route incompatibility, missing cost evidence or any ceiling breach.
+See:
 
-## Exclusions
+- [`../planning/roadmap/phase-06-deterministic-claim-selection.md`](../planning/roadmap/phase-06-deterministic-claim-selection.md);
+- [`notes/simplifying-semantic-claim-plan-pipeline.md`](notes/simplifying-semantic-claim-plan-pipeline.md);
+- parent issue #283.
 
-MiMo V2.5 Pro and Seed 2.0 Mini are not retried:
+## Preserved evidence and boundary
 
-- MiMo had no route eligible for the complete governed request and provider policy.
-- Seed completed fairly but failed multiple semantic taxonomy rules and selected too many claims.
+The corrective runner, configuration, prompt artefacts, schema, validator, renderer, Git history and protected run artefacts remain auditable. Only the manual Actions workflow entry point is removed.
 
-Those reasons are retained in the checked-in plan and protected artefact.
-
-## Shared controls
-
-The screen reuses:
-
-- exact requested model identity;
-- `require_parameters: true` and `data_collection: deny`;
-- disabled cross-model fallback;
-- canonical Coinbase USD `price` to `price_usd` evidence normalisation;
-- strict claim-plan schema;
-- canonical semantic validator;
-- deterministic renderer;
-- redacted provider diagnostics;
-- validator-gated expectation scoring;
-- unscored rejected or missing plans.
-
-## Trust boundary
-
-The workflow is manual, trusted-main, read-only, protected-environment and artefact-only. It cannot publish analysis, modify repository content, select a production model or enable automatic generation.
-
-After merge, dispatch **Semantic plan correction — Luna + DeepSeek + Qwen** once from `main` and verify the preflight before approving the protected job.
+Do not rerun this screen. Any future model evaluation must use the Phase 6 candidate-selection boundary and a separately reviewed case, repeat and cost plan.
