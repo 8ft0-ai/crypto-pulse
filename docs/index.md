@@ -50,6 +50,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 - [Look up the semantic claim-plan benchmark](reference/semantic-plan-benchmark.md) for protected workflow boundaries, retained artefacts and qualification fields.
 - [Review the historical five-model catalogue screen](governed-semantic-plan-model-catalogue-screen.md) for the retained compatibility evidence and exclusions.
 - [Review the corrective prompt-v2 screen](governed-semantic-plan-model-corrective-screen.md) for the Luna, DeepSeek and Qwen retry contract and USD 0.10 boundary.
+- [Read the semantic claim-plan simplification note](notes/simplifying-semantic-claim-plan-pipeline.md) for the proposed shift from model-authored plans to deterministic candidates and bounded selection.
 - [Look up the governed workflows](reference/governed-llm-workflows.md) for triggers, inputs, permissions, artefacts and repository effects.
 - [Understand the evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) before treating generated analysis as reviewable repository content.
 
@@ -105,6 +106,14 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
 - [Fail-closed analysis validation](explanation/fail-closed-analysis-validation.md)
 - [Trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md)
+
+### Working notes
+
+Working notes preserve research and architectural reflection without making them normative documentation.
+
+- [Notes index](notes/README.md)
+- [Simplifying the semantic claim-plan pipeline](notes/simplifying-semantic-claim-plan-pipeline.md)
+- [Semantic claim selection: implementation patterns and references](notes/semantic-claim-selection-implementation-patterns.md)
 
 ## Records outside the documentation system
 
