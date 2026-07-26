@@ -5,59 +5,40 @@ from pathlib import Path
 
 
 class GovernedSemanticPlanModelCorrectiveScreenWorkflowTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.path = Path(
+    def test_completed_corrective_screen_is_not_dispatchable(self) -> None:
+        workflow = Path(
             ".github/workflows/governed-semantic-plan-model-corrective-screen.yml"
         )
-        cls.text = cls.path.read_text(encoding="utf-8")
+        self.assertFalse(workflow.exists())
 
-    def test_manual_trusted_main_read_only_boundary(self) -> None:
-        self.assertIn(
-            "name: Semantic plan correction — Luna + DeepSeek + Qwen", self.text
-        )
-        self.assertIn("workflow_dispatch:", self.text)
-        self.assertIn("contents: read", self.text)
-        self.assertIn("refs/heads/main", self.text)
-        self.assertIn("persist-credentials: false", self.text)
-        self.assertNotIn("pull_request:", self.text)
-        self.assertNotIn("contents: write", self.text)
-
-    def test_preflight_states_exact_contract_and_cost_boundary(self) -> None:
-        self.assertIn("semantic-plan-model-corrective-screen/v1", self.text)
-        self.assertIn("Prompt: crypto-market-claim-plan/v2", self.text)
-        self.assertIn(
-            "Candidates: openai/gpt-5.6-luna, deepseek/deepseek-v4-flash, qwen/qwen3.6-flash",
-            self.text,
-        )
-        self.assertIn("Maximum route probes: 3", self.text)
-        self.assertIn("Maximum substantive generations: 3", self.text)
-        self.assertIn("Whole-run cost ceiling: USD 0.10", self.text)
-        self.assertIn("DeepSeek route probe output allowance: 256 tokens", self.text)
-        self.assertIn("Qwen full-contract output allowance: 8000 tokens", self.text)
-        self.assertIn("One-source-subject-per-source_status rule: explicit", self.text)
-        self.assertIn("Quality leaderboard: disabled", self.text)
-        self.assertIn("Deployment selection: disabled", self.text)
-        self.assertIn("Cross-model fallback: false", self.text)
-
-    def test_workflow_runs_prompt_v2_screen_and_only_uploads_artefacts(self) -> None:
-        self.assertIn("semantic_plan_model_evaluation prepare", self.text)
-        self.assertIn("semantic_plan_model_prompt_v2_screen", self.text)
-        self.assertIn("config/semantic-plan-model-corrective-screen.yml", self.text)
-        self.assertIn("timeout-minutes: 30", self.text)
-        self.assertIn("environment: governed-llm-dry-run", self.text)
-        self.assertIn(
-            "OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}", self.text
-        )
-        self.assertIn("actions/upload-artifact@v4", self.text)
-        for prohibited in (
-            "git push",
-            "gh pr",
-            "actions/deploy-pages",
-            "pages: write",
-            "id-token: write",
+    def test_historical_corrective_assets_remain_auditable(self) -> None:
+        for path in (
+            Path("config/semantic-plan-model-corrective-screen.yml"),
+            Path("llm_analysis/semantic_plan_model_prompt_v2_screen.py"),
+            Path("prompts/crypto-market-claim-plan-v2.md"),
+            Path("docs/governed-semantic-plan-model-corrective-screen.md"),
+            Path("evaluation/phase-05/corrective-screen-29285569716.md"),
         ):
-            self.assertNotIn(prohibited, self.text)
+            with self.subTest(path=path):
+                self.assertTrue(path.is_file())
+
+    def test_reviewed_result_is_recorded_without_model_selection(self) -> None:
+        text = Path(
+            "evaluation/phase-05/corrective-screen-29285569716.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Route probes completed:           3 / 3", text)
+        self.assertIn("Full-contract calls completed:    3 / 3", text)
+        self.assertIn("USD 0.0191477293", text)
+        self.assertIn("No candidate from this screen advances", text)
+        self.assertIn("No model has been selected", text)
+
+    def test_documentation_marks_the_screen_completed_and_historical(self) -> None:
+        text = Path(
+            "docs/governed-semantic-plan-model-corrective-screen.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("completed historical experiment; not dispatchable", text)
+        self.assertIn("Do not rerun this screen", text)
+        self.assertIn("phase-06-deterministic-claim-selection.md", text)
 
 
 if __name__ == "__main__":
