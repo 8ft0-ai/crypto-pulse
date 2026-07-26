@@ -110,7 +110,7 @@ class FakeClient:
 def catalogue() -> dict:
     return {"data": [
         {"id": "nvidia/nemotron-3-super-120b-a12b:free", "pricing": {"prompt": "0", "completion": "0"}, "supported_parameters": ["response_format", "structured_outputs"], "expiration_date": None},
-        {"id": "qwen/qwen3-next-80b-a3b-instruct:free", "pricing": {"prompt": "0", "completion": "0"}, "supported_parameters": ["response_format", "structured_outputs"], "expiration_date": "2026-07-19"},
+        {"id": "qwen/qwen3-next-80b-a3b-instruct:free", "pricing": {"prompt": "0", "completion": "0"}, "supported_parameters": ["response_format", "structured_outputs"], "expiration_date": None},
     ]}
 
 
@@ -140,17 +140,22 @@ class EvaluationTests(unittest.TestCase):
 
     def test_prepare_rejects_hash_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / "repo"; fixture_repo(root)
+            root = Path(tmp); fixture_repo(root)
             with self.assertRaisesRegex(EvaluationIntegrityError, "SHA-256 mismatch"):
                 prepare_evaluation(repository_root=root, config_path="config/llm-evaluation.yml", output_dir=Path(tmp) / "out", bundle_builder=FakeBuilder("c" * 64))
 
     def test_catalogue_requires_zero_price_and_structured_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); fixture_repo(root); plan = load_evaluation_plan(root, "config/llm-evaluation.yml")
-            result = check_model_availability(plan.models, catalogue_loader=catalogue, now=lambda: datetime(2026, 7, 11, tzinfo=timezone.utc))
+            fixed_now = lambda: datetime(2026, 7, 11, tzinfo=timezone.utc)
+            result = check_model_availability(plan.models, catalogue_loader=catalogue, now=fixed_now)
             self.assertTrue(all(item.eligible for item in result))
             bad = copy.deepcopy(catalogue()); bad["data"][1]["pricing"]["completion"] = "0.01"
-            self.assertFalse(check_model_availability(plan.models, catalogue_loader=lambda: bad)[1].eligible)
+            self.assertFalse(check_model_availability(plan.models, catalogue_loader=lambda: bad, now=fixed_now)[1].eligible)
+            expired = copy.deepcopy(catalogue()); expired["data"][1]["expiration_date"] = "2026-07-10"
+            expired_result = check_model_availability(plan.models, catalogue_loader=lambda: expired, now=fixed_now)
+            self.assertFalse(expired_result[1].eligible)
+            self.assertEqual(expired_result[1].reason, "model expired on 2026-07-10")
 
     def test_execute_records_runs_and_retain_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
