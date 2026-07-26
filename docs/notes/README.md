@@ -7,3 +7,4 @@ Notes may inform later issues and decisions. Repository specifications, schemas,
 ## Current notes
 
 - [Simplifying the semantic claim-plan pipeline](simplifying-semantic-claim-plan-pipeline.md)
+- [Semantic claim selection: implementation patterns and references](semantic-claim-selection-implementation-patterns.md)
