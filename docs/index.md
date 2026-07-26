@@ -106,6 +106,13 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Fail-closed analysis validation](explanation/fail-closed-analysis-validation.md)
 - [Trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md)
 
+## Working notes
+
+Exploratory architecture and research notes are kept separately from authoritative documentation:
+
+- [Browse working notes](notes/README.md).
+- [Simplifying semantic claim selection](notes/simplifying-semantic-claim-selection.md).
+
 ## Records outside the documentation system
 
 These paths are intentionally separate from Diátaxis documentation:
@@ -117,11 +124,3 @@ These paths are intentionally separate from Diátaxis documentation:
 - [`prompts/`](../prompts/) — versioned prompt artefacts;
 - [`config/`](../config/) — executable configuration;
 - [`reports/`](../reports/) — source report content.
-
-Reference and explanation pages link to these canonical artefacts rather than copying them into `docs/`.
-
-## Compatibility paths
-
-Former flat documentation paths remain as short pointers where historical issues and pull requests are likely to link to them. They are not canonical and contain no duplicated procedure or contract body.
-
-The migration history is recorded in the [`Diátaxis migration plan`](../planning/documentation/diataxis-migration.md) and [`post-implementation review`](../planning/documentation/diataxis-post-implementation-review.md).
