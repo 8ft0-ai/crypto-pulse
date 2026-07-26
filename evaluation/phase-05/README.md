@@ -54,18 +54,6 @@ The subsequent model-selection work compared GPT-5.6 Sol, Nex N2 Mini and MiniMa
 
 The full chronology, technical findings and self-reflection are recorded in [`semantic-model-evaluation-retrospective.md`](semantic-model-evaluation-retrospective.md).
 
-Current status:
-
-- no model has been selected;
-- GPT-5.6 Sol remains benchmark-only;
-- Nex N2 Mini remains the affordable candidate pending one fair corrected full-contract call;
-- MiniMax M3 does not advance;
-- North Mini Code remains catalogue-ineligible;
-- automatic generation and publication remain disabled;
-- issue #269 remains open until the prompt-v2 final two-call artefact is reviewed.
-
-The active final calibration workflow is **Semantic plan calibration — GPT-5.6 + Nex only** and now uses `crypto-market-claim-plan/v2`. A successful calibration would prove compatibility, not complete production selection. Repeated multi-case evidence and a separately reviewed decision would still be required.
-
 ## Five-model catalogue expansion screen
 
 Issue #273 introduced a separate screen for DeepSeek V4 Flash, GPT-5.6 Luna, Qwen3.6 Flash, MiMo V2.5 Pro and Seed 2.0 Mini. Protected run [`29246391801`](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29246391801) completed against trusted `main` SHA `5bb4c8a8c9816353fee6487eb39f7906333ffada` for USD 0.0200591105.
@@ -82,13 +70,50 @@ The original five-model workflow is removed from the Actions UI. Its runner, con
 
 ## Prompt-v2 corrective screen
 
-Issue #275 adds the immutable `crypto-market-claim-plan/v2` prompt. It preserves prompt v1 and makes the validator's source grouping rule explicit:
+Issue #275 added immutable prompt `crypto-market-claim-plan/v2`, which preserved prompt v1 and made the validator's source grouping rule explicit:
 
 > A `source_status` claim must describe exactly one source subject. Every cited evidence record in that claim must belong to that same source subject. Use separate claims for separate sources.
 
-The corrective workflow **Semantic plan correction — Luna + DeepSeek + Qwen** gives Luna, DeepSeek and Qwen one corrected route probe and one full-contract call over the same normalised `historical-normal-crosschecked` evidence. It has a USD 0.10 hard ceiling, no leaderboard, no deployment selection, no automatic generation and no publication.
+Protected run [`29285569716`](https://github.com/8ft0-ai/crypto-pulse/actions/runs/29285569716) completed all three route probes and all three full-contract calls over the same normalised evidence bundle. The observed total cost was USD 0.0191477293 against the USD 0.10 ceiling.
 
-MiMo and Seed remain excluded from that corrective run for the reviewed reasons above.
+The reviewed result is recorded in [`corrective-screen-29285569716.md`](corrective-screen-29285569716.md):
+
+- GPT-5.6 Luna produced the strongest plan but selected a four-operand comparison and an unsupported data-quality limitation;
+- DeepSeek V4 Flash ignored the required top-level claim-plan schema, produced 7,582 output tokens and required about 250 seconds;
+- Qwen3.6 Flash completed within its corrected allowance but returned an invented wrapper and unsupported schema fields;
+- all rejected plans remained unscored;
+- no deployment decision, automatic generation or publication occurred.
+
+## Reviewed Phase 5 conclusion
+
+Phase 5 proved the evidence bundle, semantic contracts, fail-closed validator, deterministic renderer, protected routing, cost controls and evaluation evidence trail. It did not select a model or authorise automatic generation.
+
+The final corrective evidence showed that the remaining model task was still too broad. The model was effectively being asked to act as a semantic compiler by constructing intent, operands, relation, source/data-quality eligibility, sections and ordering while reproducing deterministic repository rules.
+
+The approved direction is now Phase 6:
+
+```text
+canonical evidence
+  -> deterministic valid claim candidates
+  -> deterministic ranking baseline
+  -> optional model selection of candidate IDs only
+  -> repository-owned plan reconstruction
+  -> existing validator and renderer
+```
+
+- Phase 6 roadmap: [`../../planning/roadmap/phase-06-deterministic-claim-selection.md`](../../planning/roadmap/phase-06-deterministic-claim-selection.md)
+- Parent implementation issue: #283
+- Architectural note: [`../../docs/notes/simplifying-semantic-claim-plan-pipeline.md`](../../docs/notes/simplifying-semantic-claim-plan-pipeline.md)
+
+Issue #275 is complete. Issue #269 and its pending GPT-5.6 Sol/Nex full-plan calibration are superseded and should not run. The corrective and final calibration workflows are removed from the Actions UI, while their runners, configurations, prompts, documentation, Git history and protected artefacts remain auditable.
+
+Current status:
+
+- no model has been selected;
+- the full semantic claim-plan evaluation path is closed;
+- historical claim-plan v1/v2 artefacts remain immutable;
+- deterministic candidate compilation is the next implementation direction;
+- automatic generation and publication remain disabled.
 
 ## Fixed corpus
 
@@ -112,18 +137,11 @@ The GPT-4o mini public-data path uses a separate profile and paid benchmark conf
 
 The later semantic model-selection and calibration configurations remain retained as historical evaluation artefacts. Obsolete manual workflow entry points may be removed without deleting their runners, configurations, Git history or protected run evidence.
 
-At execution time the workflows check the public OpenRouter catalogue again. A disappeared, expired, incorrectly priced or structured-output-ineligible model is recorded as ineligible rather than silently replaced.
+At execution time the historical workflows checked the public OpenRouter catalogue again. A disappeared, expired, incorrectly priced or structured-output-ineligible model was recorded as ineligible rather than silently replaced.
 
-## Operating sequence
+## Historical evaluation sequence
 
-```text
-merge evaluation harness
-manually dispatch protected evaluation from main
-review evaluation artefacts and reviewer worksheet
-commit the approved decision in a separate review PR
-```
-
-For future candidates, the evaluation sequence is now more explicit:
+The Phase 5 process evolved into:
 
 ```text
 catalogue eligibility
@@ -134,4 +152,4 @@ multi-case evaluation
 reviewed decision
 ```
 
-The separate decision PR is required because pull-request code must not receive `OPENROUTER_API_KEY`, and workflow artefacts must be reviewed before a production-proof configuration is selected.
+The Phase 6 architecture moves formal semantic construction before the model boundary. Any future model evaluation will measure selection quality against the deterministic baseline rather than asking a model to recreate the repository validator.

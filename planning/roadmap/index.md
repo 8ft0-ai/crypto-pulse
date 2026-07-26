@@ -43,9 +43,22 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 | Phase | Status | Planning record | Delivery record |
 | --- | --- | --- | --- |
 | Phase 4 — Live-site provenance UX | Shaping | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | Pending |
-| Phase 5 — Governed LLM analysis | Evaluation hardening; final GPT-5.6/Nex calibration pending | [phase-05-governed-llm-analysis.md](phase-05-governed-llm-analysis.md) | Pending |
+| Phase 6 — Deterministic claim candidates and bounded model selection | Shaping; parent issue #283 | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) | Pending |
 
-Phase 5 has implemented the semantic claim-plan contract, deterministic rendering and protected evaluation machinery, but has not selected a model or authorised automatic generation. The model-selection chronology and lessons are recorded in [`../../evaluation/phase-05/semantic-model-evaluation-retrospective.md`](../../evaluation/phase-05/semantic-model-evaluation-retrospective.md).
+Phase 6 is the active governed-analysis direction. It compiles semantically valid claim candidates deterministically, proves a no-LLM ranking baseline, and permits a model only to select bounded repository-owned candidate IDs after the baseline is complete.
+
+## Superseded active direction
+
+| Phase | Status | Planning record | Evidence |
+| --- | --- | --- | --- |
+| Phase 5 — Governed LLM analysis | Research and evaluation complete; full-plan model path superseded by Phase 6 | [phase-05-governed-llm-analysis.md](phase-05-governed-llm-analysis.md) | [Phase 5 evaluation history](../../evaluation/phase-05/README.md) |
+
+Phase 5 implemented the evidence bundle, semantic claim-plan contracts, fail-closed validator, deterministic renderer and protected evaluation machinery. No model was selected and automatic generation was not authorised. Corrective run `29285569716` showed that the remaining full-plan model responsibility was still too broad, so the pending GPT-5.6/Nex calibration was cancelled in favour of deterministic candidate compilation and bounded selection.
+
+The chronology and lessons remain recorded in:
+
+- [`../../evaluation/phase-05/semantic-model-evaluation-retrospective.md`](../../evaluation/phase-05/semantic-model-evaluation-retrospective.md);
+- [`../../evaluation/phase-05/corrective-screen-29285569716.md`](../../evaluation/phase-05/corrective-screen-29285569716.md).
 
 ## Backlog
 
