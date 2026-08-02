@@ -104,3 +104,5 @@ jobs:
           git add llm_analysis/candidate_selection_model_scoring.py
           git commit -m 'Evaluate decisive deployment failure before full-corpus requirement'
           git push
+
+      # Branch-local migration workflow; removed before review.
