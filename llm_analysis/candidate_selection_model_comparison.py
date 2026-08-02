@@ -403,7 +403,7 @@ def _model_runtime(
         runtime,
         prompt_path=comparison.selector_prompt,
         analysis_schema_path=comparison.selection_schema,
-        prompt_version="crypto-market-candidate-selection/v1",
+        prompt_version="crypto-market-candidate-selection-compact/v1",
         analysis_schema_version="crypto-market-candidate-selection/v1",
         temperature=0.0,
         max_output_tokens=model.max_output_tokens,
