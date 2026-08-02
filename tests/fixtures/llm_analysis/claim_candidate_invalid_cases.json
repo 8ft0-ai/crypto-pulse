@@ -1,0 +1,88 @@
+{
+  "free_form_rationale": {
+    "base_index": 0,
+    "operation": "set",
+    "path": ["rationale"],
+    "value": "Bitcoin is attractive here.",
+    "expected_code": "additional_property"
+  },
+  "copied_numeric_value": {
+    "base_index": 0,
+    "operation": "set",
+    "path": ["value"],
+    "value": 12345.67,
+    "expected_code": "additional_property"
+  },
+  "comparison_operand_count": {
+    "base_index": 2,
+    "operation": "set",
+    "path": ["evidence_ids"],
+    "value": ["exchange.coinbase.bitcoin.price_usd"],
+    "expected_code": "min_items"
+  },
+  "comparison_relation_missing": {
+    "base_index": 2,
+    "operation": "set",
+    "path": ["comparison_relation"],
+    "value": "none",
+    "expected_code": "enum"
+  },
+  "non_comparison_relation": {
+    "base_index": 0,
+    "operation": "set",
+    "path": ["comparison_relation"],
+    "value": "not_equal",
+    "expected_code": "const"
+  },
+  "source_status_subject": {
+    "base_index": 5,
+    "operation": "set",
+    "path": ["subject", "type"],
+    "value": "asset",
+    "expected_code": "const"
+  },
+  "snapshot_status_subject": {
+    "base_index": 4,
+    "operation": "set",
+    "path": ["subject", "type"],
+    "value": "asset",
+    "expected_code": "const"
+  },
+  "data_quality_section": {
+    "base_index": 3,
+    "operation": "set",
+    "path": ["section"],
+    "value": "market_summary",
+    "expected_code": "enum"
+  },
+  "unknown_feature": {
+    "base_index": 0,
+    "operation": "set",
+    "path": ["features", "model_score"],
+    "value": 0.9,
+    "expected_code": "additional_property"
+  },
+  "duplicate_evidence_reference": {
+    "base_index": 2,
+    "operation": "set",
+    "path": ["evidence_ids"],
+    "value": [
+      "exchange.coinbase.bitcoin.price_usd",
+      "exchange.coinbase.bitcoin.price_usd"
+    ],
+    "expected_code": "unique_items"
+  },
+  "malformed_candidate_id": {
+    "base_index": 0,
+    "operation": "set",
+    "path": ["candidate_id"],
+    "value": "claim-1",
+    "expected_code": "pattern"
+  },
+  "missing_metric": {
+    "base_index": 0,
+    "operation": "delete",
+    "path": ["metric"],
+    "expected_code": "required"
+  }
+}
