@@ -1,0 +1,35 @@
+name: Apply compact Slice 6 prompt version
+
+on:
+  push:
+    branches:
+      - agent/correct-phase-6-slice-6-provider-transport
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/correct-phase-6-slice-6-provider-transport
+      - name: Record compact prompt identity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('llm_analysis/candidate_selection_model_comparison.py')
+          source = path.read_text()
+          old = '        prompt_version="crypto-market-candidate-selection/v1",\n'
+          new = '        prompt_version="crypto-market-candidate-selection-compact/v1",\n'
+          if source.count(old) != 1:
+              raise SystemExit('expected prompt-version marker exactly once')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add llm_analysis/candidate_selection_model_comparison.py
+          git commit -m 'Record compact candidate-selection prompt identity'
+          git push
