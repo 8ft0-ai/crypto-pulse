@@ -11,11 +11,12 @@
 | Comparison configuration | [`config/candidate-selection-model-comparison.yml`](../../config/candidate-selection-model-comparison.yml) |
 | Configuration loader | [`llm_analysis/candidate_selection_model_comparison_config.py`](../../llm_analysis/candidate_selection_model_comparison_config.py) |
 | OpenRouter selector adapter | [`llm_analysis/openrouter_candidate_selector.py`](../../llm_analysis/openrouter_candidate_selector.py) |
-| Protected evaluator | [`llm_analysis/candidate_selection_model_comparison.py`](../../llm_analysis/candidate_selection_model_comparison.py) |
+| Comparison evaluator | [`llm_analysis/candidate_selection_model_comparison.py`](../../llm_analysis/candidate_selection_model_comparison.py) |
+| Fail-closed protected runner | [`llm_analysis/candidate_selection_model_comparison_runner.py`](../../llm_analysis/candidate_selection_model_comparison_runner.py) |
 | Scoring and decision rules | [`llm_analysis/candidate_selection_model_scoring.py`](../../llm_analysis/candidate_selection_model_scoring.py) |
 | Manual workflow | [`.github/workflows/governed-candidate-selection-model-comparison.yml`](../../.github/workflows/governed-candidate-selection-model-comparison.yml) |
 | Evaluation record | [`evaluation/phase-06/candidate-selection-model-comparison/`](../../evaluation/phase-06/candidate-selection-model-comparison/) |
-| Permanent tests | [`tests/test_candidate_selection_model_comparison.py`](../../tests/test_candidate_selection_model_comparison.py), [`tests/test_openrouter_candidate_selector.py`](../../tests/test_openrouter_candidate_selector.py) and [`tests/test_governed_candidate_selection_model_comparison_workflow.py`](../../tests/test_governed_candidate_selection_model_comparison_workflow.py) |
+| Permanent tests | [`tests/test_candidate_selection_model_comparison.py`](../../tests/test_candidate_selection_model_comparison.py), [`tests/test_candidate_selection_model_comparison_runner.py`](../../tests/test_candidate_selection_model_comparison_runner.py), [`tests/test_openrouter_candidate_selector.py`](../../tests/test_openrouter_candidate_selector.py) and [`tests/test_governed_candidate_selection_model_comparison_workflow.py`](../../tests/test_governed_candidate_selection_model_comparison_workflow.py) |
 
 This contract implements issue #295. It does not enable a production selector. A
 separate reviewed decision is required after the protected comparison.
@@ -86,6 +87,18 @@ The workflow is:
 - protected by the existing `governed-llm-dry-run` environment;
 - unable to create branches, commits, pull requests, reports or site output.
 
+The workflow invokes `candidate_selection_model_comparison_runner`, not the lower-level
+evaluator directly. The runner wraps route probes so an unmetered failure reserves the
+full reviewed call cap and retains sanitized evidence before the route is rejected.
+The selector adapter likewise writes every metered response before checking model
+content, provider identity or model identity. A networked response with missing usage
+or cost reserves the full call cap and aborts the comparison.
+
+Malformed model JSON from an otherwise correctly routed and metered call remains a
+model failure: Slice 5 applies deterministic fallback, but the call is fully charged and
+retained. Provider fallback, provider substitution, model substitution or over-cap cost
+are infrastructure/governance failures and stop the corpus immediately.
+
 The public-data profile permits only `public-market-data` and `evaluation-only` inputs,
 keeps `data_collection: deny`, and uses the explicit public-data `zdr: false`
 exception. Raw completions remain protected workflow artefacts.
@@ -105,6 +118,11 @@ reported cost is received. Missing cost or token metadata fails closed. Network 
 is disabled inside the adapter, and the comparison pacer permits one transport attempt
 per logical provider call, so infrastructure retry cannot silently exceed the 60-call
 ceiling.
+
+The ceilings are independent maxima, not a promise that all calls will execute. Route
+cost consumes the same per-model and whole-run budgets as corpus calls; if remaining
+budget cannot cover the next reviewed per-call maximum, execution stops before that
+request.
 
 ## Model credit
 
@@ -165,6 +183,8 @@ result. A separately reviewed issue and pull request must make the Phase 6 decis
 
 Prepared inputs are retained for seven days. Protected outputs are retained for thirty
 days and include raw completions, hashes, validations, repairs, fallbacks, per-run
-scores, aggregate JSON, reviewer CSV and decision-input Markdown.
+scores, aggregate JSON, reviewer CSV and decision-input Markdown. Route and selector
+attempt evidence is persisted under the protected output directory before any failure
+is re-raised, so it remains available even when the workflow fails closed.
 
 Nothing in this workflow is committed or published automatically.
