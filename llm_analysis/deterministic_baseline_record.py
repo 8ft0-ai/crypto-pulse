@@ -5,7 +5,7 @@ import argparse
 import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .claim_candidate_gold_corpus import DEFAULT_MANIFEST as DEFAULT_GOLD_MANIFEST
 from .contracts import canonical_json_bytes
@@ -17,21 +17,23 @@ from .deterministic_baseline_evaluation import (
 )
 from .deterministic_ranking import DEFAULT_RANKING_CONFIG
 
-DEFAULT_CASES_DIR = "evaluation/phase-06/deterministic-baseline/cases"
+DEFAULT_SCORES = "evaluation/phase-06/deterministic-baseline/scores.json"
+SCORES_VERSION = "phase-06-deterministic-baseline-scores/v1"
 
 
 @dataclass(frozen=True)
 class DeterministicBaselineRecord:
     summary: dict[str, Any]
-    case_records: Mapping[str, dict[str, Any]]
+    scores: dict[str, Any]
     report_markdown: bytes
 
     @property
     def summary_bytes(self) -> bytes:
         return canonical_json_bytes(self.summary) + b"\n"
 
-    def case_bytes(self, key: str) -> bytes:
-        return canonical_json_bytes(self.case_records[key]) + b"\n"
+    @property
+    def scores_bytes(self) -> bytes:
+        return canonical_json_bytes(self.scores) + b"\n"
 
 
 def evaluate_deterministic_baseline_record(
@@ -39,7 +41,7 @@ def evaluate_deterministic_baseline_record(
     *,
     ranking_config_path: str | Path = DEFAULT_RANKING_CONFIG,
     gold_manifest_path: str | Path = DEFAULT_GOLD_MANIFEST,
-    cases_dir: str | Path = DEFAULT_CASES_DIR,
+    scores_path: str | Path = DEFAULT_SCORES,
 ) -> DeterministicBaselineRecord:
     evaluation = evaluate_deterministic_baseline(
         repository_root,
@@ -48,9 +50,7 @@ def evaluate_deterministic_baseline_record(
     )
     summary = copy.deepcopy(evaluation.summary)
     summary.pop("ranking_config", None)
-    case_records: dict[str, dict[str, Any]] = {}
-    case_paths: dict[str, str] = {}
-    directory = Path(cases_dir).as_posix().rstrip("/")
+    score_records: list[dict[str, Any]] = []
     for case in summary["cases"]:
         selection = case.pop("selection")
         plan = case.pop("claim_plan")
@@ -60,14 +60,19 @@ def evaluate_deterministic_baseline_record(
         case["subject_count"] = selection["subject_count"]
         case["redundancy_group_count"] = selection["redundancy_group_count"]
         case["selected_candidate_ids"] = selection["selected_candidate_ids"]
-        for selected in case["selected_candidates"]:
-            selected.pop("sentence", None)
-        key = case["key"]
-        case_records[key] = copy.deepcopy(case)
-        case_paths[key] = f"{directory}/{key}.json"
-        case.pop("selected_candidates")
-    summary["case_record_paths"] = case_paths
-    return DeterministicBaselineRecord(summary, case_records, evaluation.report_markdown)
+        for selected in case.pop("selected_candidates"):
+            score_records.append(
+                {
+                    "case": case["key"],
+                    "candidate_id": selected["candidate_id"],
+                    "selection_stage": selected["selection_stage"],
+                    "score_vector": selected["score_vector"],
+                    "gold_name": selected["gold_name"],
+                }
+            )
+    summary["score_record_path"] = Path(scores_path).as_posix()
+    scores = {"version": SCORES_VERSION, "records": score_records}
+    return DeterministicBaselineRecord(summary, scores, evaluation.report_markdown)
 
 
 def main() -> int:
@@ -79,7 +84,7 @@ def main() -> int:
     parser.add_argument("--gold-manifest", default=DEFAULT_GOLD_MANIFEST)
     parser.add_argument("--summary", default=DEFAULT_SUMMARY)
     parser.add_argument("--report", default=DEFAULT_REPORT)
-    parser.add_argument("--cases-dir", default=DEFAULT_CASES_DIR)
+    parser.add_argument("--scores", default=DEFAULT_SCORES)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     root = Path(args.repository_root).resolve()
@@ -87,15 +92,12 @@ def main() -> int:
         root,
         ranking_config_path=args.ranking_config,
         gold_manifest_path=args.gold_manifest,
-        cases_dir=args.cases_dir,
+        scores_path=args.scores,
     )
     outputs = {
         root / args.summary: record.summary_bytes,
+        root / args.scores: record.scores_bytes,
         root / args.report: record.report_markdown,
-        **{
-            root / args.cases_dir / f"{key}.json": record.case_bytes(key)
-            for key in record.case_records
-        },
     }
     for path, content in outputs.items():
         if args.check:
