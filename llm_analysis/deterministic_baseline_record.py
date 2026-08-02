@@ -5,8 +5,9 @@ import argparse
 import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
+from .claim_candidate_gold_corpus import DEFAULT_MANIFEST as DEFAULT_GOLD_MANIFEST
 from .contracts import canonical_json_bytes
 from .deterministic_baseline_evaluation import (
     DEFAULT_REPORT,
@@ -15,17 +16,22 @@ from .deterministic_baseline_evaluation import (
     evaluate_deterministic_baseline,
 )
 from .deterministic_ranking import DEFAULT_RANKING_CONFIG
-from .claim_candidate_gold_corpus import DEFAULT_MANIFEST as DEFAULT_GOLD_MANIFEST
+
+DEFAULT_CASES_DIR = "evaluation/phase-06/deterministic-baseline/cases"
 
 
 @dataclass(frozen=True)
 class DeterministicBaselineRecord:
     summary: dict[str, Any]
+    case_records: Mapping[str, dict[str, Any]]
     report_markdown: bytes
 
     @property
     def summary_bytes(self) -> bytes:
         return canonical_json_bytes(self.summary) + b"\n"
+
+    def case_bytes(self, key: str) -> bytes:
+        return canonical_json_bytes(self.case_records[key]) + b"\n"
 
 
 def evaluate_deterministic_baseline_record(
@@ -33,6 +39,7 @@ def evaluate_deterministic_baseline_record(
     *,
     ranking_config_path: str | Path = DEFAULT_RANKING_CONFIG,
     gold_manifest_path: str | Path = DEFAULT_GOLD_MANIFEST,
+    cases_dir: str | Path = DEFAULT_CASES_DIR,
 ) -> DeterministicBaselineRecord:
     evaluation = evaluate_deterministic_baseline(
         repository_root,
@@ -40,6 +47,10 @@ def evaluate_deterministic_baseline_record(
         gold_manifest_path=gold_manifest_path,
     )
     summary = copy.deepcopy(evaluation.summary)
+    summary.pop("ranking_config", None)
+    case_records: dict[str, dict[str, Any]] = {}
+    case_paths: dict[str, str] = {}
+    directory = Path(cases_dir).as_posix().rstrip("/")
     for case in summary["cases"]:
         selection = case.pop("selection")
         plan = case.pop("claim_plan")
@@ -51,7 +62,12 @@ def evaluate_deterministic_baseline_record(
         case["selected_candidate_ids"] = selection["selected_candidate_ids"]
         for selected in case["selected_candidates"]:
             selected.pop("sentence", None)
-    return DeterministicBaselineRecord(summary, evaluation.report_markdown)
+        key = case["key"]
+        case_records[key] = copy.deepcopy(case)
+        case_paths[key] = f"{directory}/{key}.json"
+        case.pop("selected_candidates")
+    summary["case_record_paths"] = case_paths
+    return DeterministicBaselineRecord(summary, case_records, evaluation.report_markdown)
 
 
 def main() -> int:
@@ -63,6 +79,7 @@ def main() -> int:
     parser.add_argument("--gold-manifest", default=DEFAULT_GOLD_MANIFEST)
     parser.add_argument("--summary", default=DEFAULT_SUMMARY)
     parser.add_argument("--report", default=DEFAULT_REPORT)
+    parser.add_argument("--cases-dir", default=DEFAULT_CASES_DIR)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     root = Path(args.repository_root).resolve()
@@ -70,10 +87,15 @@ def main() -> int:
         root,
         ranking_config_path=args.ranking_config,
         gold_manifest_path=args.gold_manifest,
+        cases_dir=args.cases_dir,
     )
     outputs = {
         root / args.summary: record.summary_bytes,
         root / args.report: record.report_markdown,
+        **{
+            root / args.cases_dir / f"{key}.json": record.case_bytes(key)
+            for key in record.case_records
+        },
     }
     for path, content in outputs.items():
         if args.check:
