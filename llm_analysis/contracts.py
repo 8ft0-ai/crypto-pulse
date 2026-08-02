@@ -20,6 +20,8 @@ PROMPT_VERSION = "crypto-market-analysis/v1"
 CLAIM_PLAN_SCHEMA_VERSION = "crypto-market-claim-plan/v1"
 CLAIM_PLAN_PROMPT_VERSION = "crypto-market-claim-plan/v1"
 CLAIM_PLAN_RENDERER_VERSION = "crypto-market-claim-plan-renderer/v1"
+CLAIM_CANDIDATE_SCHEMA_VERSION = "crypto-market-claim-candidate/v1"
+CLAIM_CANDIDATE_IDENTITY_VERSION = "crypto-market-claim-candidate-identity/v1"
 
 CLAIM_TYPES = (
     "absolute_observation",
