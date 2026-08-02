@@ -1,4 +1,4 @@
-"""Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
+"""Governed CryptoPulse analysis contracts, deterministic paths, and provider client."""
 
 from .claim_candidate_compiler import (
     ClaimCandidateCompilationError,
@@ -55,6 +55,27 @@ from .contracts import (
     content_sha256,
     evidence_id,
 )
+from .deterministic_baseline_evaluation import (
+    BASELINE_EVALUATION_VERSION,
+    DeterministicBaselineEvaluation,
+    DeterministicBaselineEvaluationError,
+    evaluate_deterministic_baseline,
+)
+from .deterministic_baseline_record import (
+    DeterministicBaselineRecord,
+    evaluate_deterministic_baseline_record,
+)
+from .deterministic_ranking import (
+    DEFAULT_RANKING_CONFIG,
+    DETERMINISTIC_RANKING_VERSION,
+    DeterministicBaselineResult,
+    DeterministicRankingError,
+    RankingConfig,
+    load_ranking_config,
+    run_deterministic_baseline,
+    select_deterministic_candidates,
+)
+from .deterministic_reconstruction import reconstruct_claim_plan
 from .diagnostics import Diagnostic, ValidationReport
 from .generation_config import (
     ConfigurationError,
@@ -87,6 +108,7 @@ from .validate import validate_analysis
 
 __all__ = [
     "ANALYSIS_SCHEMA_VERSION",
+    "BASELINE_EVALUATION_VERSION",
     "CANDIDATE_COMPARISON_RELATION_ORDER",
     "CANDIDATE_INTENT_ORDER",
     "CANDIDATE_SECTION_ORDER",
@@ -101,6 +123,8 @@ __all__ = [
     "CLAIM_PLAN_SCHEMA_VERSION",
     "CLAIM_PLAN_SECTION_KINDS",
     "CLAIM_TYPES",
+    "DEFAULT_RANKING_CONFIG",
+    "DETERMINISTIC_RANKING_VERSION",
     "EVIDENCE_ID_PATTERN",
     "EVIDENCE_SCHEMA_VERSION",
     "PROMPT_VERSION",
@@ -114,6 +138,11 @@ __all__ = [
     "ClaimPlanRenderError",
     "ConfigurationError",
     "CostLimitError",
+    "DeterministicBaselineEvaluation",
+    "DeterministicBaselineEvaluationError",
+    "DeterministicBaselineRecord",
+    "DeterministicBaselineResult",
+    "DeterministicRankingError",
     "Diagnostic",
     "GenerationConfig",
     "GenerationError",
@@ -129,6 +158,7 @@ __all__ = [
     "PipelineResult",
     "ProviderGenerationError",
     "ProviderPolicy",
+    "RankingConfig",
     "RenderedClaim",
     "TransportGenerationError",
     "ValidationReport",
@@ -142,6 +172,8 @@ __all__ = [
     "content_sha256",
     "derive_candidate_id",
     "evaluate_claim_candidate_gold_corpus",
+    "evaluate_deterministic_baseline",
+    "evaluate_deterministic_baseline_record",
     "evidence_id",
     "index_candidates_by_id",
     "is_source_disagreement_pair",
@@ -149,13 +181,17 @@ __all__ = [
     "load_claim_candidate_gold_manifest",
     "load_generation_config",
     "load_json",
+    "load_ranking_config",
     "model_matches",
     "normalise_candidate_semantics",
     "order_candidates",
     "process_analysis",
+    "reconstruct_claim_plan",
     "render_claim_plan",
     "render_markdown",
     "render_prompt",
+    "run_deterministic_baseline",
+    "select_deterministic_candidates",
     "validate_analysis",
     "validate_claim_plan",
 ]
