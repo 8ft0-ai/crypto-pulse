@@ -29,7 +29,7 @@ compile_claim_candidates(
 
 The result is an immutable tuple of candidate dictionaries in canonical candidate order.
 
-The caller must provide the canonical evidence and candidate schemas. Compilation fails before semantic use when the evidence bundle does not satisfy its schema.
+The caller supplies the canonical evidence and candidate schemas. Compilation fails before semantic use when the evidence bundle does not satisfy its schema.
 
 ## Pipeline boundary
 
@@ -52,6 +52,30 @@ canonical candidate ordering
 ```
 
 The compiler does not rank candidates, choose a subset, reconstruct a production claim plan, call a provider or render a report.
+
+## Candidate subject keys
+
+Evidence subject IDs are intentionally broad. A validated evidence record may contain an ID that starts with a digit or includes upper-case or display-oriented characters. Candidate subject IDs use the stricter repository-key pattern defined by Slice 1.
+
+The compiler applies one explicit metadata projection:
+
+1. a lower-case evidence subject ID that already satisfies the candidate pattern is preserved unchanged;
+2. any broader ID becomes a type-prefixed lower-case slug;
+3. a 12-character canonical SHA-256 suffix derived from the original subject type and ID is appended.
+
+For example, an evidence snapshot ID such as:
+
+```text
+1742-aest
+```
+
+becomes a candidate metadata key shaped like:
+
+```text
+snapshot_1742_aest_<hash>
+```
+
+This projection does not mutate the evidence bundle, evidence IDs, operands, field, unit, value or source. Evidence references remain authoritative. The hash suffix prevents two distinct broad evidence IDs from silently collapsing to the same candidate subject key.
 
 ## Absolute observations
 
@@ -137,11 +161,13 @@ The compiler groups numeric observations by the exact tuple:
 
 Each pair must contain two distinct evidence IDs. A same-subject pair from the same source is omitted as a duplicate measurement rather than offered as a comparison.
 
-The compiler never repairs or silently normalises fields, units or subjects. In particular:
+The compiler never repairs or silently transforms evidence fields, units or comparison operands. In particular:
 
 ```text
 price != price_usd
 ```
+
+The candidate subject-key projection described above is metadata canonicalisation only; it is not measure or evidence normalisation.
 
 Any future cross-source measure normalisation must be a separate, explicit and versioned evidence transformation that produces a new evidence-bundle identity before compilation.
 
@@ -161,7 +187,7 @@ Relations are selected deterministically:
 4. other values inside tolerance become `approximately_equal`;
 5. remaining pairs become `greater_than` or `less_than`.
 
-Operands are already ordered by evidence ID before candidate construction. Slice 1 identity canonicalisation remains defence in depth.
+Operands are ordered by evidence ID before candidate construction. Slice 1 identity canonicalisation remains defence in depth.
 
 Cross-subject comparisons use the repository subject marker:
 
@@ -282,6 +308,7 @@ For the same evidence-bundle identity and semantically equivalent evidence recor
 
 - source dictionary order does not matter;
 - evidence-array traversal order does not matter;
+- candidate subject-key projection is deterministic and collision-resistant;
 - candidate IDs are derived only from Slice 1 semantic identity fields;
 - candidate IDs are unique;
 - output candidate order is canonical;
