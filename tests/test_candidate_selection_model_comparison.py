@@ -7,6 +7,7 @@ from pathlib import Path
 
 from llm_analysis.candidate_selection_model_comparison import (
     PREPARED_MANIFEST,
+    _model_runtime,
     prepare_candidate_selection_comparison,
 )
 from llm_analysis.candidate_selection_model_comparison_config import (
@@ -15,6 +16,10 @@ from llm_analysis.candidate_selection_model_comparison_config import (
 from llm_analysis.candidate_selection_model_scoring import (
     apply_predeclared_decision,
     score_selection,
+)
+from llm_analysis.semantic_plan_benchmark import (
+    _validate_profile_chain,
+    load_semantic_plan_profile,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +82,43 @@ class CandidateSelectionModelComparisonTests(unittest.TestCase):
             self.assertEqual(case["prohibited_candidate_ids"], [])
             self.assertEqual(len(case["baseline_selected_candidate_ids"]), 7)
 
+    def test_runtime_overlay_preserves_public_policy_and_exact_model_bounds(self) -> None:
+        profile = load_semantic_plan_profile(ROOT, self.plan.base_profile)
+        public_profile, base_plan, _ = _validate_profile_chain(ROOT, profile)
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            for model in self.plan.models:
+                _, runtime = _model_runtime(
+                    ROOT,
+                    output,
+                    self.plan,
+                    public_profile,
+                    profile,
+                    base_plan,
+                    model,
+                )
+                self.assertEqual(runtime.model, model.model)
+                self.assertEqual(runtime.provider_policy.only, (model.allowed_actual_provider,))
+                self.assertEqual(runtime.provider_policy.data_collection, "deny")
+                self.assertFalse(runtime.provider_policy.zdr)
+                self.assertFalse(runtime.provider_policy.allow_fallbacks)
+                self.assertFalse(runtime.cross_model_fallback)
+                self.assertEqual(runtime.retry_limit, 0)
+                self.assertEqual(runtime.max_output_tokens, 512)
+                self.assertEqual(runtime.max_request_bytes, 5_000_000)
+                self.assertEqual(runtime.max_cost_usd, model.maximum_generation_cost_usd)
+                self.assertEqual(
+                    runtime.provider_policy.max_request_price,
+                    model.maximum_generation_cost_usd,
+                )
+                record = json.loads(
+                    (output / "runtime-configs" / f"{model.key}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertFalse(record["automatic_generation"])
+                self.assertFalse(record["publication"])
+
     def test_fallback_receives_no_model_quality_credit(self) -> None:
         score = score_selection([], ["candidate-a", "candidate-b"])
         self.assertEqual(score["selected_count"], 0)
@@ -100,6 +142,7 @@ class CandidateSelectionModelComparisonTests(unittest.TestCase):
                 "governance_pass": True,
                 "route_pass": True,
                 "availability_pass": True,
+                "cost_metadata_complete": True,
             },
             {
                 "role": "deployment_candidate",
@@ -116,6 +159,7 @@ class CandidateSelectionModelComparisonTests(unittest.TestCase):
                 "governance_pass": True,
                 "route_pass": True,
                 "availability_pass": True,
+                "cost_metadata_complete": True,
             },
         ]
         decision = apply_predeclared_decision(self.plan, summaries)
@@ -145,6 +189,32 @@ class CandidateSelectionModelComparisonTests(unittest.TestCase):
                 },
             ],
         )
+        self.assertEqual(decision["outcome"], "inconclusive-infrastructure")
+        self.assertEqual(decision["status"], "inconclusive")
+
+    def test_missing_cost_evidence_is_infrastructure_not_model_quality(self) -> None:
+        summaries = []
+        for role in ("quality_benchmark", "deployment_candidate"):
+            summaries.append(
+                {
+                    "role": role,
+                    "completed_runs": 15,
+                    "expected_runs": 15,
+                    "accepted_runs": 15,
+                    "prohibited_selected_count": 0,
+                    "precision": 0.90,
+                    "recall": 0.90,
+                    "f1": 0.90,
+                    "mean_pairwise_jaccard": 0.90,
+                    "logical_latency_ms": {"p95": 1000},
+                    "mean_cost_per_accepted_selection_usd": 0.001,
+                    "governance_pass": False,
+                    "route_pass": True,
+                    "availability_pass": True,
+                    "cost_metadata_complete": False,
+                }
+            )
+        decision = apply_predeclared_decision(self.plan, summaries)
         self.assertEqual(decision["outcome"], "inconclusive-infrastructure")
         self.assertEqual(decision["status"], "inconclusive")
 
