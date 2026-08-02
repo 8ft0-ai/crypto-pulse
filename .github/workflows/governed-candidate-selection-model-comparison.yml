@@ -1,0 +1,146 @@
+name: Governed candidate selection model comparison
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-candidate-selection-model-comparison-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from main." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Freeze bounded-selector comparison corpus
+    needs: guard
+    runs-on: ubuntu-24.04
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Regenerate baseline and freeze selector inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.candidate_selection_model_comparison_runner prepare \
+            --repository-root . \
+            --config config/candidate-selection-model-comparison.yml \
+            --output-dir "$RUNNER_TEMP/candidate-selection-model-comparison-prepared"
+
+      - name: Upload prepared corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-selection-model-comparison-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-selection-model-comparison-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  evaluate:
+    name: Run protected bounded-selector comparison
+    needs: prepare
+    runs-on: ubuntu-24.04
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Download prepared corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-selection-model-comparison-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-selection-model-comparison-prepared
+
+      - name: Run exact two-model comparison
+        id: comparison
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+          CRYPTOPULSE_SELECTOR_EVIDENCE_DIR: ${{ runner.temp }}/candidate-selection-model-comparison/provider-evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.candidate_selection_model_comparison_runner run \
+            --repository-root . \
+            --config config/candidate-selection-model-comparison.yml \
+            --prepared-dir "$RUNNER_TEMP/candidate-selection-model-comparison-prepared" \
+            --output-dir "$RUNNER_TEMP/candidate-selection-model-comparison" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Publish comparison summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/candidate-selection-model-comparison/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/candidate-selection-model-comparison/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Bounded candidate-selection comparison" >> "$GITHUB_STEP_SUMMARY"
+            echo "The protected comparison failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload protected comparison artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-selection-model-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-selection-model-comparison/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail when comparison infrastructure failed
+        if: steps.comparison.outcome != 'success'
+        shell: bash
+        run: |
+          echo "The protected comparison did not complete. Review retained artefacts." >&2
+          exit 1
