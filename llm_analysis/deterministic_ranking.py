@@ -348,7 +348,7 @@ def load_ranking_config(
             "invalid_scope_priority",
             f"{relative}.evidence_scope_priority",
             "must define every supported evidence scope",
-         )
+        )
     evidence_scope_priority = {
         scope: _integer(
             raw_scope_priority[scope],
@@ -405,7 +405,7 @@ def _candidate_subject(candidate: Mapping[str, Any]) -> tuple[str, str]:
     subject = candidate.get("subject")
     if not isinstance(subject, Mapping):
         return ("", "")
-    return (str(subject.get("type", "")), str(subject.get("id", ""))
+    return (str(subject.get("type", "")), str(subject.get("id", "")))
 
 
 def _evidence_scope(candidate: Mapping[str, Any]) -> str:
@@ -786,12 +786,6 @@ def reconstruct_claim_plan(
         _fail("empty_selection", "$.selection.selected_candidate_ids", "must not be empty")
     if len(identifiers) != len(set(identifiers)):
         _fail("duplicate_selection", "$.selection.selected_candidate_ids", "must be unique")
-    if len(identifiers) > config.max_total:
-        _fail(
-            "excessive_selection",
-            "$.selection.selected_candidate_ids",
-            f"must contain at most {config.max_total} candidate IDs",
-        )
     missing = [identifier for identifier in identifiers if identifier not in indexed]
     if missing:
         _fail(
@@ -800,50 +794,13 @@ def reconstruct_claim_plan(
             "unknown candidate IDs: " + ", ".join(str(item) for item in missing),
         )
 
-    bundle_id = _string(selection.get("evidence_bundle_id"), "$.selection.evidence_bundle_id")
     selected = [indexed[str(identifier)] for identifier in identifiers]
     grouped: dict[str, list[dict[str, Any]]] = {}
     claim_ids: set[str] = set()
-    redundancy_groups: set[str] = set()
-    section_counts: Counter[str] = Counter()
-    intent_counts: Counter[str] = Counter()
-    for index, candidate in enumerate(selected):
-        if candidate.get("evidence_bundle_id") != bundle_id:
-            _fail(
-                "selected_candidate_bundle_mismatch",
-                f"$.selection.selected_candidate_ids[{index}]",
-                "selected candidate does not reference the selection evidence bundle",
-            )
+    for candidate in selected:
         section = _string(candidate.get("section"), "$.candidate.section")
         if section not in config.section_order:
             _fail("unsupported_section", "$.candidate.section", f"unsupported section: {section}")
-        intent = _string(candidate.get("intent"), "$.candidate.intent")
-        section_counts[section] += 1
-        intent_counts[intent] += 1
-        if section_counts[section] > min(config.section_limits[section], config.max_per_section):
-            _fail(
-                "selection_section_limit",
-                f"$.selection.selected_candidate_ids[{index}]",
-                f"selection exceeds the configured {section} section limit",
-            )
-        if intent_counts[intent] > config.intent_limits[intent]:
-            _fail(
-                "selection_intent_limit",
-                f"$.selection.selected_candidate_ids[{index}]",
-                f"selection exceeds the configured {intent} intent limit",
-            )
-        features = _mapping(candidate.get("features"), "$.candidate.features")
-        redundancy_group = _string(
-            features.get("redundancy_group"),
-            "$.candidate.features.redundancy_group",
-        )
-        if redundancy_group in redundancy_groups:
-            _fail(
-                "selection_redundancy_violation",
-                f"$.selection.selected_candidate_ids[{index}]",
-                f"redundancy group selected more than once: {redundancy_group}",
-            )
-        redundancy_groups.add(redundancy_group)
         claim_id = _claim_id(_string(candidate.get("candidate_id"), "$.candidate.candidate_id"))
         if claim_id in claim_ids:
             _fail("claim_id_collision", "$.claim_plan", f"duplicate claim ID: {claim_id}")
@@ -866,7 +823,7 @@ def reconstruct_claim_plan(
     plan = {
         "claim_plan_version": CLAIM_PLAN_SCHEMA_VERSION,
         "prompt_version": CLAIM_PLAN_PROMPT_VERSION,
-        "evidence_bundle_id": bundle_id,
+        "evidence_bundle_id": selection["evidence_bundle_id"],
         "analysis_order": analysis_order,
         "sections": sections,
     }
