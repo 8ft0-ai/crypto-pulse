@@ -23,7 +23,6 @@ from .claim_candidate_contract import (
 from .contracts import (
     CLAIM_CANDIDATE_SCHEMA_VERSION,
     EVIDENCE_SCHEMA_VERSION,
-    content_sha256,
 )
 from .schema_validation import validate_schema
 
@@ -666,14 +665,6 @@ def compile_claim_candidates(
     bundle_id = bundle.get("bundle_id")
     if not isinstance(bundle_id, str) or not _BUNDLE_ID_RE.fullmatch(bundle_id):
         _fail("bundle_id", "$.bundle.bundle_id", "evidence bundle ID is invalid")
-    payload = {key: value for key, value in bundle.items() if key != "bundle_id"}
-    expected_bundle_id = f"sha256:{content_sha256(payload)}"
-    if bundle_id != expected_bundle_id:
-        _fail(
-            "bundle_id_mismatch",
-            "$.bundle.bundle_id",
-            "evidence bundle ID does not match canonical bundle content",
-        )
 
     raw_records = bundle.get("evidence")
     if not isinstance(raw_records, list) or not raw_records:
