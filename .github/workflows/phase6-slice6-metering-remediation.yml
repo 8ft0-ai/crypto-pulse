@@ -1,0 +1,133 @@
+name: Apply Slice 6 metering remediation
+
+on:
+  push:
+    branches:
+      - agent/phase-6-slice-6-model-selection-comparison
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-6-slice-6-model-selection-comparison
+      - name: Stop after unmetered or misrouted comparison attempts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('llm_analysis/candidate_selection_model_comparison.py')
+          source = path.read_text()
+
+          availability = '''        if not availability.availability.eligible:
+            route_row = {
+                "model_key": model.key,
+                "requested_model": model.model,
+                "status": "not_attempted",
+                "failure_code": availability.availability.reason or "catalogue_ineligible",
+            }
+            route_rows.append(route_row)
+            route_by_key[model.key] = route_row
+            continue
+'''
+          availability_replacement = availability.replace('            continue\n', '            break\n')
+          if source.count(availability) != 1:
+              raise SystemExit('availability guard marker missing')
+          source = source.replace(availability, availability_replacement, 1)
+
+          route = '''        if route_row["status"] != "passed":
+            continue
+'''
+          route_replacement = '''        if route_row["status"] != "passed":
+            break
+'''
+          if source.count(route) != 1:
+              raise SystemExit('route guard marker missing')
+          source = source.replace(route, route_replacement, 1)
+
+          run_call = '''                result = run_bounded_candidate_selector(
+                    bundle,
+                    candidates,
+                    client=client,
+                    config=ranking,
+                    evidence_schema=evidence_schema,
+                    candidate_schema=candidate_schema,
+                    claim_plan_schema=claim_plan_schema,
+                    selection_schema=selection_schema,
+                )
+                provider_calls = [item.protected_dict() for item in client.call_records]
+'''
+          run_replacement = '''                try:
+                    result = run_bounded_candidate_selector(
+                        bundle,
+                        candidates,
+                        client=client,
+                        config=ranking,
+                        evidence_schema=evidence_schema,
+                        candidate_schema=candidate_schema,
+                        claim_plan_schema=claim_plan_schema,
+                        selection_schema=selection_schema,
+                    )
+                except Exception as exc:
+                    provider_calls = [item.protected_dict() for item in client.call_records]
+                    failure_dir = output / "runs" / model.key / case_key / f"repeat-{repeat_index}"
+                    failure_dir.mkdir(parents=True, exist_ok=True)
+                    _write_json(
+                        failure_dir / "provider-calls-protected.json",
+                        {"calls": provider_calls},
+                    )
+                    _write_json(
+                        failure_dir / "execution-error.json",
+                        {
+                            "code": str(getattr(exc, "code", None) or "comparison_execution_failure"),
+                            "message": " ".join(str(exc).split())[:500].replace(api_key, "[REDACTED]"),
+                        },
+                    )
+                    _write_json(
+                        output / ATTEMPT_RECORDS_FILE,
+                        {"attempts": [asdict(item) for item in pacer.records]},
+                    )
+                    raise
+                provider_calls = [item.protected_dict() for item in client.call_records]
+'''
+          if source.count(run_call) != 1:
+              raise SystemExit('selector call marker missing')
+          source = source.replace(run_call, run_replacement, 1)
+
+          append = '''                _write_json(run_dir / "score.json", record)
+                records.append(record)
+'''
+          append_replacement = '''                _write_json(run_dir / "score.json", record)
+                records.append(record)
+                expected_call_count = int(result.record["selector_attempt_count"])
+                governance_violation = any(
+                    call.get("actual_model") != model.model
+                    or call.get("actual_provider") != model.allowed_actual_provider
+                    or call.get("provider_fallback_used") is not False
+                    or call.get("cross_model_fallback_used") is not False
+                    for call in provider_calls
+                )
+                if len(provider_calls) != expected_call_count or governance_violation:
+                    _write_json(
+                        output / ATTEMPT_RECORDS_FILE,
+                        {"attempts": [asdict(item) for item in pacer.records]},
+                    )
+                    raise EvaluationIntegrityError(
+                        f"{logical_id} lacked complete metering or violated model/provider routing"
+                    )
+'''
+          if source.count(append) != 1:
+              raise SystemExit('run append marker missing')
+          source = source.replace(append, append_replacement, 1)
+          path.write_text(source)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add llm_analysis/candidate_selection_model_comparison.py
+          git commit -m 'Stop after unmetered or misrouted selector calls'
+          git push
