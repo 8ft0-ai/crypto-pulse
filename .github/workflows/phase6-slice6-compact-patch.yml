@@ -103,3 +103,5 @@ jobs:
           git add llm_analysis/candidate_selection_model_comparison_config.py llm_analysis/candidate_selection_model_comparison.py
           git commit -m 'Use compact calibrated Slice 6 provider transport'
           git push
+
+      # This workflow is branch-local and removed before review.
