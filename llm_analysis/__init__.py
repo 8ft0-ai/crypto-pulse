@@ -1,5 +1,9 @@
 """Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
 
+from .claim_candidate_compiler import (
+    ClaimCandidateCompilationError,
+    compile_claim_candidates,
+)
 from .claim_candidate_contract import (
     CANDIDATE_COMPARISON_RELATION_ORDER,
     CANDIDATE_INTENT_ORDER,
@@ -97,6 +101,7 @@ __all__ = [
     "PROVENANCE_SCHEMA_VERSION",
     "AuthenticationGenerationError",
     "BillingGenerationError",
+    "ClaimCandidateCompilationError",
     "ClaimPlanRender",
     "ClaimPlanRenderError",
     "ConfigurationError",
@@ -125,6 +130,7 @@ __all__ = [
     "candidate_sort_key",
     "canonical_json_bytes",
     "claim_source_disagreement_eligible",
+    "compile_claim_candidates",
     "content_sha256",
     "derive_candidate_id",
     "evidence_id",
