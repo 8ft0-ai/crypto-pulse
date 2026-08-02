@@ -5,7 +5,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .candidate_selection_contract import render_candidate_selector_prompt
 from .candidate_selector import SelectorClientError, SelectorClientResponse
@@ -112,6 +112,8 @@ class OpenRouterCandidateSelectorClient:
         pacer: AttemptPacer | None = None,
         send_temperature: bool = True,
         monotonic: Any = time.monotonic,
+        before_provider_call: Callable[[float], None] | None = None,
+        after_provider_call: Callable[[float], None] | None = None,
     ) -> None:
         if not api_key or not api_key.strip() or "\n" in api_key or "\r" in api_key:
             raise ValueError("a valid OPENROUTER_API_KEY is required")
@@ -129,6 +131,8 @@ class OpenRouterCandidateSelectorClient:
         self.pacer = pacer
         self.send_temperature = send_temperature
         self.monotonic = monotonic
+        self.before_provider_call = before_provider_call
+        self.after_provider_call = after_provider_call
         self.call_records: list[CandidateSelectorCallRecord] = []
 
     def select(
@@ -192,6 +196,8 @@ class OpenRouterCandidateSelectorClient:
             raise InvalidResponseError(
                 f"candidate selector request is {len(body)} bytes; limit is {self.config.max_request_bytes}"
             )
+        if self.before_provider_call is not None:
+            self.before_provider_call(self.config.max_cost_usd)
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -271,6 +277,8 @@ class OpenRouterCandidateSelectorClient:
             raise CostLimitError(
                 f"OpenRouter candidate selector cost {cost:.6f} USD exceeds configured limit"
             )
+        if self.after_provider_call is not None:
+            self.after_provider_call(cost)
         details = usage.get("completion_tokens_details")
         reasoning_tokens = (
             details.get("reasoning_tokens")
