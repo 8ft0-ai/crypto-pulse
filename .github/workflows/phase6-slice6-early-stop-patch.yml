@@ -1,0 +1,89 @@
+name: Apply Slice 6 decisive early-stop patch
+
+on:
+  push:
+    branches:
+      - agent/correct-phase-6-slice-6-provider-transport
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/correct-phase-6-slice-6-provider-transport
+      - name: Add decisive two-fallback stopping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def one(source, old, new, label):
+              if source.count(old) != 1:
+                  raise SystemExit(f'{label}: expected one match, found {source.count(old)}')
+              return source.replace(old, new, 1)
+
+          path = Path('llm_analysis/candidate_selection_model_comparison.py')
+          source = path.read_text()
+          source = one(source,
+              '    transport_builder = transport_factory or (lambda: ClassifiedTransport())\n\n    for model in comparison.models:\n',
+              '    transport_builder = transport_factory or (lambda: ClassifiedTransport())\n    stop_after_quality_failure = False\n\n    for model in comparison.models:\n        if stop_after_quality_failure:\n            break\n        decisive_model_failure = False\n',
+              'model stop flags')
+          source = one(source,
+              '                record = {\n',
+              '                model_fallback_count = sum(\n                    row.get("fallback_used") is True\n                    for row in records\n                    if row.get("model_key") == model.key\n                ) + (1 if result.record["fallback_used"] else 0)\n                decisive_stop = (\n                    model_fallback_count\n                    >= comparison.maximum_fallbacks_before_decisive_failure\n                )\n                record = {\n',
+              'decisive count')
+          source = one(source,
+              '                    "fallback_reason": result.record["fallback_reason"],\n',
+              '                    "fallback_reason": result.record["fallback_reason"],\n                    "decisive_stop": decisive_stop,\n',
+              'decisive record')
+          source = one(source,
+              '                _write_json(run_dir / "score.json", record)\n                records.append(record)\n\n    _write_json(output / AVAILABILITY_FILE, {"models": availability_rows})\n',
+              '                _write_json(run_dir / "score.json", record)\n                records.append(record)\n                if decisive_stop:\n                    decisive_model_failure = True\n                    break\n            if decisive_model_failure:\n                break\n        if decisive_model_failure and model.role == "quality_benchmark":\n            stop_after_quality_failure = True\n\n    _write_json(output / AVAILABILITY_FILE, {"models": availability_rows})\n',
+              'break loops')
+          path.write_text(source)
+
+          path = Path('llm_analysis/candidate_selection_model_scoring.py')
+          source = path.read_text()
+          source = one(source,
+              '    cost_metadata_complete = (\n        len(call_costs) == len(provider_calls) == expected_provider_calls\n        and route_cost is not None\n        and len(rows) == expected_runs\n    )\n',
+              '    observed_cost_metadata_complete = (\n        len(call_costs) == len(provider_calls) == expected_provider_calls\n        and route_cost is not None\n    )\n    cost_metadata_complete = (\n        observed_cost_metadata_complete and len(rows) == expected_runs\n    )\n',
+              'observed cost')
+          source = one(source,
+              '    governance_pass = bool(\n        route_pass\n        and availability_pass\n        and len(rows) == expected_runs\n        and identity_pass\n        and provider_pass\n        and fallback_metadata_pass\n        and cost_metadata_complete\n',
+              '    observed_governance_pass = bool(\n        route_pass\n        and availability_pass\n        and identity_pass\n        and provider_pass\n        and fallback_metadata_pass\n        and observed_cost_metadata_complete\n',
+              'observed governance')
+          source = one(source,
+              '            for call in provider_calls\n        )\n    )\n\n    return {\n',
+              '            for call in provider_calls\n        )\n    )\n    governance_pass = bool(\n        observed_governance_pass and len(rows) == expected_runs\n    )\n    decisive_acceptance_failure = any(\n        row.get("decisive_stop") is True for row in rows\n    )\n\n    return {\n',
+              'full governance')
+          source = one(source,
+              '        "fallback_runs": len(fallbacks),\n',
+              '        "fallback_runs": len(fallbacks),\n        "decisive_acceptance_failure": decisive_acceptance_failure,\n',
+              'summary decisive')
+          source = one(source,
+              '        "cost_metadata_complete": cost_metadata_complete,\n',
+              '        "observed_cost_metadata_complete": observed_cost_metadata_complete,\n        "cost_metadata_complete": cost_metadata_complete,\n',
+              'summary observed cost')
+          source = one(source,
+              '        "availability_pass": availability_pass,\n        "governance_pass": governance_pass,\n',
+              '        "availability_pass": availability_pass,\n        "observed_governance_pass": observed_governance_pass,\n        "governance_pass": governance_pass,\n',
+              'summary observed governance')
+          source = one(source,
+              '    complete = (\n',
+              '    if (\n        isinstance(quality, Mapping)\n        and quality.get("decisive_acceptance_failure") is True\n        and quality.get("observed_governance_pass") is True\n    ):\n        return {\n            "status": "complete",\n            "outcome": plan.outcomes["quality_benchmark_failed"],\n            "quality_gate": {\n                "minimum_accepted_runs": False,\n                "decisive_two_fallback_stop": True,\n                "governance": True,\n            },\n            "deployment_gate": {},\n        }\n\n    complete = (\n',
+              'quality decisive decision')
+          source = one(source,
+              '    baseline = plan.baseline_reference\n',
+              '    if (\n        isinstance(deployment, Mapping)\n        and deployment.get("decisive_acceptance_failure") is True\n        and deployment.get("observed_governance_pass") is True\n    ):\n        return {\n            "status": "complete",\n            "outcome": plan.outcomes["deployment_candidate_failed"],\n            "quality_gate": quality_checks,\n            "deployment_gate": {\n                "minimum_accepted_runs": False,\n                "decisive_two_fallback_stop": True,\n                "governance": True,\n            },\n        }\n\n    baseline = plan.baseline_reference\n',
+              'deployment decisive decision')
+          path.write_text(source)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add llm_analysis/candidate_selection_model_comparison.py llm_analysis/candidate_selection_model_scoring.py
+          git commit -m 'Stop comparison after two decisive model fallbacks'
+          git push
