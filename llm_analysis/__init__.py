@@ -72,10 +72,10 @@ from .deterministic_ranking import (
     DeterministicRankingError,
     RankingConfig,
     load_ranking_config,
-    reconstruct_claim_plan,
     run_deterministic_baseline,
     select_deterministic_candidates,
 )
+from .deterministic_reconstruction import reconstruct_claim_plan
 from .diagnostics import Diagnostic, ValidationReport
 from .generation_config import (
     ConfigurationError,
