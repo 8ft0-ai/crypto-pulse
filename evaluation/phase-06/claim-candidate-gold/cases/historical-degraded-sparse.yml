@@ -1,0 +1,94 @@
+key: historical-degraded-sparse
+classification: historical
+expected_candidate_count: 201
+expected_ordered_candidate_sha256: 330769db9e7f13663bdd34ccaa49bbfa73cc7cda832196072e252df82ef9eaf6
+expectations:
+- name: btc-price
+  rationale: Bitcoin spot price is a representative required market observation.
+  match:
+    intent: absolute_observation
+    metric: price_usd
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.bitcoin.price_usd
+- name: btc-24h-direction
+  rationale: Bitcoin 24-hour movement is available despite optional-source degradation.
+  match:
+    intent: directional_observation
+    metric: change_24h_pct
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.bitcoin.change_24h_pct
+- name: sol-24h-direction
+  rationale: Solana 24-hour movement provides a material directional candidate.
+  match:
+    intent: directional_observation
+    metric: change_24h_pct
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.solana.change_24h_pct
+- name: btc-eth-price-comparison
+  rationale: Bitcoin and Ethereum use the same canonical price field and unit.
+  match:
+    intent: comparison
+    metric: price_usd
+    comparison_relation: greater_than
+    evidence_ids:
+    - market.asset.bitcoin.price_usd
+    - market.asset.ethereum.price_usd
+- name: binance-status
+  rationale: The unavailable optional exchange remains visible as bounded source status.
+  match:
+    intent: source_status
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - source.binance.status
+- name: binance-limitation
+  rationale: The skipped optional exchange explicitly supports a data-quality limitation.
+  match:
+    intent: data_quality_limitation
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - source.binance.status
+- name: snapshot-status
+  rationale: The validated degraded snapshot status remains available.
+  match:
+    intent: snapshot_status
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - quality.snapshot.status
+- name: snapshot-degradation
+  rationale: The valid-degraded snapshot explicitly supports a separate limitation candidate.
+  match:
+    intent: data_quality_limitation
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - quality.snapshot.status
+forbidden:
+- name: no-invented-exchange-comparison
+  rationale: The sparse historical case has no Coinbase exchange row.
+  predicate: evidence_ids_together
+  evidence_ids:
+  - exchange.coinbase_exchange.btc-usd.price
+  - market.asset.bitcoin.price_usd
+- name: no-mixed-source-status
+  rationale: One source-status candidate cannot cite multiple source subjects.
+  predicate: mixed_source_status
+- name: no-incompatible-comparison
+  rationale: Every comparison must retain exact field and unit compatibility.
+  predicate: comparison_field_or_unit_mismatch
+forbidden_text: []
+omissions:
+- name: optional-exchange-detail
+  rationale: No safe deterministic detail record exists beyond the bounded skipped status in this snapshot.
+  evidence_ids:
+  - source.binance.status
+- name: exchange-price-comparison
+  rationale: Absent exchange rows cannot support an exchange-versus-market price comparison.
+  evidence_ids:
+  - exchange.coinbase_exchange.btc-usd.price
+  - market.asset.bitcoin.price_usd
