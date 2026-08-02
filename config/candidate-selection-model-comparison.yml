@@ -3,7 +3,7 @@ base_profile: config/llm-public-data-semantic-plan.yml
 viability_config: config/llm-evaluation-viability.yml
 gold_manifest: evaluation/phase-06/claim-candidate-gold/manifest.yml
 ranking_config: config/claim-candidate-ranking-v1.yml
-selector_prompt: prompts/crypto-market-candidate-selection-v1.txt
+selector_prompt: prompts/crypto-market-candidate-selection-compact-v1.txt
 selection_schema: schemas/crypto-market-candidate-selection-v1.json
 maximum_logical_runs: 30
 maximum_substantive_generations: 60
