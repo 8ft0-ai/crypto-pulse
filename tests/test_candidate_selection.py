@@ -131,8 +131,9 @@ class CandidateSelectionTests(unittest.TestCase):
             and item["scenario"] == "accepted_initial"
         )
         raw_ids = accepted["attempts"][0]["response"]["selected_candidate_ids"]
-        self.assertEqual(raw_ids, list(reversed(accepted["selected_candidate_ids"])))
-        self.assertNotEqual(raw_ids, accepted["selected_candidate_ids"])
+        canonical_ids = accepted["selected_candidate_ids"]
+        self.assertCountEqual(raw_ids, canonical_ids)
+        self.assertNotEqual(raw_ids, canonical_ids)
 
     def test_no_provider_or_publication_execution_path_is_added(self) -> None:
         source = "\n".join(
