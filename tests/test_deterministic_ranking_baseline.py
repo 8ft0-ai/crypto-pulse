@@ -14,8 +14,8 @@ from llm_analysis.deterministic_baseline_record import (
 from llm_analysis.deterministic_ranking import (
     DeterministicRankingError,
     load_ranking_config,
-    reconstruct_claim_plan,
 )
+from llm_analysis.deterministic_reconstruction import reconstruct_claim_plan
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "evaluation" / "phase-06" / "deterministic-baseline"
@@ -221,6 +221,7 @@ class DeterministicRankingBaselineTests(unittest.TestCase):
             (ROOT / "llm_analysis" / name).read_text(encoding="utf-8")
             for name in (
                 "deterministic_ranking.py",
+                "deterministic_reconstruction.py",
                 "deterministic_baseline_evaluation.py",
                 "deterministic_baseline_record.py",
             )
