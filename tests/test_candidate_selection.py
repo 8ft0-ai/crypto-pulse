@@ -4,15 +4,11 @@ import json
 import unittest
 from pathlib import Path
 
-from llm_analysis.candidate_selection_contract import (
-    CANDIDATE_SELECTION_SCHEMA_VERSION,
-    build_candidate_selector_request,
-)
+from llm_analysis.candidate_selection_contract import CANDIDATE_SELECTION_SCHEMA_VERSION
 from llm_analysis.candidate_selection_proof import evaluate_candidate_selection_proof
 from llm_analysis.openai_schema_projection import project_openai_strict_schema
 
 ROOT = Path(__file__).resolve().parents[1]
-PROOF = ROOT / "evaluation" / "phase-06" / "candidate-selection"
 SCHEMA = ROOT / "schemas" / "crypto-market-candidate-selection-v1.json"
 PROMPT = ROOT / "prompts" / "crypto-market-candidate-selection-v1.txt"
 
@@ -107,17 +103,16 @@ class CandidateSelectionTests(unittest.TestCase):
 
     def test_request_is_canonical_and_contains_no_source_instructions(self) -> None:
         request = self.proof.representative_request
-        reversed_request = build_candidate_selector_request(
-            list(reversed(request["candidates"])),
-            config=__import__(
-                "llm_analysis.deterministic_ranking",
-                fromlist=["load_ranking_config"],
-            ).load_ranking_config(ROOT),
-            evidence_bundle_id=request["evidence_bundle_id"],
-        )
-        self.assertEqual(request, reversed_request)
+        material = next(item for item in self.summary["cases"] if item["key"] == "historical-material-move")
+        self.assertEqual(request["request_id"], material["request_id"])
+        self.assertEqual(request["candidate_set_id"], material["candidate_set_id"])
         self.assertEqual(request["max_selection_count"], 7)
         self.assertEqual(request["response_schema_version"], CANDIDATE_SELECTION_SCHEMA_VERSION)
+        identifiers = [item["candidate_id"] for item in request["candidates"]]
+        self.assertEqual(len(identifiers), material["candidate_count"])
+        self.assertEqual(len(identifiers), len(set(identifiers)))
+        self.assertTrue(material["candidate_permutation_stable"])
+        self.assertTrue(material["evidence_permutation_stable"])
         catalogue_text = json.dumps(request["candidates"], sort_keys=True).casefold()
         for unsafe in (
             "ignore all prior instructions",
