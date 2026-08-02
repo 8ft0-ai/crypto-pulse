@@ -23,8 +23,8 @@ from .candidate_selection_proof_support import (
     fail,
     render_report,
     scripted_response,
-    validation_matrix,
 )
+from .candidate_selection_validation_proof import validation_matrix
 from .candidate_selector import (
     CANDIDATE_SELECTOR_RUN_VERSION,
     BoundedCandidateSelectorResult,
