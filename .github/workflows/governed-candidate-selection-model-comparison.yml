@@ -107,6 +107,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+          CRYPTOPULSE_SELECTOR_EVIDENCE_DIR: ${{ runner.temp }}/candidate-selection-model-comparison/provider-evidence
         shell: bash
         run: |
           set -euo pipefail
