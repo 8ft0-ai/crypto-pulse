@@ -3,18 +3,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .candidate_selection_contract import render_candidate_selector_prompt
-from .candidate_selector import SelectorClientError, SelectorClientResponse
+from .candidate_selector import SelectorClientResponse
 from .contracts import canonical_json_bytes
 from .evaluation import EvaluationIntegrityError
 from .evaluation_viability import AttemptPacer
 from .generation_config import GenerationConfig, model_matches
 from .openrouter_client import (
-    CostLimitError,
     GenerationError,
     InvalidResponseError,
     Transport,
@@ -112,6 +113,7 @@ class OpenRouterCandidateSelectorClient:
         monotonic: Any = time.monotonic,
         before_provider_call: Callable[[float], None] | None = None,
         after_provider_call: Callable[[float], None] | None = None,
+        evidence_root: str | Path | None = None,
     ) -> None:
         if not api_key or not api_key.strip() or "\n" in api_key or "\r" in api_key:
             raise ValueError("a valid OPENROUTER_API_KEY is required")
@@ -131,7 +133,30 @@ class OpenRouterCandidateSelectorClient:
         self.monotonic = monotonic
         self.before_provider_call = before_provider_call
         self.after_provider_call = after_provider_call
+        configured_evidence = evidence_root or os.environ.get(
+            "CRYPTOPULSE_SELECTOR_EVIDENCE_DIR"
+        )
+        self.evidence_root = (
+            Path(configured_evidence).resolve() if configured_evidence else None
+        )
         self.call_records: list[CandidateSelectorCallRecord] = []
+        self._network_started: set[int] = set()
+
+    def _evidence_path(self, call_number: int, suffix: str) -> Path | None:
+        if self.evidence_root is None:
+            return None
+        return (
+            self.evidence_root
+            / Path(*self.logical_id.split("/"))
+            / f"provider-call-{call_number}-{suffix}.json"
+        )
+
+    def _write_evidence(self, call_number: int, suffix: str, value: Mapping[str, Any]) -> None:
+        path = self._evidence_path(call_number, suffix)
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(canonical_json_bytes(dict(value)) + b"\n")
 
     def select(
         self,
@@ -154,10 +179,31 @@ class OpenRouterCandidateSelectorClient:
                 else operation()
             )
         except GenerationError as exc:
+            network_started = call_number in self._network_started
+            if network_started and self.after_provider_call is not None:
+                # Usage is unavailable, so reserve the reviewed per-call maximum.
+                self.after_provider_call(self.config.max_cost_usd)
             message = " ".join(str(exc).split())[:500].replace(
                 self.api_key, "[REDACTED]"
             )
-            raise SelectorClientError(str(getattr(exc, "code", "provider_error")), message) from exc
+            self._write_evidence(
+                call_number,
+                "unmetered-error",
+                {
+                    "call_number": call_number,
+                    "logical_id": self.logical_id,
+                    "requested_model": self.config.model,
+                    "network_started": network_started,
+                    "reserved_cost_usd": (
+                        self.config.max_cost_usd if network_started else 0.0
+                    ),
+                    "code": str(getattr(exc, "code", "provider_error")),
+                    "message": message,
+                },
+            )
+            raise EvaluationIntegrityError(
+                f"{self.logical_id} provider call lacked complete metering: {message}"
+            ) from exc
 
     def _select_once(
         self,
@@ -203,6 +249,7 @@ class OpenRouterCandidateSelectorClient:
             "X-OpenRouter-Title": self.config.app_title,
             "X-OpenRouter-Metadata": "enabled",
         }
+        self._network_started.add(call_number)
         started = self.monotonic()
         response = self.transport.post(
             self.config.endpoint,
@@ -218,7 +265,7 @@ class OpenRouterCandidateSelectorClient:
         usage = payload.get("usage") if isinstance(payload.get("usage"), Mapping) else {}
         cost_raw = usage.get("cost")
         if isinstance(cost_raw, bool) or not isinstance(cost_raw, (int, float)):
-            raise CostLimitError("OpenRouter candidate selector did not report usage.cost")
+            raise InvalidResponseError("OpenRouter candidate selector did not report usage.cost")
         cost = float(cost_raw)
         input_tokens = _required_int(usage.get("prompt_tokens"), "usage.prompt_tokens")
         output_tokens = _required_int(
@@ -297,6 +344,7 @@ class OpenRouterCandidateSelectorClient:
             finish_reason=finish_reason,
         )
         self.call_records.append(record)
+        self._write_evidence(call_number, "metered-response", record.protected_dict())
 
         # Account for the paid response before evaluating provider identity or model output.
         if self.after_provider_call is not None:
@@ -305,12 +353,21 @@ class OpenRouterCandidateSelectorClient:
             raise EvaluationIntegrityError(
                 f"OpenRouter candidate selector cost {cost:.6f} USD exceeds configured limit"
             )
+        if actual_provider != self.config.provider_policy.only[0]:
+            raise EvaluationIntegrityError(
+                f"{self.logical_id} selected unapproved provider {actual_provider!r}"
+            )
+        if provider_fallback:
+            raise EvaluationIntegrityError(
+                f"{self.logical_id} used provider fallback"
+            )
+        if cross_model_fallback:
+            raise EvaluationIntegrityError(
+                f"{self.logical_id} did not preserve model {self.config.model!r}"
+            )
 
-        provider_ok = actual_provider == self.config.provider_policy.only[0]
-        governance_ok = provider_ok and not provider_fallback and not cross_model_fallback
-        response_payload = decoded if governance_ok else None
         return SelectorClientResponse(
-            payload=response_payload,
+            payload=decoded,
             raw_response=completion,
             metadata={
                 "client": "openrouter",
