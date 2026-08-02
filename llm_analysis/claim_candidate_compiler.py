@@ -107,6 +107,7 @@ _UNTRUSTED_INSTRUCTION_PATTERNS = (
 )
 _BUNDLE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CANDIDATE_SUBJECT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
+_STATUS_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 class ClaimCandidateCompilationError(ValueError):
@@ -144,14 +145,7 @@ def _slug(*parts: Any) -> str:
 
 
 def _candidate_subject_id(subject_type: str, raw_identifier: str) -> str:
-    """Project an evidence subject ID into the stricter candidate identifier space.
-
-    Evidence subject IDs are intentionally broad and may begin with a digit or
-    contain upper-case/display characters. Candidate IDs are stable repository
-    keys. Already-compatible lower-case IDs are preserved. Other IDs receive a
-    type-prefixed slug and a hash suffix so normalisation cannot silently merge
-    distinct evidence subjects.
-    """
+    """Project an evidence subject ID into the stricter candidate identifier space."""
 
     if _CANDIDATE_SUBJECT_ID_RE.fullmatch(raw_identifier):
         return raw_identifier
@@ -184,12 +178,29 @@ def _safe_detail(record: Mapping[str, Any]) -> bool:
     return isinstance(value, str) and not any(pattern.search(value) for pattern in _UNTRUSTED_INSTRUCTION_PATTERNS)
 
 
+def _renderable_status(record: Mapping[str, Any]) -> bool:
+    value = record.get("value")
+    return (
+        record.get("evidence_type") == "status"
+        and isinstance(value, str)
+        and bool(_STATUS_TOKEN_RE.fullmatch(value))
+    )
+
+
 def _finite_number(record: Mapping[str, Any]) -> float | None:
     value = record.get("value")
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def _renderable_number(record: Mapping[str, Any]) -> bool:
+    number = _finite_number(record)
+    unit = record.get("unit")
+    if number is None or unit not in _RENDERABLE_NUMERIC_UNITS:
+        return False
+    return unit != "rank" or number.is_integer()
 
 
 def _source_names(records: list[Mapping[str, Any]]) -> tuple[str, ...]:
@@ -285,26 +296,28 @@ def _candidate(
 
 def _eligible_observation(record: Mapping[str, Any]) -> bool:
     evidence_type = record.get("evidence_type")
-    return (
-        _subject(record).get("type") in _MARKET_SUBJECT_TYPES
-        and evidence_type in _ABSOLUTE_TYPES
-        and record.get("field") in _RENDERABLE_METRICS
-        and _has_renderable_alias(record)
-        and (
-            evidence_type != "number"
-            or (
-                record.get("unit") in _RENDERABLE_NUMERIC_UNITS
-                and _finite_number(record) is not None
-            )
-        )
-    )
+    if (
+        _subject(record).get("type") not in _MARKET_SUBJECT_TYPES
+        or evidence_type not in _ABSOLUTE_TYPES
+        or record.get("field") not in _RENDERABLE_METRICS
+        or not _has_renderable_alias(record)
+    ):
+        return False
+    if evidence_type == "number":
+        return _renderable_number(record)
+    if evidence_type == "status":
+        return _renderable_status(record)
+    return True
 
 
 def _eligible_direction(record: Mapping[str, Any]) -> bool:
     if not _eligible_observation(record):
         return False
     if record.get("evidence_type") == "number":
-        return record.get("field") in _DIRECTIONAL_FIELDS
+        return (
+            record.get("field") in _DIRECTIONAL_FIELDS
+            and record.get("unit") == "percent"
+        )
     if record.get("evidence_type") == "status":
         return str(record.get("value", "")).casefold() in _DIRECTIONAL_STATUS
     return False
@@ -382,11 +395,9 @@ def _qualifying_quality_record(record: Mapping[str, Any]) -> bool:
     value = record.get("value")
     folded = str(value).casefold()
     if field in {"status", "quality_status"}:
-        return folded in _LIMITATION_STATUS
+        return _renderable_status(record) and folded in _LIMITATION_STATUS
     if field == "warning":
-        return bool(value) and (
-            record.get("evidence_type") != "string" or _safe_detail(record)
-        )
+        return _safe_detail(record) and bool(value)
     if field == "missing_symbols":
         return (
             record.get("evidence_type") == "set"
@@ -466,7 +477,6 @@ def _compile_comparisons(
         for record in records
         if _eligible_observation(record)
         and record.get("evidence_type") == "number"
-        and _finite_number(record) is not None
     ]
     grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = defaultdict(list)
     for record in eligible:
@@ -533,19 +543,25 @@ def _compile_source_status(
     candidates: list[dict[str, Any]] = []
     for raw_subject_id, group in sorted(grouped.items()):
         subject = _canonical_subject(group[0])
-        statuses = [
+        status_records = [
             record
             for record in group
             if record.get("field") == "status"
             and record.get("evidence_type") == "status"
         ]
-        if not statuses:
+        if not status_records:
             continue
-        if len(statuses) != 1:
+        if len(status_records) != 1:
             _fail(
                 "ambiguous_source_status",
                 f"$.bundle.evidence[{raw_subject_id}]",
                 "one source subject must have exactly one status record",
+            )
+        if not _renderable_status(status_records[0]):
+            _fail(
+                "unsupported_source_status",
+                f"$.bundle.evidence[{status_records[0]['evidence_id']}]",
+                "source status must be a bounded renderer-compatible token",
             )
         details = [
             record
@@ -553,7 +569,7 @@ def _compile_source_status(
             for record in group
             if record.get("field") == field and _safe_detail(record)
         ]
-        selected = [statuses[0], *details[:3]]
+        selected = [status_records[0], *details[:3]]
         candidates.append(
             _candidate(
                 bundle_id,
@@ -642,6 +658,12 @@ def _compile_snapshot_status(
             or record.get("evidence_type") != "status"
         ):
             continue
+        if not _renderable_status(record):
+            _fail(
+                "unsupported_snapshot_status",
+                f"$.bundle.evidence[{record['evidence_id']}]",
+                "snapshot status must be a bounded renderer-compatible token",
+            )
         candidate_subject = _canonical_subject(record)
         field = str(record["field"])
         candidates.append(
