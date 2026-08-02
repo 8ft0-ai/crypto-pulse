@@ -155,10 +155,12 @@ def summarize_model(
         and call.get("cross_model_fallback_used") is False
         for call in provider_calls
     )
-    cost_metadata_complete = (
+    observed_cost_metadata_complete = (
         len(call_costs) == len(provider_calls) == expected_provider_calls
         and route_cost is not None
-        and len(rows) == expected_runs
+    )
+    cost_metadata_complete = (
+        observed_cost_metadata_complete and len(rows) == expected_runs
     )
     route_pass = isinstance(route, Mapping) and route.get("status") == "passed"
     availability_pass = (
@@ -172,14 +174,13 @@ def summarize_model(
     prohibited_count = sum(
         len(row.get("prohibited_selected_candidate_ids") or ()) for row in rows
     )
-    governance_pass = bool(
+    observed_governance_pass = bool(
         route_pass
         and availability_pass
-        and len(rows) == expected_runs
         and identity_pass
         and provider_pass
         and fallback_metadata_pass
-        and cost_metadata_complete
+        and observed_cost_metadata_complete
         and total_cost <= model.maximum_model_cost_usd + 1e-12
         and expected_provider_calls <= expected_runs * 2
         and all(
@@ -187,6 +188,12 @@ def summarize_model(
             <= model.maximum_generation_cost_usd + 1e-12
             for call in provider_calls
         )
+    )
+    governance_pass = bool(
+        observed_governance_pass and len(rows) == expected_runs
+    )
+    decisive_acceptance_failure = any(
+        row.get("decisive_stop") is True for row in rows
     )
 
     return {
@@ -201,6 +208,7 @@ def summarize_model(
         "accepted_initial_runs": len(first_pass),
         "accepted_after_repair_runs": len(repaired),
         "fallback_runs": len(fallbacks),
+        "decisive_acceptance_failure": decisive_acceptance_failure,
         "fallback_reasons": sorted(
             {
                 str(row.get("fallback_reason"))
@@ -255,9 +263,11 @@ def summarize_model(
         "identity_pass": identity_pass,
         "provider_pass": provider_pass,
         "fallback_metadata_pass": fallback_metadata_pass,
+        "observed_cost_metadata_complete": observed_cost_metadata_complete,
         "cost_metadata_complete": cost_metadata_complete,
         "route_pass": route_pass,
         "availability_pass": availability_pass,
+        "observed_governance_pass": observed_governance_pass,
         "governance_pass": governance_pass,
     }
 
@@ -273,6 +283,22 @@ def apply_predeclared_decision(
     indexed = {str(item["role"]): item for item in summaries}
     quality = indexed.get("quality_benchmark")
     deployment = indexed.get("deployment_candidate")
+    if (
+        isinstance(quality, Mapping)
+        and quality.get("decisive_acceptance_failure") is True
+        and quality.get("observed_governance_pass") is True
+    ):
+        return {
+            "status": "complete",
+            "outcome": plan.outcomes["quality_benchmark_failed"],
+            "quality_gate": {
+                "minimum_accepted_runs": False,
+                "decisive_two_fallback_stop": True,
+                "governance": True,
+            },
+            "deployment_gate": {},
+        }
+
     complete = (
         isinstance(quality, Mapping)
         and isinstance(deployment, Mapping)
@@ -312,6 +338,22 @@ def apply_predeclared_decision(
             "outcome": plan.outcomes["quality_benchmark_failed"],
             "quality_gate": quality_checks,
             "deployment_gate": {},
+        }
+
+    if (
+        isinstance(deployment, Mapping)
+        and deployment.get("decisive_acceptance_failure") is True
+        and deployment.get("observed_governance_pass") is True
+    ):
+        return {
+            "status": "complete",
+            "outcome": plan.outcomes["deployment_candidate_failed"],
+            "quality_gate": quality_checks,
+            "deployment_gate": {
+                "minimum_accepted_runs": False,
+                "decisive_two_fallback_stop": True,
+                "governance": True,
+            },
         }
 
     baseline = plan.baseline_reference

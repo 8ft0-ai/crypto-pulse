@@ -628,8 +628,12 @@ def execute_candidate_selection_comparison(
     availability_by_key: dict[str, dict[str, Any]] = {}
     records: list[dict[str, Any]] = []
     transport_builder = transport_factory or (lambda: ClassifiedTransport())
+    stop_after_quality_failure = False
 
     for model in comparison.models:
+        if stop_after_quality_failure:
+            break
+        decisive_model_failure = False
         paid_plan, runtime = _model_runtime(
             root,
             output,
@@ -768,6 +772,15 @@ def execute_candidate_selection_comparison(
                 (run_dir / "rendered-report.md").write_bytes(result.render.markdown)
                 logical_latency = sum(int(item["latency_ms"]) for item in provider_calls)
                 logical_cost = sum(float(item["estimated_cost_usd"]) for item in provider_calls)
+                model_fallback_count = sum(
+                    row.get("fallback_used") is True
+                    for row in records
+                    if row.get("model_key") == model.key
+                ) + (1 if result.record["fallback_used"] else 0)
+                decisive_stop = (
+                    model_fallback_count
+                    >= comparison.maximum_fallbacks_before_decisive_failure
+                )
                 record = {
                     "model_key": model.key,
                     "model": model.model,
@@ -778,6 +791,7 @@ def execute_candidate_selection_comparison(
                     "outcome": result.record["outcome"],
                     "fallback_used": result.record["fallback_used"],
                     "fallback_reason": result.record["fallback_reason"],
+                    "decisive_stop": decisive_stop,
                     "semantic_repair_count": result.record["semantic_repair_count"],
                     "selector_attempt_count": result.record["selector_attempt_count"],
                     "model_selected_candidate_ids": model_selected_ids,
@@ -804,6 +818,13 @@ def execute_candidate_selection_comparison(
                 }
                 _write_json(run_dir / "score.json", record)
                 records.append(record)
+                if decisive_stop:
+                    decisive_model_failure = True
+                    break
+            if decisive_model_failure:
+                break
+        if decisive_model_failure and model.role == "quality_benchmark":
+            stop_after_quality_failure = True
 
     _write_json(output / AVAILABILITY_FILE, {"models": availability_rows})
     _write_json(output / ROUTES_FILE, {"routes": route_rows})
