@@ -1,5 +1,18 @@
 """Governed CryptoPulse LLM analysis contracts, provider client, and offline pipeline."""
 
+from .claim_candidate_contract import (
+    CANDIDATE_COMPARISON_RELATION_ORDER,
+    CANDIDATE_INTENT_ORDER,
+    CANDIDATE_SECTION_ORDER,
+    CLAIM_CANDIDATE_ID_PREFIX,
+    candidate_id_matches,
+    candidate_identity_payload,
+    candidate_sort_key,
+    derive_candidate_id,
+    index_candidates_by_id,
+    normalise_candidate_semantics,
+    order_candidates,
+)
 from .claim_plan_render import (
     ClaimPlanRender,
     ClaimPlanRenderError,
@@ -14,6 +27,8 @@ from .claim_plan_validation import (
 )
 from .contracts import (
     ANALYSIS_SCHEMA_VERSION,
+    CLAIM_CANDIDATE_IDENTITY_VERSION,
+    CLAIM_CANDIDATE_SCHEMA_VERSION,
     CLAIM_PLAN_COMPARISON_RELATIONS,
     CLAIM_PLAN_CONFIDENCE_LEVELS,
     CLAIM_PLAN_INTENTS,
@@ -62,6 +77,12 @@ from .validate import validate_analysis
 
 __all__ = [
     "ANALYSIS_SCHEMA_VERSION",
+    "CANDIDATE_COMPARISON_RELATION_ORDER",
+    "CANDIDATE_INTENT_ORDER",
+    "CANDIDATE_SECTION_ORDER",
+    "CLAIM_CANDIDATE_IDENTITY_VERSION",
+    "CLAIM_CANDIDATE_ID_PREFIX",
+    "CLAIM_CANDIDATE_SCHEMA_VERSION",
     "CLAIM_PLAN_COMPARISON_RELATIONS",
     "CLAIM_PLAN_CONFIDENCE_LEVELS",
     "CLAIM_PLAN_INTENTS",
@@ -99,15 +120,22 @@ __all__ = [
     "TransportGenerationError",
     "ValidationReport",
     "build_request_body",
+    "candidate_id_matches",
+    "candidate_identity_payload",
+    "candidate_sort_key",
     "canonical_json_bytes",
     "claim_source_disagreement_eligible",
     "content_sha256",
+    "derive_candidate_id",
     "evidence_id",
+    "index_candidates_by_id",
     "is_source_disagreement_pair",
     "iter_plan_claims",
     "load_generation_config",
     "load_json",
     "model_matches",
+    "normalise_candidate_semantics",
+    "order_candidates",
     "process_analysis",
     "render_claim_plan",
     "render_markdown",
