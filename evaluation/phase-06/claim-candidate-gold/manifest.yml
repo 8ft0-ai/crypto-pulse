@@ -1,0 +1,11 @@
+version: 1
+source_evaluation_config: config/llm-evaluation.yml
+source_corpus: evaluation/phase-05/corpus.yml
+source_corpus_git_blob_sha: 1ebbda1bdc2acf7a0b4eaca3c8f88cc98f523556
+case_files:
+- evaluation/phase-06/claim-candidate-gold/cases/historical-degraded-sparse.yml
+- evaluation/phase-06/claim-candidate-gold/cases/historical-normal-crosschecked.yml
+- evaluation/phase-06/claim-candidate-gold/cases/historical-material-move.yml
+- evaluation/phase-06/claim-candidate-gold/cases/adversarial-prompt-injection.yml
+- evaluation/phase-06/claim-candidate-gold/cases/adversarial-source-disagreement.yml
+normalisation_probe_file: evaluation/phase-06/claim-candidate-gold/normalisation-probe.yml
