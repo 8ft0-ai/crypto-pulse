@@ -29,6 +29,7 @@ def _proof_validation_matrix(
     mixed["candidate_id"] = derive_candidate_id(mixed)
 
     pair: tuple[dict[str, Any], dict[str, Any]] | None = None
+    existing_ids = {str(item["candidate_id"]) for item in ordered}
     for first in ordered:
         for second in ordered:
             if first["candidate_id"] == second["candidate_id"]:
@@ -41,8 +42,11 @@ def _proof_validation_matrix(
                 continue
             synthetic = copy.deepcopy(second)
             synthetic["features"]["redundancy_group"] = first["features"]["redundancy_group"]
+            synthetic["subject"]["id"] = synthetic["subject"]["id"] + "-synthetic"
             synthetic["candidate_id"] = ""
             synthetic["candidate_id"] = derive_candidate_id(synthetic)
+            if synthetic["candidate_id"] in existing_ids:
+                continue
             pair = (dict(first), synthetic)
             break
         if pair is not None:
