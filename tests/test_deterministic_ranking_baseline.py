@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -157,7 +156,16 @@ class DeterministicRankingBaselineTests(unittest.TestCase):
             },
         )
 
-    def test_unknown_duplicate_selection_and_unsafe_config_fail_closed(self) -> None:
+        mismatched = copy.deepcopy(selection)
+        mismatched["evidence_bundle_id"] = "sha256:" + "2" * 64
+        with self.assertRaises(DeterministicRankingError) as raised:
+            reconstruct_claim_plan(mismatched, [candidate], config=config)
+        self.assertEqual(
+            raised.exception.code,
+            "selected_candidate_bundle_mismatch",
+        )
+
+    def test_unknown_duplicate_excessive_selection_and_unsafe_config_fail_closed(self) -> None:
         config = load_ranking_config(ROOT)
         unknown = "claim-candidate:sha256:" + "0" * 64
         with self.assertRaises(DeterministicRankingError) as raised:
@@ -181,6 +189,21 @@ class DeterministicRankingBaselineTests(unittest.TestCase):
                 config=config,
             )
         self.assertEqual(raised.exception.code, "duplicate_selection")
+
+        excessive = [
+            "claim-candidate:sha256:" + f"{index:064x}"
+            for index in range(config.max_total + 1)
+        ]
+        with self.assertRaises(DeterministicRankingError) as raised:
+            reconstruct_claim_plan(
+                {
+                    "evidence_bundle_id": "sha256:" + "1" * 64,
+                    "selected_candidate_ids": excessive,
+                },
+                [],
+                config=config,
+            )
+        self.assertEqual(raised.exception.code, "excessive_selection")
 
         raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
         invalid = copy.deepcopy(raw)
