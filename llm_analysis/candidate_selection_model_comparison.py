@@ -19,6 +19,7 @@ from .candidate_selection_model_comparison_config import (
     ComparisonModel,
     load_candidate_selection_comparison_plan,
 )
+from .compact_candidate_selector_client import CompactCandidateSelectorClient
 from .candidate_selection_model_scoring import (
     apply_predeclared_decision,
     score_selection,
@@ -338,6 +339,7 @@ def prepare_candidate_selection_comparison(
             "maximum_substantive_generations": plan.maximum_substantive_generations,
             "maximum_route_probes": plan.maximum_route_probes,
             "maximum_semantic_repairs_per_run": plan.maximum_semantic_repairs_per_run,
+            "maximum_fallbacks_before_decisive_failure": plan.maximum_fallbacks_before_decisive_failure,
             "maximum_total_cost_usd": plan.maximum_total_cost_usd,
         },
         "cases": cases,
@@ -404,7 +406,7 @@ def _model_runtime(
         prompt_version="crypto-market-candidate-selection/v1",
         analysis_schema_version="crypto-market-candidate-selection/v1",
         temperature=0.0,
-        max_output_tokens=512,
+        max_output_tokens=model.max_output_tokens,
         max_request_bytes=5_000_000,
         max_cost_usd=model.maximum_generation_cost_usd,
         retry_limit=0,
@@ -725,7 +727,7 @@ def execute_candidate_selection_comparison(
 
             for repeat_index in range(1, model.repeats_per_case + 1):
                 logical_id = f"corpus/{model.key}/{case_key}/repeat-{repeat_index}"
-                client = OpenRouterCandidateSelectorClient(
+                provider_client = OpenRouterCandidateSelectorClient(
                     runtime,
                     prompt_template=prompt_template,
                     api_key=api_key,
@@ -739,6 +741,7 @@ def execute_candidate_selection_comparison(
                     ),
                     after_provider_call=lambda actual, current=model: ledger.add(current, actual),
                 )
+                client = CompactCandidateSelectorClient(provider_client)
                 result = run_bounded_candidate_selector(
                     bundle,
                     candidates,
@@ -749,7 +752,7 @@ def execute_candidate_selection_comparison(
                     claim_plan_schema=claim_plan_schema,
                     selection_schema=selection_schema,
                 )
-                provider_calls = [item.protected_dict() for item in client.call_records]
+                provider_calls = [item.protected_dict() for item in provider_client.call_records]
                 model_selected_ids = (
                     []
                     if result.record["fallback_used"]
@@ -790,6 +793,8 @@ def execute_candidate_selection_comparison(
                     "logical_latency_ms": logical_latency,
                     "logical_cost_usd": logical_cost,
                     "provider_calls": _safe_provider_calls(provider_calls),
+                    "compact_request_id": client.compact_requests[-1]["compact_request_id"],
+                    "compact_request_sha256": content_sha256(client.compact_requests[-1]),
                     "claim_plan_sha256": result.record["claim_plan_sha256"],
                     "rendered_markdown_sha256": result.record[
                         "rendered_markdown_sha256"

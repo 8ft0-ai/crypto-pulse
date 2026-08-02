@@ -41,6 +41,7 @@ class ComparisonModel:
     maximum_completion_price_per_million: float
     maximum_generation_cost_usd: float
     maximum_model_cost_usd: float
+    max_output_tokens: int
     send_temperature: bool
 
 
@@ -88,6 +89,7 @@ class CandidateSelectionComparisonPlan:
     maximum_substantive_generations: int
     maximum_route_probes: int
     maximum_semantic_repairs_per_run: int
+    maximum_fallbacks_before_decisive_failure: int
     maximum_total_cost_usd: float
     models: tuple[ComparisonModel, ...]
     baseline_reference: BaselineReference
@@ -196,6 +198,7 @@ def load_candidate_selection_comparison_plan(
             "maximum_substantive_generations",
             "maximum_route_probes",
             "maximum_semantic_repairs_per_run",
+            "maximum_fallbacks_before_decisive_failure",
             "maximum_total_cost_usd",
             "models",
             "baseline_reference",
@@ -223,6 +226,7 @@ def load_candidate_selection_comparison_plan(
         "maximum_completion_price_per_million",
         "maximum_generation_cost_usd",
         "maximum_model_cost_usd",
+        "max_output_tokens",
         "send_temperature",
     }
     models: list[ComparisonModel] = []
@@ -304,6 +308,12 @@ def load_candidate_selection_comparison_plan(
                 0.000001,
                 10.0,
             ),
+            max_output_tokens=_integer(
+                row.get("max_output_tokens"),
+                f"models[{index}].max_output_tokens",
+                512,
+                1024,
+            ),
             send_temperature=_bool(
                 row.get("send_temperature"),
                 f"models[{index}].send_temperature",
@@ -318,6 +328,11 @@ def load_candidate_selection_comparison_plan(
         if model_row.maximum_model_cost_usd + 1e-12 < minimum_model_ceiling:
             raise EvaluationConfigurationError(
                 f"{key} model ceiling does not cover every initial and repair call"
+            )
+        expected_output = 1024 if role == "quality_benchmark" else 512
+        if model_row.max_output_tokens != expected_output:
+            raise EvaluationConfigurationError(
+                f"{key} max_output_tokens must be {expected_output}"
             )
         models.append(model_row)
         seen_keys.add(key)
@@ -343,6 +358,12 @@ def load_candidate_selection_comparison_plan(
         1,
         1,
     )
+    maximum_fallbacks = _integer(
+        raw.get("maximum_fallbacks_before_decisive_failure"),
+        "maximum_fallbacks_before_decisive_failure",
+        2,
+        2,
+    )
     planned_logical = sum(item.repeats_per_case * 5 for item in models)
     if planned_logical != maximum_logical_runs:
         raise EvaluationConfigurationError(
@@ -353,7 +374,7 @@ def load_candidate_selection_comparison_plan(
             "substantive generation ceiling must cover one initial and one repair per run"
         )
     maximum_total_cost = _number(
-        raw.get("maximum_total_cost_usd"), "maximum_total_cost_usd", 4.0, 4.0
+        raw.get("maximum_total_cost_usd"), "maximum_total_cost_usd", 5.0, 5.0
     )
     if sum(item.maximum_model_cost_usd for item in models) > maximum_total_cost + 1e-12:
         raise EvaluationConfigurationError("model ceilings exceed the whole-run ceiling")
@@ -538,6 +559,7 @@ def load_candidate_selection_comparison_plan(
         maximum_substantive_generations=maximum_generations,
         maximum_route_probes=maximum_route_probes,
         maximum_semantic_repairs_per_run=maximum_repairs,
+        maximum_fallbacks_before_decisive_failure=maximum_fallbacks,
         maximum_total_cost_usd=maximum_total_cost,
         models=tuple(models),
         baseline_reference=baseline,
