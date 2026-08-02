@@ -12,6 +12,7 @@ from .claim_candidate_contract import candidate_sort_key, index_candidates_by_id
 from .claim_plan_render import ClaimPlanRender, render_claim_plan
 from .claim_plan_validation import validate_claim_plan
 from .contracts import (
+    CLAIM_PLAN_COMPARISON_RELATIONS,
     CLAIM_PLAN_INTENTS,
     CLAIM_PLAN_PROMPT_VERSION,
     CLAIM_PLAN_SCHEMA_VERSION,
@@ -54,9 +55,13 @@ class RankingConfig:
     max_per_section: int
     section_order: tuple[str, ...]
     required_sections_if_available: tuple[str, ...]
+    required_slots: tuple[Mapping[str, Any], ...]
     section_limits: Mapping[str, int]
     intent_limits: Mapping[str, int]
     priorities: Mapping[str, tuple[Any, ...]]
+    metric_priority: Mapping[str, int]
+    evidence_scope_priority: Mapping[str, int]
+    comparison_relation_priority: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -65,11 +70,24 @@ class RankingConfig:
             "max_per_section": self.max_per_section,
             "section_order": list(self.section_order),
             "required_sections_if_available": list(self.required_sections_if_available),
+            "required_slots": [
+                {
+                    "name": slot["name"],
+                    "section": slot["section"],
+                    "intent": slot["intent"],
+                    "metrics": list(slot["metrics"]),
+                    "evidence_scopes": list(slot["evidence_scopes"]),
+                }
+                for slot in self.required_slots
+            ],
             "section_limits": dict(self.section_limits),
             "intent_limits": dict(self.intent_limits),
             "priorities": {
                 key: list(value) for key, value in self.priorities.items()
             },
+            "metric_priority": dict(self.metric_priority),
+            "evidence_scope_priority": dict(self.evidence_scope_priority),
+            "comparison_relation_priority": list(self.comparison_relation_priority),
         }
 
 
@@ -158,9 +176,13 @@ def load_ranking_config(
         "max_per_section",
         "section_order",
         "required_sections_if_available",
+        "required_slots",
         "section_limits",
         "intent_limits",
         "priorities",
+        "metric_priority",
+        "evidence_scope_priority",
+        "comparison_relation_priority",
     }
     if set(raw) != expected or raw.get("version") != 1:
         _fail("invalid_config", relative, "must use version 1 and exact supported keys")
@@ -194,6 +216,49 @@ def load_ranking_config(
             "invalid_required_sections",
             f"{relative}.required_sections_if_available",
             "must contain unique canonical sections",
+        )
+
+    raw_slots = _list(raw["required_slots"], f"{relative}.required_slots")
+    required_slots: list[dict[str, Any]] = []
+    slot_names: set[str] = set()
+    supported_scopes = {"primary_market", "exchange", "governance", "defi", "mixed", "other"}
+    for index, value in enumerate(raw_slots):
+        path = f"{relative}.required_slots[{index}]"
+        slot = dict(_mapping(value, path))
+        if set(slot) != {"name", "section", "intent", "metrics", "evidence_scopes"}:
+            _fail("invalid_required_slot", path, "uses unsupported or missing keys")
+        name = _string(slot["name"], f"{path}.name")
+        if name in slot_names:
+            _fail("duplicate_required_slot", f"{path}.name", f"duplicate slot: {name}")
+        slot_names.add(name)
+        section = _string(slot["section"], f"{path}.section")
+        intent = _string(slot["intent"], f"{path}.intent")
+        metrics = tuple(
+            _string(item, f"{path}.metrics")
+            for item in _list(slot["metrics"], f"{path}.metrics")
+        )
+        scopes = tuple(
+            _string(item, f"{path}.evidence_scopes")
+            for item in _list(slot["evidence_scopes"], f"{path}.evidence_scopes")
+        )
+        if section not in section_order or intent not in CLAIM_PLAN_INTENTS:
+            _fail("invalid_required_slot", path, "section or intent is unsupported")
+        if not metrics or len(metrics) != len(set(metrics)):
+            _fail("invalid_required_slot", f"{path}.metrics", "must contain unique metrics")
+        if (
+            not scopes
+            or len(scopes) != len(set(scopes))
+            or any(scope not in supported_scopes for scope in scopes)
+        ):
+            _fail("invalid_required_slot", f"{path}.evidence_scopes", "must contain unique supported scopes")
+        required_slots.append(
+            {
+                "name": name,
+                "section": section,
+                "intent": intent,
+                "metrics": metrics,
+                "evidence_scopes": scopes,
+            }
         )
 
     raw_sections = _mapping(raw["section_limits"], f"{relative}.section_limits")
@@ -259,15 +324,71 @@ def load_ranking_config(
             f"{relative}.priorities",
         ),
     }
+
+    raw_metric_priority = _mapping(raw["metric_priority"], f"{relative}.metric_priority")
+    if "*" not in raw_metric_priority:
+        _fail("invalid_metric_priority", f"{relative}.metric_priority", "must define '*' default")
+    metric_priority = {
+        _string(key, f"{relative}.metric_priority.key"): _integer(
+            value,
+            f"{relative}.metric_priority.{key}",
+            0,
+        )
+        for key, value in raw_metric_priority.items()
+    }
+    if any(value > 20 for value in metric_priority.values()):
+        _fail("invalid_metric_priority", f"{relative}.metric_priority", "values must be <= 20")
+
+    raw_scope_priority = _mapping(
+        raw["evidence_scope_priority"],
+        f"{relative}.evidence_scope_priority",
+    )
+    if set(raw_scope_priority) != supported_scopes:
+        _fail(
+            "invalid_scope_priority",
+            f"{relative}.evidence_scope_priority",
+            "must define every supported evidence scope",
+        )
+    evidence_scope_priority = {
+        scope: _integer(
+            raw_scope_priority[scope],
+            f"{relative}.evidence_scope_priority.{scope}",
+            0,
+        )
+        for scope in sorted(supported_scopes)
+    }
+    if any(value > 20 for value in evidence_scope_priority.values()):
+        _fail("invalid_scope_priority", f"{relative}.evidence_scope_priority", "values must be <= 20")
+
+    comparison_relation_priority = tuple(
+        _string(item, f"{relative}.comparison_relation_priority")
+        for item in _list(
+            raw["comparison_relation_priority"],
+            f"{relative}.comparison_relation_priority",
+        )
+    )
+    if (
+        len(comparison_relation_priority) != len(CLAIM_PLAN_COMPARISON_RELATIONS)
+        or set(comparison_relation_priority) != set(CLAIM_PLAN_COMPARISON_RELATIONS)
+    ):
+        _fail(
+            "invalid_relation_priority",
+            f"{relative}.comparison_relation_priority",
+            "must contain every comparison relation exactly once",
+        )
     return RankingConfig(
         ranking_version,
         max_total,
         max_per_section,
         section_order,
         required_sections,
+        tuple(required_slots),
         section_limits,
         intent_limits,
         priorities,
+        metric_priority,
+        evidence_scope_priority,
+        comparison_relation_priority,
     )
 
 
@@ -285,6 +406,47 @@ def _candidate_subject(candidate: Mapping[str, Any]) -> tuple[str, str]:
     if not isinstance(subject, Mapping):
         return ("", "")
     return (str(subject.get("type", "")), str(subject.get("id", "")))
+
+
+def _evidence_scope(candidate: Mapping[str, Any]) -> str:
+    identifiers = candidate.get("evidence_ids")
+    if not isinstance(identifiers, list) or not identifiers:
+        return "other"
+    values = [str(identifier) for identifier in identifiers]
+    if all(value.startswith("market.asset.") for value in values):
+        return "primary_market"
+    if all(value.startswith("exchange.") for value in values):
+        return "exchange"
+    if all(value.startswith(("source.", "quality.")) for value in values):
+        return "governance"
+    if all(value.startswith("defi.") for value in values):
+        return "defi"
+    if len({value.split(".", 1)[0] for value in values}) > 1:
+        return "mixed"
+    return "other"
+
+
+def _metric_score(candidate: Mapping[str, Any], config: RankingConfig) -> int:
+    metric = str(candidate.get("metric", ""))
+    return config.metric_priority.get(metric, config.metric_priority["*"])
+
+
+def _relation_score(candidate: Mapping[str, Any], config: RankingConfig) -> int:
+    relation = str(candidate.get("comparison_relation", ""))
+    try:
+        index = config.comparison_relation_priority.index(relation)
+    except ValueError:
+        _fail("unknown_relation", "$.candidate.comparison_relation", f"unsupported relation: {relation!r}")
+    return len(config.comparison_relation_priority) - index - 1
+
+
+def _matches_required_slot(candidate: Mapping[str, Any], slot: Mapping[str, Any]) -> bool:
+    return (
+        candidate.get("section") == slot["section"]
+        and candidate.get("intent") == slot["intent"]
+        and candidate.get("metric") in slot["metrics"]
+        and _evidence_scope(candidate) in slot["evidence_scopes"]
+    )
 
 
 def _base_score(candidate: Mapping[str, Any], config: RankingConfig) -> tuple[int, ...]:
@@ -313,6 +475,9 @@ def _base_score(candidate: Mapping[str, Any], config: RankingConfig) -> tuple[in
             features.get("materiality_bucket"),
             "$.candidate.features.materiality_bucket",
         ),
+        _metric_score(candidate, config),
+        config.evidence_scope_priority[_evidence_scope(candidate)],
+        _relation_score(candidate, config),
         _priority_value(
             config,
             "intent",
@@ -342,7 +507,7 @@ def _selection_score(
 ) -> tuple[int, ...]:
     base = _base_score(candidate, config)
     diversity = int(_candidate_subject(candidate) not in seen_subjects)
-    return (*base[:3], diversity, *base[3:])
+    return (*base[:6], diversity, *base[6:])
 
 
 def _best_candidate(
@@ -491,7 +656,28 @@ def select_deterministic_candidates(
     intent_counts: Counter[str] = Counter()
     seen_subjects: set[tuple[str, str]] = set()
 
+    for slot in config.required_slots:
+        pool = [candidate for candidate in ordered if _matches_required_slot(candidate, slot)]
+        if pool and not _select_one(
+            pool,
+            config=config,
+            selected=selected,
+            selected_ids=selected_ids,
+            redundancy_groups=redundancy_groups,
+            section_counts=section_counts,
+            intent_counts=intent_counts,
+            seen_subjects=seen_subjects,
+            stage=f"required_slot:{slot['name']}",
+        ):
+            _fail(
+                "required_slot_unselectable",
+                f"$.config.required_slots.{slot['name']}",
+                "eligible candidates exist but configured limits prevent required coverage",
+            )
+
     for section in config.required_sections_if_available:
+        if section_counts[section]:
+            continue
         pool = [candidate for candidate in ordered if candidate.get("section") == section]
         if pool and not _select_one(
             pool,
