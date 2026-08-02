@@ -17,6 +17,12 @@ from .claim_candidate_contract import (
     normalise_candidate_semantics,
     order_candidates,
 )
+from .claim_candidate_gold_corpus import (
+    ClaimCandidateGoldCorpusError,
+    ClaimCandidateGoldCorpusEvaluation,
+    evaluate_claim_candidate_gold_corpus,
+    load_claim_candidate_gold_manifest,
+)
 from .claim_plan_render import (
     ClaimPlanRender,
     ClaimPlanRenderError,
@@ -102,6 +108,8 @@ __all__ = [
     "AuthenticationGenerationError",
     "BillingGenerationError",
     "ClaimCandidateCompilationError",
+    "ClaimCandidateGoldCorpusError",
+    "ClaimCandidateGoldCorpusEvaluation",
     "ClaimPlanRender",
     "ClaimPlanRenderError",
     "ConfigurationError",
@@ -133,10 +141,12 @@ __all__ = [
     "compile_claim_candidates",
     "content_sha256",
     "derive_candidate_id",
+    "evaluate_claim_candidate_gold_corpus",
     "evidence_id",
     "index_candidates_by_id",
     "is_source_disagreement_pair",
     "iter_plan_claims",
+    "load_claim_candidate_gold_manifest",
     "load_generation_config",
     "load_json",
     "model_matches",
