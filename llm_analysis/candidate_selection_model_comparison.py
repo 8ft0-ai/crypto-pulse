@@ -405,6 +405,7 @@ def _model_runtime(
         analysis_schema_version="crypto-market-candidate-selection/v1",
         temperature=0.0,
         max_output_tokens=512,
+        max_request_bytes=5_000_000,
         max_cost_usd=model.maximum_generation_cost_usd,
         retry_limit=0,
         cross_model_fallback=False,
