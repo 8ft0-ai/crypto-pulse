@@ -1,6 +1,6 @@
 version: 1
 ranking_version: phase-06-deterministic-ranking/v1
-max_total: 10
+max_total: 7
 max_per_section: 8
 section_order:
   - market_summary
@@ -60,25 +60,18 @@ required_slots:
       - quality_status
     evidence_scopes:
       - governance
-  - name: source-status
-    section: source_status
-    intent: source_status
-    metrics:
-      - status
-    evidence_scopes:
-      - governance
 section_limits:
-  market_summary: 2
+  market_summary: 1
   key_observations: 4
   risks_and_limitations: 0
-  data_quality: 3
-  source_status: 1
+  data_quality: 2
+  source_status: 0
 intent_limits:
-  absolute_observation: 2
+  absolute_observation: 1
   directional_observation: 3
   comparison: 2
-  source_status: 1
-  data_quality_limitation: 2
+  source_status: 0
+  data_quality_limitation: 1
   snapshot_status: 1
 priorities:
   conflict_status:
