@@ -1,16 +1,13 @@
 """Retained-artifact helpers for the offline bounded-selector proof."""
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
-from .candidate_selection_contract import validate_candidate_selection
 from .candidate_selector import (
     BoundedCandidateSelectorResult,
     SelectorClientResponse,
 )
-from .claim_candidate_contract import derive_candidate_id, order_candidates
 from .contracts import canonical_json_bytes, content_sha256
 from .deterministic_ranking import DeterministicBaselineResult
 
@@ -137,83 +134,6 @@ def assert_outcome(
         fail("unexpected_scenario_outcome", path, f"expected {expected!r}, got {actual!r}")
 
 
-def _redundancy_pair(candidates: Sequence[Mapping[str, Any]], config: Any) -> tuple[str, str]:
-    groups: dict[str, list[Mapping[str, Any]]] = {}
-    for candidate in order_candidates(candidates):
-        features = candidate.get("features")
-        section = candidate.get("section")
-        intent = candidate.get("intent")
-        if not isinstance(features, Mapping) or not isinstance(section, str) or not isinstance(intent, str):
-            continue
-        if config.section_limits.get(section, 0) < 2 or config.intent_limits.get(intent, 0) < 2:
-            continue
-        group = features.get("redundancy_group")
-        if isinstance(group, str):
-            groups.setdefault(group, []).append(candidate)
-    for group in sorted(groups):
-        if len(groups[group]) >= 2:
-            return (
-                str(groups[group][0]["candidate_id"]),
-                str(groups[group][1]["candidate_id"]),
-            )
-    fail("missing_redundancy_pair", "$.candidates", "no real redundancy pair was available")
-
-
-def validation_matrix(
-    candidates: Sequence[Mapping[str, Any]],
-    *,
-    config: Any,
-    bundle_id: str,
-    selection_schema: Mapping[str, Any],
-) -> list[dict[str, Any]]:
-    ordered = list(order_candidates(candidates))
-    first_id = str(ordered[0]["candidate_id"])
-    unknown = "claim-candidate:sha256:" + "0" * 64
-    mixed = copy.deepcopy(ordered[0])
-    mixed["evidence_bundle_id"] = "sha256:" + "f" * 64
-    mixed["candidate_id"] = ""
-    mixed["candidate_id"] = derive_candidate_id(mixed)
-    checks = [
-        ("unknown", {"selected_candidate_ids": [unknown]}, ordered),
-        ("duplicate", {"selected_candidate_ids": [first_id, first_id]}, ordered),
-        (
-            "excessive",
-            {
-                "selected_candidate_ids": [
-                    str(item["candidate_id"])
-                    for item in ordered[: config.max_total + 1]
-                ]
-            },
-            ordered,
-        ),
-        (
-            "redundancy",
-            {"selected_candidate_ids": list(_redundancy_pair(ordered, config))},
-            ordered,
-        ),
-        ("mixed_bundle", {"selected_candidate_ids": [mixed["candidate_id"]]}, [*ordered, mixed]),
-    ]
-    result: list[dict[str, Any]] = []
-    for name, payload, candidate_set in checks:
-        validation = validate_candidate_selection(
-            payload,
-            candidate_set,
-            config=config,
-            evidence_bundle_id=bundle_id,
-            selection_schema=selection_schema,
-        )
-        if validation.is_valid:
-            fail("validation_matrix_false_accept", f"$.validation_matrix.{name}", "invalid response accepted")
-        result.append(
-            {
-                "name": name,
-                "response": payload,
-                "diagnostics": [item.as_dict() for item in validation.diagnostics],
-            }
-        )
-    return result
-
-
 def render_report(summary: Mapping[str, Any]) -> bytes:
     overall = summary["overall"]
     lines = [
@@ -244,7 +164,13 @@ def render_report(summary: Mapping[str, Any]) -> bytes:
             f"{item['selector_attempt_count']} | {item['semantic_repair_count']} | "
             f"`{str(item['fallback_exact']).lower()}` |"
         )
-    lines += ["", "## Validation matrix", "", "| Invalid selection | Stable diagnostics |", "| --- | --- |"]
+    lines += [
+        "",
+        "## Validation matrix",
+        "",
+        "| Invalid selection | Stable diagnostics |",
+        "| --- | --- |",
+    ]
     for item in summary["validation_matrix"]:
         codes = ", ".join(diag["code"] for diag in item["diagnostics"])
         lines.append(f"| `{item['name']}` | `{codes}` |")
