@@ -234,7 +234,7 @@ class ClaimCandidateContractTests(unittest.TestCase):
             "ranking features are excluded",
             "comparison operands",
             "Presentation ordering",
-            "crypto-market-claim-plan/v1 remains unchanged",
+            "`crypto-market-claim-plan/v1` remains unchanged",
             "A future model may select existing candidate IDs only",
             "Slice 2 remains blocked",
             "does not compile candidates",
