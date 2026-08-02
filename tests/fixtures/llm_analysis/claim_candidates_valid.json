@@ -1,0 +1,181 @@
+[
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:1bdd2dff9b009ff86871aed30ffd7c191fae712eb14a9719499f9fda28213850",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "absolute_observation",
+    "evidence_ids": [
+      "market.asset.bitcoin.price_usd"
+    ],
+    "comparison_relation": "none",
+    "section": "market_summary",
+    "subject": {
+      "type": "asset",
+      "id": "bitcoin"
+    },
+    "metric": "price_usd",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "medium",
+      "cross_source": false,
+      "conflict_status": "none",
+      "recency_bucket": "current",
+      "quality_significance": "not_applicable",
+      "section_eligibility": [
+        "market_summary",
+        "key_observations"
+      ],
+      "redundancy_group": "bitcoin_spot_price",
+      "corroboration_count": 1
+    }
+  },
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:e4771850783d02be5b918fb7e7f5478b4a706b5a5d37c397227e704fd2799c99",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "directional_observation",
+    "evidence_ids": [
+      "market.asset.solana.change_24h_pct"
+    ],
+    "comparison_relation": "none",
+    "section": "key_observations",
+    "subject": {
+      "type": "asset",
+      "id": "solana"
+    },
+    "metric": "change_24h_pct",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "high",
+      "cross_source": false,
+      "conflict_status": "none",
+      "recency_bucket": "current",
+      "quality_significance": "not_applicable",
+      "section_eligibility": [
+        "market_summary",
+        "key_observations"
+      ],
+      "redundancy_group": "solana_24h_change",
+      "corroboration_count": 1
+    }
+  },
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:863f3f09e1f38dc5eb1b9469fa68b687eb406873e5ab951fa84b1d50d43868a1",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "comparison",
+    "evidence_ids": [
+      "exchange.coinbase.bitcoin.price_usd",
+      "market.coingecko.bitcoin.price_usd"
+    ],
+    "comparison_relation": "not_equal",
+    "section": "key_observations",
+    "subject": {
+      "type": "asset",
+      "id": "bitcoin"
+    },
+    "metric": "price_usd",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "low",
+      "cross_source": true,
+      "conflict_status": "divergent",
+      "recency_bucket": "current",
+      "quality_significance": "not_applicable",
+      "section_eligibility": [
+        "key_observations",
+        "risks_and_limitations"
+      ],
+      "redundancy_group": "bitcoin_spot_price",
+      "corroboration_count": 2
+    }
+  },
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:0281905d734c64d2b3a2b0bf7e8ace0459b79180153e848ba71bf1460064fd21",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "data_quality_limitation",
+    "evidence_ids": [
+      "snapshot.quality.missing_symbols"
+    ],
+    "comparison_relation": "none",
+    "section": "data_quality",
+    "subject": {
+      "type": "snapshot",
+      "id": "hourly_crypto"
+    },
+    "metric": "missing_symbols",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "not_applicable",
+      "cross_source": false,
+      "conflict_status": "none",
+      "recency_bucket": "current",
+      "quality_significance": "material",
+      "section_eligibility": [
+        "risks_and_limitations",
+        "data_quality"
+      ],
+      "redundancy_group": "snapshot_missing_symbols",
+      "corroboration_count": 1
+    }
+  },
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:0331556ad48d80fc60f04d2b1cbfedbe231533f8d5ad9c4394277add62092718",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "snapshot_status",
+    "evidence_ids": [
+      "snapshot.quality.status"
+    ],
+    "comparison_relation": "none",
+    "section": "data_quality",
+    "subject": {
+      "type": "snapshot",
+      "id": "hourly_crypto"
+    },
+    "metric": "quality_status",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "not_applicable",
+      "cross_source": false,
+      "conflict_status": "none",
+      "recency_bucket": "current",
+      "quality_significance": "minor",
+      "section_eligibility": [
+        "data_quality"
+      ],
+      "redundancy_group": "snapshot_quality_status",
+      "corroboration_count": 1
+    }
+  },
+  {
+    "candidate_version": "crypto-market-claim-candidate/v1",
+    "candidate_id": "claim-candidate:sha256:5ac8f795da14b7b7cc5860d6a948bae720f1824f9d40693ae54d3c6d2a23dcf2",
+    "evidence_bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent": "source_status",
+    "evidence_ids": [
+      "source.coinbase.status"
+    ],
+    "comparison_relation": "none",
+    "section": "source_status",
+    "subject": {
+      "type": "source",
+      "id": "coinbase"
+    },
+    "metric": "status",
+    "confidence": "high",
+    "features": {
+      "materiality_bucket": "not_applicable",
+      "cross_source": false,
+      "conflict_status": "none",
+      "recency_bucket": "current",
+      "quality_significance": "not_applicable",
+      "section_eligibility": [
+        "source_status"
+      ],
+      "redundancy_group": "coinbase_source_status",
+      "corroboration_count": 1
+    }
+  }
+]
