@@ -1,0 +1,55 @@
+version: 1
+ranking_version: phase-06-deterministic-ranking/v1
+max_total: 12
+max_per_section: 8
+section_order:
+  - market_summary
+  - key_observations
+  - risks_and_limitations
+  - data_quality
+  - source_status
+required_sections_if_available:
+  - market_summary
+  - key_observations
+section_limits:
+  market_summary: 3
+  key_observations: 6
+  risks_and_limitations: 2
+  data_quality: 2
+  source_status: 1
+intent_limits:
+  absolute_observation: 3
+  directional_observation: 4
+  comparison: 3
+  source_status: 1
+  data_quality_limitation: 2
+  snapshot_status: 1
+priorities:
+  conflict_status:
+    - divergent
+    - corroborated
+    - none
+  quality_significance:
+    - material
+    - minor
+    - not_applicable
+  materiality_bucket:
+    - high
+    - medium
+    - low
+    - not_applicable
+  intent:
+    - comparison
+    - data_quality_limitation
+    - directional_observation
+    - absolute_observation
+    - snapshot_status
+    - source_status
+  cross_source:
+    - true
+    - false
+  recency_bucket:
+    - current
+    - recent
+    - unknown
+    - stale
