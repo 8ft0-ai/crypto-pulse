@@ -23,6 +23,7 @@ from .claim_candidate_contract import (
 from .contracts import (
     CLAIM_CANDIDATE_SCHEMA_VERSION,
     EVIDENCE_SCHEMA_VERSION,
+    content_sha256,
 )
 from .schema_validation import validate_schema
 
@@ -105,13 +106,14 @@ _UNTRUSTED_INSTRUCTION_PATTERNS = (
     ),
 )
 _BUNDLE_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_CANDIDATE_SUBJECT_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 
 
 class ClaimCandidateCompilationError(ValueError):
     """The evidence bundle cannot be compiled without ambiguity or repair."""
 
     def __init__(self, code: str, path: str, message: str):
-        super().__init__(message)
+        super().__init__(f"{path}: {message}")
         self.code = code
         self.path = path
         self.message = message
@@ -131,9 +133,41 @@ def _source(record: Mapping[str, Any]) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+def _slug(*parts: Any) -> str:
+    text = "_".join(str(part).casefold() for part in parts if str(part))
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    if not text:
+        return "candidate"
+    if not text[0].isalpha():
+        text = "candidate_" + text
+    return text
+
+
+def _candidate_subject_id(subject_type: str, raw_identifier: str) -> str:
+    """Project an evidence subject ID into the stricter candidate identifier space.
+
+    Evidence subject IDs are intentionally broad and may begin with a digit or
+    contain upper-case/display characters. Candidate IDs are stable repository
+    keys. Already-compatible lower-case IDs are preserved. Other IDs receive a
+    type-prefixed slug and a hash suffix so normalisation cannot silently merge
+    distinct evidence subjects.
+    """
+
+    if _CANDIDATE_SUBJECT_ID_RE.fullmatch(raw_identifier):
+        return raw_identifier
+    prefix = _slug(subject_type, raw_identifier)
+    suffix = content_sha256({"type": subject_type, "id": raw_identifier})[:12]
+    return f"{prefix}_{suffix}"
+
+
 def _canonical_subject(record: Mapping[str, Any]) -> dict[str, str]:
     subject = _subject(record)
-    return {"type": str(subject.get("type", "")), "id": str(subject.get("id", ""))}
+    subject_type = str(subject.get("type", "")).casefold()
+    raw_identifier = str(subject.get("id", ""))
+    return {
+        "type": subject_type,
+        "id": _candidate_subject_id(subject_type, raw_identifier),
+    }
 
 
 def _has_renderable_alias(record: Mapping[str, Any]) -> bool:
@@ -156,16 +190,6 @@ def _finite_number(record: Mapping[str, Any]) -> float | None:
         return None
     number = float(value)
     return number if math.isfinite(number) else None
-
-
-def _slug(*parts: Any) -> str:
-    text = "_".join(str(part).casefold() for part in parts if str(part))
-    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
-    if not text:
-        return "candidate"
-    if not text[0].isalpha():
-        text = "candidate_" + text
-    return text
 
 
 def _source_names(records: list[Mapping[str, Any]]) -> tuple[str, ...]:
@@ -507,7 +531,8 @@ def _compile_source_status(
             grouped[str(subject["id"])].append(record)
 
     candidates: list[dict[str, Any]] = []
-    for subject_id, group in sorted(grouped.items()):
+    for raw_subject_id, group in sorted(grouped.items()):
+        subject = _canonical_subject(group[0])
         statuses = [
             record
             for record in group
@@ -519,7 +544,7 @@ def _compile_source_status(
         if len(statuses) != 1:
             _fail(
                 "ambiguous_source_status",
-                f"$.bundle.evidence[{subject_id}]",
+                f"$.bundle.evidence[{raw_subject_id}]",
                 "one source subject must have exactly one status record",
             )
         details = [
@@ -536,7 +561,7 @@ def _compile_source_status(
                 records=selected,
                 relation="none",
                 section="source_status",
-                subject={"type": "source", "id": subject_id},
+                subject=subject,
                 metric="status",
                 features=_features(
                     selected,
@@ -544,7 +569,7 @@ def _compile_source_status(
                     conflict_status="none",
                     quality_significance="not_applicable",
                     section_eligibility=["source_status"],
-                    redundancy_group=_slug(subject_id, "source_status"),
+                    redundancy_group=_slug(subject["id"], "source_status"),
                 ),
             )
         )
@@ -556,11 +581,14 @@ def _compile_data_quality(
 ) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = defaultdict(list)
     for record in records:
-        subject = _canonical_subject(record)
-        grouped[(subject["type"], subject["id"])].append(record)
+        raw_subject = _subject(record)
+        grouped[
+            (str(raw_subject.get("type", "")), str(raw_subject.get("id", "")))
+        ].append(record)
 
     candidates: list[dict[str, Any]] = []
-    for (subject_type, subject_id), group in sorted(grouped.items()):
+    for (_raw_subject_type, _raw_subject_id), group in sorted(grouped.items()):
+        subject = _canonical_subject(group[0])
         for qualifying in sorted(
             (record for record in group if _qualifying_quality_record(record)),
             key=lambda record: str(record["evidence_id"]),
@@ -587,7 +615,7 @@ def _compile_data_quality(
                     records=selected,
                     relation="none",
                     section="data_quality",
-                    subject={"type": subject_type, "id": subject_id},
+                    subject=subject,
                     metric=field,
                     features=_features(
                         selected,
@@ -595,7 +623,7 @@ def _compile_data_quality(
                         conflict_status="none",
                         quality_significance=_quality_significance(qualifying),
                         section_eligibility=["risks_and_limitations", "data_quality"],
-                        redundancy_group=_slug(subject_id, field, "quality"),
+                        redundancy_group=_slug(subject["id"], field, "quality"),
                     ),
                 )
             )
@@ -614,7 +642,7 @@ def _compile_snapshot_status(
             or record.get("evidence_type") != "status"
         ):
             continue
-        subject_id = str(subject.get("id", ""))
+        candidate_subject = _canonical_subject(record)
         field = str(record["field"])
         candidates.append(
             _candidate(
@@ -623,7 +651,7 @@ def _compile_snapshot_status(
                 records=[record],
                 relation="none",
                 section="data_quality",
-                subject={"type": "snapshot", "id": subject_id},
+                subject=candidate_subject,
                 metric=field,
                 features=_features(
                     [record],
@@ -635,7 +663,9 @@ def _compile_snapshot_status(
                         else "not_applicable"
                     ),
                     section_eligibility=["data_quality"],
-                    redundancy_group=_slug(subject_id, field, "snapshot_status"),
+                    redundancy_group=_slug(
+                        candidate_subject["id"], field, "snapshot_status"
+                    ),
                 ),
             )
         )
