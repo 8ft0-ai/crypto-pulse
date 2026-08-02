@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from llm_analysis.evaluation import EvaluationIntegrityError
 from llm_analysis.generation_config import GenerationConfig, ProviderPolicy
@@ -20,12 +22,14 @@ class FakeTransport:
         actual_model: str = "openai/gpt-5.6-sol",
         actual_provider: str = "OpenAI",
         cost: float = 0.001,
+        include_cost: bool = True,
     ) -> None:
         self.provider_fallback = provider_fallback
         self.content = content
         self.actual_model = actual_model
         self.actual_provider = actual_provider
         self.cost = cost
+        self.include_cost = include_cost
         self.requests: list[dict] = []
 
     def post(self, url, *, headers, body, timeout_seconds):
@@ -44,6 +48,14 @@ class FakeTransport:
                 {"selected_candidate_ids": [CANDIDATE_ID]},
                 separators=(",", ":"),
             )
+        usage = {
+            "prompt_tokens": 100,
+            "completion_tokens": 20,
+            "total_tokens": 120,
+            "completion_tokens_details": {"reasoning_tokens": 5},
+        }
+        if self.include_cost:
+            usage["cost"] = self.cost
         payload = {
             "id": "generation-1",
             "model": self.actual_model,
@@ -53,13 +65,7 @@ class FakeTransport:
                     "message": {"content": completion},
                 }
             ],
-            "usage": {
-                "prompt_tokens": 100,
-                "completion_tokens": 20,
-                "total_tokens": 120,
-                "cost": self.cost,
-                "completion_tokens_details": {"reasoning_tokens": 5},
-            },
+            "usage": usage,
             "openrouter_metadata": {
                 "attempt": len(attempts),
                 "attempts": attempts,
@@ -139,7 +145,14 @@ class OpenRouterCandidateSelectorTests(unittest.TestCase):
             },
         }
 
-    def client(self, transport, *, before=None, after=None):
+    def client(
+        self,
+        transport,
+        *,
+        before=None,
+        after=None,
+        evidence_root=None,
+    ):
         return OpenRouterCandidateSelectorClient(
             runtime(),
             prompt_template=(
@@ -152,18 +165,28 @@ class OpenRouterCandidateSelectorTests(unittest.TestCase):
             send_temperature=False,
             before_provider_call=before,
             after_provider_call=after,
+            evidence_root=evidence_root,
         )
 
     def test_adapter_returns_only_the_decoded_selection_and_records_provenance(self):
         transport = FakeTransport()
         before: list[float] = []
         after: list[float] = []
-        client = self.client(transport, before=before.append, after=after.append)
-        result = client.select(
-            request=self.request(),
-            response_schema=self.schema(),
-            repair=None,
-        )
+        with tempfile.TemporaryDirectory() as temporary:
+            client = self.client(
+                transport,
+                before=before.append,
+                after=after.append,
+                evidence_root=temporary,
+            )
+            result = client.select(
+                request=self.request(),
+                response_schema=self.schema(),
+                repair=None,
+            )
+            evidence = Path(temporary) / "test/run/provider-call-1-metered-response.json"
+            self.assertTrue(evidence.is_file())
+            retained = json.loads(evidence.read_text(encoding="utf-8"))
         self.assertEqual(result.payload, {"selected_candidate_ids": [CANDIDATE_ID]})
         self.assertEqual(before, [0.12])
         self.assertEqual(after, [0.001])
@@ -174,35 +197,27 @@ class OpenRouterCandidateSelectorTests(unittest.TestCase):
         self.assertEqual(record.reasoning_tokens, 5)
         self.assertFalse(record.provider_fallback_used)
         self.assertFalse(record.cross_model_fallback_used)
+        self.assertEqual(retained["raw_completion"], record.raw_completion)
         request_body = transport.requests[0]
         self.assertNotIn("temperature", request_body)
         self.assertEqual(request_body["provider"]["only"], ["OpenAI"])
-        self.assertEqual(
-            set(result.metadata),
-            {
-                "client",
-                "model",
-                "provider",
-                "generation_id",
-                "latency_ms",
-                "input_tokens",
-                "output_tokens",
-                "estimated_cost_usd",
-            },
-        )
 
-    def test_provider_fallback_is_metered_and_forced_to_fallback_payload(self):
+    def test_provider_fallback_is_metered_persisted_and_aborts(self):
         after: list[float] = []
-        client = self.client(
-            FakeTransport(provider_fallback=True),
-            after=after.append,
-        )
-        result = client.select(
-            request=self.request(),
-            response_schema=self.schema(),
-            repair=None,
-        )
-        self.assertIsNone(result.payload)
+        with tempfile.TemporaryDirectory() as temporary:
+            client = self.client(
+                FakeTransport(provider_fallback=True),
+                after=after.append,
+                evidence_root=temporary,
+            )
+            with self.assertRaises(EvaluationIntegrityError):
+                client.select(
+                    request=self.request(),
+                    response_schema=self.schema(),
+                    repair=None,
+                )
+            evidence = Path(temporary) / "test/run/provider-call-1-metered-response.json"
+            self.assertTrue(evidence.is_file())
         self.assertEqual(after, [0.001])
         self.assertEqual(len(client.call_records), 1)
         self.assertTrue(client.call_records[0].provider_fallback_used)
@@ -220,20 +235,46 @@ class OpenRouterCandidateSelectorTests(unittest.TestCase):
         self.assertEqual(client.call_records[0].raw_completion, "{not-json")
         self.assertFalse(client.call_records[0].provider_fallback_used)
 
-    def test_cross_model_response_is_metered_and_forced_to_fallback_payload(self):
+    def test_cross_model_response_is_metered_persisted_and_aborts(self):
         after: list[float] = []
-        client = self.client(
-            FakeTransport(actual_model="other/model"),
-            after=after.append,
-        )
-        result = client.select(
-            request=self.request(),
-            response_schema=self.schema(),
-            repair=None,
-        )
-        self.assertIsNone(result.payload)
+        with tempfile.TemporaryDirectory() as temporary:
+            client = self.client(
+                FakeTransport(actual_model="other/model"),
+                after=after.append,
+                evidence_root=temporary,
+            )
+            with self.assertRaises(EvaluationIntegrityError):
+                client.select(
+                    request=self.request(),
+                    response_schema=self.schema(),
+                    repair=None,
+                )
+            evidence = Path(temporary) / "test/run/provider-call-1-metered-response.json"
+            self.assertTrue(evidence.is_file())
         self.assertEqual(after, [0.001])
         self.assertTrue(client.call_records[0].cross_model_fallback_used)
+
+    def test_missing_cost_reserves_the_full_cap_persists_error_and_aborts(self):
+        after: list[float] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            client = self.client(
+                FakeTransport(include_cost=False),
+                after=after.append,
+                evidence_root=temporary,
+            )
+            with self.assertRaises(EvaluationIntegrityError):
+                client.select(
+                    request=self.request(),
+                    response_schema=self.schema(),
+                    repair=None,
+                )
+            evidence = Path(temporary) / "test/run/provider-call-1-unmetered-error.json"
+            self.assertTrue(evidence.is_file())
+            retained = json.loads(evidence.read_text(encoding="utf-8"))
+        self.assertEqual(after, [0.12])
+        self.assertEqual(retained["reserved_cost_usd"], 0.12)
+        self.assertTrue(retained["network_started"])
+        self.assertEqual(client.call_records, [])
 
     def test_over_cap_response_is_recorded_and_aborts_after_accounting(self):
         after: list[float] = []
