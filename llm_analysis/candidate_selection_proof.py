@@ -4,20 +4,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from . import candidate_selection_evaluation as evaluation
+from .candidate_selection_evaluation import evaluate_candidate_selection_proof
 from .candidate_selection_proof_support import fail
-from .candidate_selection_validation_proof import validation_matrix
-
-
-def evaluate_candidate_selection_proof(*args, **kwargs):
-    """Evaluate with explicit evaluation-only invalid-selection fixtures."""
-
-    original = evaluation.validation_matrix
-    evaluation.validation_matrix = validation_matrix
-    try:
-        return evaluation.evaluate_candidate_selection_proof(*args, **kwargs)
-    finally:
-        evaluation.validation_matrix = original
 
 
 def main() -> int:
