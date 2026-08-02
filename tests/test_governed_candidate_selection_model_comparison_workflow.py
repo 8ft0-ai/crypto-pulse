@@ -31,16 +31,24 @@ class GovernedCandidateSelectionModelComparisonWorkflowTests(unittest.TestCase):
         self.assertIn("environment: governed-llm-dry-run", evaluate_section)
         self.assertIn("OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}", evaluate_section)
         self.assertIn(
-            "python -m llm_analysis.candidate_selection_model_comparison prepare",
+            "python -m llm_analysis.candidate_selection_model_comparison_runner prepare",
             prepare_section,
         )
         self.assertIn(
-            "python -m llm_analysis.candidate_selection_model_comparison run",
+            "python -m llm_analysis.candidate_selection_model_comparison_runner run",
+            evaluate_section,
+        )
+        self.assertIn(
+            "CRYPTOPULSE_SELECTOR_EVIDENCE_DIR: ${{ runner.temp }}/candidate-selection-model-comparison/provider-evidence",
             evaluate_section,
         )
         self.assertIn("continue-on-error: true", evaluate_section)
         self.assertIn("if: always()", evaluate_section)
         self.assertIn("retention-days: 30", evaluate_section)
+        self.assertIn(
+            "path: ${{ runner.temp }}/candidate-selection-model-comparison/",
+            evaluate_section,
+        )
 
     def test_workflow_cannot_publish_or_write_repository_state(self) -> None:
         text = self.text
