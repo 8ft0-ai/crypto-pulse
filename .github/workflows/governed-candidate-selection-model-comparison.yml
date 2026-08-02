@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.candidate_selection_model_comparison prepare \
+          python -m llm_analysis.candidate_selection_model_comparison_runner prepare \
             --repository-root . \
             --config config/candidate-selection-model-comparison.yml \
             --output-dir "$RUNNER_TEMP/candidate-selection-model-comparison-prepared"
@@ -111,7 +111,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m llm_analysis.candidate_selection_model_comparison run \
+          python -m llm_analysis.candidate_selection_model_comparison_runner run \
             --repository-root . \
             --config config/candidate-selection-model-comparison.yml \
             --prepared-dir "$RUNNER_TEMP/candidate-selection-model-comparison-prepared" \
