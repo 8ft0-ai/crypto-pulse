@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8ft0-ai.github.io/crypto-pulse/schemas/crypto-market-candidate-selection-v1.json",
+  "title": "CryptoPulse bounded candidate-ID selection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "selected_candidate_ids"
+  ],
+  "properties": {
+    "selected_candidate_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^claim-candidate:sha256:[0-9a-f]{64}$"
+      }
+    }
+  }
+}
