@@ -29,13 +29,18 @@ The workflow retains:
 - latency, token and cost evidence;
 - per-run scores, aggregate summaries, reviewer CSV and deterministic decision input.
 
+Every metered provider response is written before model-output validation. When a
+networked selector call or route probe cannot report trustworthy usage and cost, the
+protected runner retains a sanitised failure record, reserves the full reviewed
+per-call ceiling and stops the comparison as infrastructure-inconclusive.
+
 Raw completions and generated reports are workflow artefacts only. They are never
 committed, published or copied into `_site/`.
 
 ## Reproduce the secret-free preparation
 
 ```bash
-python -m llm_analysis.candidate_selection_model_comparison prepare \
+python -m llm_analysis.candidate_selection_model_comparison_runner prepare \
   --repository-root . \
   --config config/candidate-selection-model-comparison.yml \
   --output-dir /tmp/candidate-selection-model-comparison-prepared
@@ -47,8 +52,10 @@ IDs, deterministic ranking policy or retained baseline metrics have drifted.
 ## Protected execution
 
 The workflow `Governed candidate selection model comparison` is manual-only,
-trusted-main, read-only and uses the `governed-llm-dry-run` environment. It cannot
-modify repository state or publish a report.
+trusted-main, read-only and uses the `governed-llm-dry-run` environment. It invokes the
+fail-closed comparison runner, which meters route probes and substantive selector
+calls before evaluating model content or routing identity. The workflow cannot modify
+repository state or publish a report.
 
 A separate reviewed issue and pull request must interpret the retained decision input.
 The protected run cannot promote a model automatically.
