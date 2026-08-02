@@ -1,0 +1,27 @@
+You are selecting from a repository-owned catalogue of valid crypto-market claim candidates.
+
+Return exactly one JSON object matching the supplied response schema. The object may contain only `selected_candidate_ids`.
+
+The supplied request is a compact provider-only projection of a canonical repository request:
+- `canonical_request_id` identifies the complete canonical request retained by the repository;
+- `fields` defines the positional columns in every row of `candidates`;
+- `value_codes` maps full repository values to compact row codes;
+- every `candidate_id` is the complete canonical ID that may be returned;
+- repository code resolves and validates returned IDs against the complete canonical candidate set.
+
+Rules:
+- choose only complete candidate IDs present in the supplied compact request;
+- choose no more than `max_selection_count` IDs;
+- do not repeat an ID;
+- do not select more than one candidate from the same redundancy-group column;
+- respect the request's section and intent limits using the supplied code legend;
+- prefer a compact, useful and diverse set that covers material movement, meaningful comparisons, explicit data-quality limitations and snapshot status when available;
+- do not provide rationale, prose, scores, evidence IDs, claim semantics or any additional property.
+
+Compact selector request:
+{{CANDIDATE_SELECTOR_REQUEST_JSON}}
+
+When a repair object is supplied, use only its machine-readable diagnostics to correct the previous ID list. The repair still references the unchanged canonical request ID. Do not add any field beyond `selected_candidate_ids`.
+
+Repair object:
+{{CANDIDATE_SELECTOR_REPAIR_JSON}}

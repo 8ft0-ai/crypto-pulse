@@ -19,6 +19,7 @@ from .candidate_selection_model_comparison_config import (
     ComparisonModel,
     load_candidate_selection_comparison_plan,
 )
+from .compact_candidate_selector_client import CompactCandidateSelectorClient
 from .candidate_selection_model_scoring import (
     apply_predeclared_decision,
     score_selection,
@@ -338,6 +339,7 @@ def prepare_candidate_selection_comparison(
             "maximum_substantive_generations": plan.maximum_substantive_generations,
             "maximum_route_probes": plan.maximum_route_probes,
             "maximum_semantic_repairs_per_run": plan.maximum_semantic_repairs_per_run,
+            "maximum_fallbacks_before_decisive_failure": plan.maximum_fallbacks_before_decisive_failure,
             "maximum_total_cost_usd": plan.maximum_total_cost_usd,
         },
         "cases": cases,
@@ -401,10 +403,10 @@ def _model_runtime(
         runtime,
         prompt_path=comparison.selector_prompt,
         analysis_schema_path=comparison.selection_schema,
-        prompt_version="crypto-market-candidate-selection/v1",
+        prompt_version="crypto-market-candidate-selection-compact/v1",
         analysis_schema_version="crypto-market-candidate-selection/v1",
         temperature=0.0,
-        max_output_tokens=512,
+        max_output_tokens=model.max_output_tokens,
         max_request_bytes=5_000_000,
         max_cost_usd=model.maximum_generation_cost_usd,
         retry_limit=0,
@@ -626,8 +628,12 @@ def execute_candidate_selection_comparison(
     availability_by_key: dict[str, dict[str, Any]] = {}
     records: list[dict[str, Any]] = []
     transport_builder = transport_factory or (lambda: ClassifiedTransport())
+    stop_after_quality_failure = False
 
     for model in comparison.models:
+        if stop_after_quality_failure:
+            break
+        decisive_model_failure = False
         paid_plan, runtime = _model_runtime(
             root,
             output,
@@ -725,7 +731,7 @@ def execute_candidate_selection_comparison(
 
             for repeat_index in range(1, model.repeats_per_case + 1):
                 logical_id = f"corpus/{model.key}/{case_key}/repeat-{repeat_index}"
-                client = OpenRouterCandidateSelectorClient(
+                provider_client = OpenRouterCandidateSelectorClient(
                     runtime,
                     prompt_template=prompt_template,
                     api_key=api_key,
@@ -739,6 +745,7 @@ def execute_candidate_selection_comparison(
                     ),
                     after_provider_call=lambda actual, current=model: ledger.add(current, actual),
                 )
+                client = CompactCandidateSelectorClient(provider_client)
                 result = run_bounded_candidate_selector(
                     bundle,
                     candidates,
@@ -749,7 +756,7 @@ def execute_candidate_selection_comparison(
                     claim_plan_schema=claim_plan_schema,
                     selection_schema=selection_schema,
                 )
-                provider_calls = [item.protected_dict() for item in client.call_records]
+                provider_calls = [item.protected_dict() for item in provider_client.call_records]
                 model_selected_ids = (
                     []
                     if result.record["fallback_used"]
@@ -765,6 +772,15 @@ def execute_candidate_selection_comparison(
                 (run_dir / "rendered-report.md").write_bytes(result.render.markdown)
                 logical_latency = sum(int(item["latency_ms"]) for item in provider_calls)
                 logical_cost = sum(float(item["estimated_cost_usd"]) for item in provider_calls)
+                model_fallback_count = sum(
+                    row.get("fallback_used") is True
+                    for row in records
+                    if row.get("model_key") == model.key
+                ) + (1 if result.record["fallback_used"] else 0)
+                decisive_stop = (
+                    model_fallback_count
+                    >= comparison.maximum_fallbacks_before_decisive_failure
+                )
                 record = {
                     "model_key": model.key,
                     "model": model.model,
@@ -775,6 +791,7 @@ def execute_candidate_selection_comparison(
                     "outcome": result.record["outcome"],
                     "fallback_used": result.record["fallback_used"],
                     "fallback_reason": result.record["fallback_reason"],
+                    "decisive_stop": decisive_stop,
                     "semantic_repair_count": result.record["semantic_repair_count"],
                     "selector_attempt_count": result.record["selector_attempt_count"],
                     "model_selected_candidate_ids": model_selected_ids,
@@ -790,6 +807,8 @@ def execute_candidate_selection_comparison(
                     "logical_latency_ms": logical_latency,
                     "logical_cost_usd": logical_cost,
                     "provider_calls": _safe_provider_calls(provider_calls),
+                    "compact_request_id": client.compact_requests[-1]["compact_request_id"],
+                    "compact_request_sha256": content_sha256(client.compact_requests[-1]),
                     "claim_plan_sha256": result.record["claim_plan_sha256"],
                     "rendered_markdown_sha256": result.record[
                         "rendered_markdown_sha256"
@@ -799,6 +818,13 @@ def execute_candidate_selection_comparison(
                 }
                 _write_json(run_dir / "score.json", record)
                 records.append(record)
+                if decisive_stop:
+                    decisive_model_failure = True
+                    break
+            if decisive_model_failure:
+                break
+        if decisive_model_failure and model.role == "quality_benchmark":
+            stop_after_quality_failure = True
 
     _write_json(output / AVAILABILITY_FILE, {"models": availability_rows})
     _write_json(output / ROUTES_FILE, {"routes": route_rows})
