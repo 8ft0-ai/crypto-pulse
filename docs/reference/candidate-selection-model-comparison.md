@@ -2,13 +2,16 @@
 
 > **Mode:** Reference  
 > **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
-> **Outcome:** Look up the Phase 6 Slice 6 models, provider policy, call ceilings, scoring rules, artefacts and decision boundary.
+> **Outcome:** Look up the Phase 6 Slice 6 models, compact provider transport, cost ceilings, scoring rules, artefacts and decision boundary.
 
 ## Canonical artefacts
 
 | Artefact | Canonical path |
 | --- | --- |
 | Comparison configuration | [`config/candidate-selection-model-comparison.yml`](../../config/candidate-selection-model-comparison.yml) |
+| Compact transport prompt | [`prompts/crypto-market-candidate-selection-compact-v1.txt`](../../prompts/crypto-market-candidate-selection-compact-v1.txt) |
+| Compact request projection | [`llm_analysis/candidate_selector_compact_projection.py`](../../llm_analysis/candidate_selector_compact_projection.py) |
+| Compact client wrapper | [`llm_analysis/compact_candidate_selector_client.py`](../../llm_analysis/compact_candidate_selector_client.py) |
 | Configuration loader | [`llm_analysis/candidate_selection_model_comparison_config.py`](../../llm_analysis/candidate_selection_model_comparison_config.py) |
 | OpenRouter selector adapter | [`llm_analysis/openrouter_candidate_selector.py`](../../llm_analysis/openrouter_candidate_selector.py) |
 | Comparison evaluator | [`llm_analysis/candidate_selection_model_comparison.py`](../../llm_analysis/candidate_selection_model_comparison.py) |
@@ -16,53 +19,61 @@
 | Scoring and decision rules | [`llm_analysis/candidate_selection_model_scoring.py`](../../llm_analysis/candidate_selection_model_scoring.py) |
 | Manual workflow | [`.github/workflows/governed-candidate-selection-model-comparison.yml`](../../.github/workflows/governed-candidate-selection-model-comparison.yml) |
 | Evaluation record | [`evaluation/phase-06/candidate-selection-model-comparison/`](../../evaluation/phase-06/candidate-selection-model-comparison/) |
-| Permanent tests | [`tests/test_candidate_selection_model_comparison.py`](../../tests/test_candidate_selection_model_comparison.py), [`tests/test_candidate_selection_model_comparison_runner.py`](../../tests/test_candidate_selection_model_comparison_runner.py), [`tests/test_openrouter_candidate_selector.py`](../../tests/test_openrouter_candidate_selector.py) and [`tests/test_governed_candidate_selection_model_comparison_workflow.py`](../../tests/test_governed_candidate_selection_model_comparison_workflow.py) |
 
-This contract implements issue #295. It does not enable a production selector. A
-separate reviewed decision is required after the protected comparison.
+This contract implements issue #295 and corrective issue #300. It does not enable a
+production selector. A separate reviewed decision is required after the protected run.
 
 ## Fixed comparison
 
-Only two exact OpenRouter model slugs may receive generation calls:
+| Role | Model | Allowed actual provider | Repeats | Output cap |
+| --- | --- | --- | ---: | ---: |
+| Quality upper bound | `openai/gpt-5.6-sol` | `OpenAI` | 3 per case | 1,024 tokens |
+| Deployment candidate | `nex-agi/nex-n2-mini` | `Nex AGI` | 3 per case | 512 tokens |
 
-| Role | Model | Allowed actual provider | Deployment eligible |
-| --- | --- | --- | --- |
-| Quality upper bound | `openai/gpt-5.6-sol` | `OpenAI` | No |
-| Deployment candidate | `nex-agi/nex-n2-mini` | `Nex AGI` | Yes, but only as a future candidate |
-
-Each model receives the same five frozen Slice 3 candidate sets three times. Model
-aliases, router aliases, suffix variants and cross-model substitution are prohibited.
-The live catalogue and exact route are checked again before corpus calls.
+Each model receives the same five frozen Slice 3 candidate sets. Model aliases, router
+aliases, provider substitution and cross-model fallback are prohibited. The live
+catalogue and exact route are checked before corpus calls.
 
 ## Responsibility boundary
 
-The model still owns only the choice of existing candidate IDs. Slice 5 remains
-responsible for:
+The model still owns only the choice of existing candidate IDs. Slice 5 remains the
+authority for exact membership, uniqueness, count, section, intent, bundle and
+redundancy validation, one eligible repair, deterministic fallback, canonical plan
+reconstruction, validation and rendering.
 
-- the one-field response schema;
-- exact membership, uniqueness and maximum-count checks;
-- section, intent, evidence-bundle and redundancy limits;
-- one eligible machine-readable repair;
-- deterministic fallback;
-- canonical plan reconstruction;
-- existing claim-plan validation and deterministic rendering.
+The compact projection is provider transport only. It cannot remove candidates, alter
+candidate IDs, change canonical ordering or weaken repository validation.
 
-Slice 6 adds measurement, not semantic authority. It cannot change candidate
-compilation, ranking, evidence, values, prose or report publication.
+## Compact provider request
 
-## Secret-free preparation
+Repository records retain the complete canonical selector request. For provider
+transport, each candidate is projected into one positional row containing:
 
-The prepare command regenerates and verifies the complete deterministic baseline, then
-freezes for each case:
+```text
+candidate_id, section, intent, subject type, subject id, metric, confidence,
+comparison relation, materiality, conflict status, quality significance,
+cross-source flag, corroboration count, recency and redundancy group
+```
 
-- the canonical evidence bundle;
-- the complete ordered candidate catalogue;
-- the repository-owned selector request;
-- the reviewed useful candidate IDs;
-- the deterministic selection, plan and rendered Markdown;
-- all relevant identities and hashes.
+The request contains explicit field and enum-code legends and the unchanged canonical
+request ID. Evidence IDs, source prose and verbose repeated property names are omitted.
+The full canonical candidate ID remains in every row and is the only value the model may
+return.
 
-Preparation fails if the retained baseline is not exactly:
+Secret-free preparation verifies the exact ordered ID set and a maximum of 65,536 bytes
+per compact request. The frozen cases currently produce:
+
+| Case | Canonical bytes | Compact bytes | Candidates |
+| --- | ---: | ---: | ---: |
+| Historical degraded/sparse | 125,714 | 45,174 | 201 |
+| Historical normal/cross-checked | 142,248 | 50,891 | 229 |
+| Historical material move | 142,678 | 51,320 | 230 |
+| Adversarial prompt injection | 138,531 | 49,898 | 225 |
+| Adversarial source disagreement | 137,419 | 49,693 | 224 |
+
+## Baseline and model credit
+
+Preparation regenerates the permanent deterministic comparator:
 
 ```text
 Selected candidates:        35
@@ -73,118 +84,72 @@ Recall:                     68.421053%
 F1:                         71.232877%
 ```
 
-No secret is available and no provider call is possible during preparation.
+A first-pass or repaired accepted ID list receives model credit. Deterministic fallback
+remains the safe final output but contributes an empty model selection: zero selected,
+zero useful, zero precision and zero recall. Failed repeats remain in stability and
+aggregate recall rather than being excluded.
 
 ## Protected execution
 
-The workflow is:
+The workflow is manual-only, trusted-main, exact-SHA, `contents: read`, protected by the
+existing `governed-llm-dry-run` environment and unable to write repository state or
+publish reports. It permits only public-market and evaluation-only inputs, retains
+`data_collection: deny` and uses the explicit public-data `zdr: false` exception.
 
-- manually dispatched only;
-- rejected unless dispatched from `main`;
-- prepared from the current trusted-main SHA;
-- evaluated from that exact immutable SHA;
-- granted `contents: read` only;
-- protected by the existing `governed-llm-dry-run` environment;
-- unable to create branches, commits, pull requests, reports or site output.
-
-The workflow invokes `candidate_selection_model_comparison_runner`, not the lower-level
-evaluator directly. The runner wraps route probes so an unmetered failure reserves the
-full reviewed call cap and retains sanitized evidence before the route is rejected.
-The selector adapter likewise writes every metered response before checking model
-content, provider identity or model identity. A networked response with missing usage
-or cost reserves the full call cap and aborts the comparison.
-
-Malformed model JSON from an otherwise correctly routed and metered call remains a
-model failure: Slice 5 applies deterministic fallback, but the call is fully charged and
-retained. Provider fallback, provider substitution, model substitution or over-cap cost
-are infrastructure/governance failures and stop the corpus immediately.
-
-The public-data profile permits only `public-market-data` and `evaluation-only` inputs,
-keeps `data_collection: deny`, and uses the explicit public-data `zdr: false`
-exception. Raw completions remain protected workflow artefacts.
+Every metered selector response is persisted and charged before content, model or
+provider validation. An unmetered networked selector call or route probe retains a
+sanitised failure record, reserves the full reviewed call ceiling and aborts as
+infrastructure-inconclusive. Provider fallback, model/provider substitution and over-cap
+cost are retained before aborting. Correctly routed malformed JSON remains a metered
+model failure and enters deterministic fallback.
 
 ## Call and cost ceilings
 
 ```text
-Logical selector runs:           30 maximum
-Substantive provider calls:      60 maximum
-Exact-route probes:               2 maximum
-Semantic repairs per run:         1 maximum
-Whole protected-run cost:      USD 4.00 maximum
+Logical selector runs:                    30 maximum
+Substantive provider calls:               60 maximum
+Exact-route probes:                        2 maximum
+Semantic repairs per run:                  1 maximum
+Model fallbacks before decisive failure:   2
+Whole protected-run cost:               USD 5.00 maximum
 ```
 
-Per-call and per-model ceilings are checked before every request and again after
-reported cost is received. Missing cost or token metadata fails closed. Network retry
-is disabled inside the adapter, and the comparison pacer permits one transport attempt
-per logical provider call, so infrastructure retry cannot silently exceed the 60-call
-ceiling.
+| Model | Per-call ceiling | Per-model ceiling |
+| --- | ---: | ---: |
+| GPT-5.6 Sol | USD 0.15 | USD 4.51 |
+| Nex N2 Mini | USD 0.01 | USD 0.31 |
 
-The ceilings are independent maxima, not a promise that all calls will execute. Route
-cost consumes the same per-model and whole-run budgets as corpus calls; if remaining
-budget cannot cover the next reviewed per-call maximum, execution stops before that
-request.
+Budget checks occur before every request and after reported cost. Network retry is
+disabled and only one transport attempt is allowed per logical provider call.
 
-## Model credit
+## Decisive early stopping
 
-An accepted first response or accepted repair receives model credit. Deterministic
-fallback remains the safe final result but contributes an empty model-selected set:
-zero selected candidates, zero useful candidates, zero precision and zero recall.
+Both model gates require at least 14 accepted runs out of 15. After two fully metered
+model fallbacks, that model cannot pass the acceptance gate.
 
-This prevents the permanent deterministic baseline from inflating model quality.
-Failed repeats also contribute an empty set to pairwise stability rather than being
-excluded.
+- Two quality-model fallbacks stop the comparison and yield
+  `remove-model-selector-from-active-roadmap`; Nex is not called.
+- Two deployment-candidate fallbacks yield
+  `research-only-no-deployment-selector`.
+- Catalogue, route, identity, metering, policy or other infrastructure failures remain
+  `inconclusive-infrastructure` and are never converted into model-quality failure.
 
-## Metrics
+A complete passing comparison may yield `retain-bounded-selector-candidate`, but the
+workflow cannot promote or enable the model. A separately reviewed decision issue and
+pull request remain mandatory.
 
-Per run, case and model, the evaluator retains:
+## Calibration history
 
-- first-pass acceptance, repaired acceptance and deterministic fallback;
-- useful-candidate precision, recall and F1;
-- prohibited and redundant selections;
-- exact-repeat rate and pairwise Jaccard stability;
-- logical latency;
-- input, output and reasoning tokens;
-- call, model and total cost;
-- requested and actual model/provider identities;
-- provider and cross-model fallback evidence;
-- canonical plan and rendered-output hashes.
-
-Aggregate quality is micro-averaged over all fifteen logical runs per model. Every
-repeat contributes its complete reviewed-useful denominator.
-
-## Predeclared outcomes
-
-The quality upper bound must first clear its acceptance, precision, recall, F1,
-stability, safety and governance gates. Failure yields:
-
-```text
-remove-model-selector-from-active-roadmap
-```
-
-Only when the quality upper bound passes is the deployment candidate assessed against
-baseline gaps, uplift retention, stability, latency, cost and governance. Failure or
-success yields respectively:
-
-```text
-research-only-no-deployment-selector
-retain-bounded-selector-candidate
-```
-
-An incomplete catalogue, route or corpus produces:
-
-```text
-inconclusive-infrastructure
-```
-
-The workflow writes deterministic decision input but cannot approve or promote the
-result. A separately reviewed issue and pull request must make the Phase 6 decision.
+Protected run `30771922641` validated the exact OpenAI route but showed that the original
+full JSON transport was not viable: the first corpus request used 35,806 input tokens,
+reached the 512-token completion cap and cost USD 0.23914375. It was recorded as
+infrastructure-inconclusive. The compact projection, model-specific output cap, revised
+ceilings and decisive stop are the reviewed corrective response; the run is not treated
+as model-quality evidence.
 
 ## Artefact retention
 
 Prepared inputs are retained for seven days. Protected outputs are retained for thirty
-days and include raw completions, hashes, validations, repairs, fallbacks, per-run
-scores, aggregate JSON, reviewer CSV and decision-input Markdown. Route and selector
-attempt evidence is persisted under the protected output directory before any failure
-is re-raised, so it remains available even when the workflow fails closed.
-
-Nothing in this workflow is committed or published automatically.
+days and include canonical and compact request identities, raw completions, hashes,
+validations, repairs, fallbacks, per-run scores, aggregate JSON, reviewer CSV and
+decision-input Markdown. Nothing is committed or published automatically.
