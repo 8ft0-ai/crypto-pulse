@@ -10,16 +10,14 @@ from typing import Any, Callable, Mapping
 from .candidate_selection_contract import render_candidate_selector_prompt
 from .candidate_selector import SelectorClientError, SelectorClientResponse
 from .contracts import canonical_json_bytes
+from .evaluation import EvaluationIntegrityError
 from .evaluation_viability import AttemptPacer
 from .generation_config import GenerationConfig, model_matches
 from .openrouter_client import (
     CostLimitError,
     GenerationError,
-    IneligibleRoutingError,
     InvalidResponseError,
-    ProviderGenerationError,
     Transport,
-    _check_selected_provider,
     _parse_json_bytes,
     _selected_provider,
 )
@@ -30,8 +28,8 @@ class CandidateSelectorCallRecord:
     call_number: int
     logical_id: str
     requested_model: str
-    actual_model: str
-    actual_provider: str
+    actual_model: str | None
+    actual_provider: str | None
     generation_id: str | None
     raw_completion: str
     raw_completion_sha256: str
@@ -47,7 +45,7 @@ class CandidateSelectorCallRecord:
     estimated_cost_usd: float
     provider_fallback_used: bool
     cross_model_fallback_used: bool
-    finish_reason: str
+    finish_reason: str | None
 
     def protected_dict(self) -> dict[str, Any]:
         return {
@@ -213,72 +211,20 @@ class OpenRouterCandidateSelectorClient:
             timeout_seconds=self.config.timeout_seconds,
         )
         latency_ms = max(0, int(round((self.monotonic() - started) * 1000)))
-        if not 200 <= response.status < 300:
-            raise ProviderGenerationError(
-                f"OpenRouter candidate selector returned HTTP {response.status}"
-            )
         payload = _parse_json_bytes(response.body)
         if not isinstance(payload, Mapping):
             raise InvalidResponseError("OpenRouter candidate selector response must be an object")
 
-        actual_model = payload.get("model") if isinstance(payload.get("model"), str) else None
-        if actual_model is None or not model_matches(self.config.model, actual_model):
-            raise IneligibleRoutingError(
-                "OpenRouter candidate selector did not preserve the requested model"
-            )
-        choices = payload.get("choices")
-        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], Mapping):
-            raise InvalidResponseError("OpenRouter candidate selector must return exactly one choice")
-        choice = choices[0]
-        finish_reason = choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None
-        if finish_reason != "stop":
-            raise InvalidResponseError(
-                f"OpenRouter candidate selector ended with {finish_reason!r}"
-            )
-        message = choice.get("message")
-        completion = message.get("content") if isinstance(message, Mapping) else None
-        if not isinstance(completion, str):
-            raise InvalidResponseError("OpenRouter candidate selector is missing message.content")
-        try:
-            decoded = json.loads(completion)
-        except json.JSONDecodeError as exc:
-            raise InvalidResponseError(
-                "OpenRouter candidate selector completion is not JSON"
-            ) from exc
-
-        router_metadata = (
-            payload.get("openrouter_metadata")
-            if isinstance(payload.get("openrouter_metadata"), Mapping)
-            else {}
-        )
-        actual_provider = _selected_provider(router_metadata)
-        _check_selected_provider(self.config, actual_provider)
-        if actual_provider is None:
-            raise IneligibleRoutingError(
-                "OpenRouter candidate selector did not identify the actual provider"
-            )
-        provider_fallback = _provider_fallback(router_metadata)
-        if provider_fallback:
-            raise IneligibleRoutingError(
-                "OpenRouter candidate selector used provider fallback"
-            )
-
         usage = payload.get("usage") if isinstance(payload.get("usage"), Mapping) else {}
+        cost_raw = usage.get("cost")
+        if isinstance(cost_raw, bool) or not isinstance(cost_raw, (int, float)):
+            raise CostLimitError("OpenRouter candidate selector did not report usage.cost")
+        cost = float(cost_raw)
         input_tokens = _required_int(usage.get("prompt_tokens"), "usage.prompt_tokens")
         output_tokens = _required_int(
             usage.get("completion_tokens"), "usage.completion_tokens"
         )
         total_tokens = _required_int(usage.get("total_tokens"), "usage.total_tokens")
-        cost_raw = usage.get("cost")
-        if isinstance(cost_raw, bool) or not isinstance(cost_raw, (int, float)):
-            raise CostLimitError("OpenRouter candidate selector did not report usage.cost")
-        cost = float(cost_raw)
-        if cost > self.config.max_cost_usd + 1e-12:
-            raise CostLimitError(
-                f"OpenRouter candidate selector cost {cost:.6f} USD exceeds configured limit"
-            )
-        if self.after_provider_call is not None:
-            self.after_provider_call(cost)
         details = usage.get("completion_tokens_details")
         reasoning_tokens = (
             details.get("reasoning_tokens")
@@ -287,6 +233,43 @@ class OpenRouterCandidateSelectorClient:
             and not isinstance(details.get("reasoning_tokens"), bool)
             else None
         )
+
+        actual_model = payload.get("model") if isinstance(payload.get("model"), str) else None
+        router_metadata = (
+            payload.get("openrouter_metadata")
+            if isinstance(payload.get("openrouter_metadata"), Mapping)
+            else {}
+        )
+        actual_provider = _selected_provider(router_metadata)
+        provider_fallback = _provider_fallback(router_metadata)
+        cross_model_fallback = not (
+            isinstance(actual_model, str)
+            and model_matches(self.config.model, actual_model)
+        )
+
+        choices = payload.get("choices")
+        choice = (
+            choices[0]
+            if isinstance(choices, list)
+            and len(choices) == 1
+            and isinstance(choices[0], Mapping)
+            else {}
+        )
+        finish_reason = (
+            choice.get("finish_reason")
+            if isinstance(choice.get("finish_reason"), str)
+            else None
+        )
+        message = choice.get("message")
+        completion_value = message.get("content") if isinstance(message, Mapping) else None
+        completion = completion_value if isinstance(completion_value, str) else ""
+        decoded: Any = None
+        if finish_reason == "stop" and completion:
+            try:
+                decoded = json.loads(completion)
+            except json.JSONDecodeError:
+                decoded = None
+
         generation_id = payload.get("id") if isinstance(payload.get("id"), str) else None
         record = CandidateSelectorCallRecord(
             call_number=call_number,
@@ -309,18 +292,30 @@ class OpenRouterCandidateSelectorClient:
             reasoning_tokens=reasoning_tokens,
             total_tokens=total_tokens,
             estimated_cost_usd=cost,
-            provider_fallback_used=False,
-            cross_model_fallback_used=False,
+            provider_fallback_used=provider_fallback,
+            cross_model_fallback_used=cross_model_fallback,
             finish_reason=finish_reason,
         )
         self.call_records.append(record)
+
+        # Account for the paid response before evaluating provider identity or model output.
+        if self.after_provider_call is not None:
+            self.after_provider_call(cost)
+        if cost > self.config.max_cost_usd + 1e-12:
+            raise EvaluationIntegrityError(
+                f"OpenRouter candidate selector cost {cost:.6f} USD exceeds configured limit"
+            )
+
+        provider_ok = actual_provider == self.config.provider_policy.only[0]
+        governance_ok = provider_ok and not provider_fallback and not cross_model_fallback
+        response_payload = decoded if governance_ok else None
         return SelectorClientResponse(
-            payload=decoded,
+            payload=response_payload,
             raw_response=completion,
             metadata={
                 "client": "openrouter",
-                "model": actual_model,
-                "provider": actual_provider,
+                "model": actual_model or "",
+                "provider": actual_provider or "",
                 "generation_id": generation_id or "",
                 "latency_ms": latency_ms,
                 "input_tokens": input_tokens,
