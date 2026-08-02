@@ -475,9 +475,9 @@ def _base_score(candidate: Mapping[str, Any], config: RankingConfig) -> tuple[in
             features.get("materiality_bucket"),
             "$.candidate.features.materiality_bucket",
         ),
+        _relation_score(candidate, config),
         _metric_score(candidate, config),
         config.evidence_scope_priority[_evidence_scope(candidate)],
-        _relation_score(candidate, config),
         _priority_value(
             config,
             "intent",
