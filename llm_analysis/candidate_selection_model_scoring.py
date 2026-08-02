@@ -283,6 +283,7 @@ def apply_predeclared_decision(
     indexed = {str(item["role"]): item for item in summaries}
     quality = indexed.get("quality_benchmark")
     deployment = indexed.get("deployment_candidate")
+
     if (
         isinstance(quality, Mapping)
         and quality.get("decisive_acceptance_failure") is True
@@ -299,19 +300,14 @@ def apply_predeclared_decision(
             "deployment_gate": {},
         }
 
-    complete = (
+    quality_complete = (
         isinstance(quality, Mapping)
-        and isinstance(deployment, Mapping)
         and quality.get("completed_runs") == quality.get("expected_runs")
-        and deployment.get("completed_runs") == deployment.get("expected_runs")
         and quality.get("route_pass") is True
-        and deployment.get("route_pass") is True
         and quality.get("availability_pass") is True
-        and deployment.get("availability_pass") is True
         and quality.get("cost_metadata_complete") is not False
-        and deployment.get("cost_metadata_complete") is not False
     )
-    if not complete:
+    if not quality_complete:
         return {
             "status": "inconclusive",
             "outcome": plan.outcomes["infrastructure_failure"],
@@ -354,6 +350,21 @@ def apply_predeclared_decision(
                 "decisive_two_fallback_stop": True,
                 "governance": True,
             },
+        }
+
+    deployment_complete = (
+        isinstance(deployment, Mapping)
+        and deployment.get("completed_runs") == deployment.get("expected_runs")
+        and deployment.get("route_pass") is True
+        and deployment.get("availability_pass") is True
+        and deployment.get("cost_metadata_complete") is not False
+    )
+    if not deployment_complete:
+        return {
+            "status": "inconclusive",
+            "outcome": plan.outcomes["infrastructure_failure"],
+            "quality_gate": quality_checks,
+            "deployment_gate": {},
         }
 
     baseline = plan.baseline_reference
