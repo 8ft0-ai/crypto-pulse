@@ -152,3 +152,38 @@ Delivery notes:
 - Focused tests and all four implementation PR validation runs passed.
 - A direct public HTTP smoke test was attempted during close-out, but the execution environment could not resolve the GitHub Pages host. This limitation is recorded rather than treated as a pass.
 - Issue #165 and parent #160 should close only after an external browser confirms the homepage, latest report, archive and search pages on the deployed site.
+
+## Phase 6 — Deterministic claim candidates and bounded model selection
+
+Status: complete.
+
+Primary outcome: repository code now owns claim-candidate semantics, deterministic ranking, plan reconstruction, validation and rendering; the deterministic selector remains the sole active selection path.
+
+```text
+Parent issue: #283
+Governance transition: #282 / PR #284
+Implementation issues: #285, #287, #289, #291, #293, #295
+Implementation PRs: #286, #288, #290, #292, #294, #296
+Corrective transport: #300 / PR #301
+Protected comparison runs: 30771922641, 30777564268
+Final decision: #310 / PR #311
+Decision merge: 06320a5598f630a04c3d88353fe7d18361d2fa89
+Delivery record: planning/delivery/phase-06-deterministic-claim-selection.md
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- The versioned candidate contract gives repository code complete ownership of evidence references, intent, operands, comparison relation, subject, section, confidence and stable identity.
+- The compiler produced 100% recall over 38 reviewed useful expectations across five frozen cases while excluding 20 prohibited combinations.
+- The permanent deterministic baseline selected 35 candidates, including 26 reviewed-useful candidates, for 74.29% precision, 68.42% recall and 71.23% F1; all five plans validated and rendered without a provider call.
+- The optional model boundary accepted candidate IDs only, enforced exact validation and at most one semantic repair, and proved byte-identical deterministic fallback across 15 offline fallback scenarios.
+- Protected run `30771922641` failed closed when the first full-catalogue corpus call cost USD 0.23914375 against the fixed USD 0.12 cap.
+- Corrective PR #301 retained the full candidate set and introduced compact transport, revised output limits and decisive fallback stopping without enabling a model.
+- Final run `30777564268` retained three incomplete GPT diagnostic repeats, then failed closed when the next exact-route call cost USD 0.15841625 against the fixed USD 0.15 cap. Total reported final-run spend was USD 0.37542275. No Nex corpus call occurred.
+- The comparison is formally `inconclusive-infrastructure`; no formal GPT Gate A or Nex deployment conclusion is claimed.
+- The reviewed roadmap decision removes bounded model selection from the active roadmap and retains deterministic selection as the only supported active selector.
+- No further paid Phase 6 run, provider substitution, third model, prompt retuning or cost-ceiling increase is authorised.
+- The obsolete paid comparison workflow is archived during close-out while configuration, prompts, schemas, runners, scoring code, documentation, Git history and protected artifact references remain auditable.
+- Automatic report generation and publication remain disabled and separately governed.
