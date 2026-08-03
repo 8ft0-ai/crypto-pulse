@@ -1,10 +1,28 @@
 # Governed bounded-selector model comparison
 
-> **Mode:** Reference  
+> **Mode:** Historical reference  
 > **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
-> **Outcome:** Look up the Phase 6 Slice 6 models, compact provider transport, cost ceilings, scoring rules, artefacts and decision boundary.
+> **Outcome:** Understand the completed Phase 6 Slice 6 comparison contract, retained evidence and final archival boundary.
 
-## Canonical artefacts
+## Status
+
+The bounded-selector comparison is complete and archived.
+
+The reviewed decision is recorded in:
+
+```text
+planning/roadmap/phase-06-bounded-selector-comparison-decision.md
+```
+
+The comparison is formally classified as `inconclusive-infrastructure` because neither
+protected attempt completed the fixed model corpus. Separately, bounded model selection
+was removed from the active roadmap and the deterministic Slice 4 selector remains the
+only supported active selector.
+
+The manual paid workflow entry point has been removed. The retained implementation is
+historical and must not be used to start another Phase 6 provider run.
+
+## Canonical retained artefacts
 
 | Artefact | Canonical path |
 | --- | --- |
@@ -17,37 +35,51 @@
 | Comparison evaluator | [`llm_analysis/candidate_selection_model_comparison.py`](../../llm_analysis/candidate_selection_model_comparison.py) |
 | Fail-closed protected runner | [`llm_analysis/candidate_selection_model_comparison_runner.py`](../../llm_analysis/candidate_selection_model_comparison_runner.py) |
 | Scoring and decision rules | [`llm_analysis/candidate_selection_model_scoring.py`](../../llm_analysis/candidate_selection_model_scoring.py) |
-| Manual workflow | [`.github/workflows/governed-candidate-selection-model-comparison.yml`](../../.github/workflows/governed-candidate-selection-model-comparison.yml) |
 | Evaluation record | [`evaluation/phase-06/candidate-selection-model-comparison/`](../../evaluation/phase-06/candidate-selection-model-comparison/) |
+| Final decision | [`planning/roadmap/phase-06-bounded-selector-comparison-decision.md`](../../planning/roadmap/phase-06-bounded-selector-comparison-decision.md) |
+| Phase delivery record | [`planning/delivery/phase-06-deterministic-claim-selection.md`](../../planning/delivery/phase-06-deterministic-claim-selection.md) |
 
-This contract implements issue #295 and corrective issue #300. It does not enable a
-production selector. A separate reviewed decision is required after the protected run.
+The deleted workflow remains available through Git history and the protected run records.
+Its absence from `.github/workflows/` is an intentional safety boundary.
 
-## Fixed comparison
+## Fixed comparison contract
 
 | Role | Model | Allowed actual provider | Repeats | Output cap |
 | --- | --- | --- | ---: | ---: |
 | Quality upper bound | `openai/gpt-5.6-sol` | `OpenAI` | 3 per case | 1,024 tokens |
 | Deployment candidate | `nex-agi/nex-n2-mini` | `Nex AGI` | 3 per case | 512 tokens |
 
-Each model receives the same five frozen Slice 3 candidate sets. Model aliases, router
-aliases, provider substitution and cross-model fallback are prohibited. The live
-catalogue and exact route are checked before corpus calls.
+Each model was intended to receive the same five frozen Slice 3 candidate sets. Model
+aliases, router aliases, provider substitution and cross-model fallback were prohibited.
+The live catalogue and exact route were checked before corpus calls.
+
+No Nex corpus call occurred in either protected attempt. The retained record therefore
+makes no Nex quality, stability, latency or deployment claim.
 
 ## Responsibility boundary
 
-The model still owns only the choice of existing candidate IDs. Slice 5 remains the
-authority for exact membership, uniqueness, count, section, intent, bundle and
-redundancy validation, one eligible repair, deterministic fallback, canonical plan
-reconstruction, validation and rendering.
+The model could choose existing candidate IDs only. Repository code remained authoritative
+for:
 
-The compact projection is provider transport only. It cannot remove candidates, alter
-candidate IDs, change canonical ordering or weaken repository validation.
+- exact membership and uniqueness;
+- maximum count;
+- section and intent limits;
+- evidence-bundle identity;
+- redundancy groups;
+- at most one semantic repair;
+- deterministic fallback;
+- canonical plan reconstruction;
+- semantic validation;
+- deterministic rendering.
+
+The model could not author or alter evidence IDs, claim intent, operands, comparison
+relation, source subject, data-quality eligibility, section, values, labels, dates or
+report prose.
 
 ## Compact provider request
 
-Repository records retain the complete canonical selector request. For provider
-transport, each candidate is projected into one positional row containing:
+Repository records retained the complete canonical selector request. Provider transport
+projected each candidate into one positional row containing:
 
 ```text
 candidate_id, section, intent, subject type, subject id, metric, confidence,
@@ -55,13 +87,9 @@ comparison relation, materiality, conflict status, quality significance,
 cross-source flag, corroboration count, recency and redundancy group
 ```
 
-The request contains explicit field and enum-code legends and the unchanged canonical
-request ID. Evidence IDs, source prose and verbose repeated property names are omitted.
-The full canonical candidate ID remains in every row and is the only value the model may
-return.
-
-Secret-free preparation verifies the exact ordered ID set and a maximum of 65,536 bytes
-per compact request. The frozen cases currently produce:
+The compact request preserved every full candidate ID and canonical ordering. It omitted
+evidence IDs, source prose and repeated verbose property names. Secret-free preparation
+verified that each projected request remained below 65,536 bytes.
 
 | Case | Canonical bytes | Compact bytes | Candidates |
 | --- | ---: | ---: | ---: |
@@ -71,9 +99,7 @@ per compact request. The frozen cases currently produce:
 | Adversarial prompt injection | 138,531 | 49,898 | 225 |
 | Adversarial source disagreement | 137,419 | 49,693 | 224 |
 
-## Baseline and model credit
-
-Preparation regenerates the permanent deterministic comparator:
+## Permanent deterministic comparator
 
 ```text
 Selected candidates:        35
@@ -82,28 +108,26 @@ Reviewed-useful expected:   38
 Precision:                  74.285714%
 Recall:                     68.421053%
 F1:                         71.232877%
+Validated plans:            5 / 5
+Rendered reports:           5 / 5
+Provider calls:             0
 ```
 
-A first-pass or repaired accepted ID list receives model credit. Deterministic fallback
-remains the safe final output but contributes an empty model selection: zero selected,
-zero useful, zero precision and zero recall. Failed repeats remain in stability and
-aggregate recall rather than being excluded.
+A first-pass or repaired accepted ID list received model credit. Deterministic fallback
+remained the safe output but contributed zero model selection, precision and recall.
+Failed repeats remained in stability and aggregate metrics.
 
-## Protected execution
+## Metering and fail-closed controls
 
-The workflow is manual-only, trusted-main, exact-SHA, `contents: read`, protected by the
-existing `governed-llm-dry-run` environment and unable to write repository state or
-publish reports. It permits only public-market and evaluation-only inputs, retains
-`data_collection: deny` and uses the explicit public-data `zdr: false` exception.
+Every metered response was persisted and charged before content, model or provider
+validation. Missing trustworthy usage or cost retained a sanitised failure record,
+reserved the reviewed ceiling and aborted as infrastructure-inconclusive.
 
-Every metered selector response is persisted and charged before content, model or
-provider validation. An unmetered networked selector call or route probe retains a
-sanitised failure record, reserves the full reviewed call ceiling and aborts as
-infrastructure-inconclusive. Provider fallback, model/provider substitution and over-cap
-cost are retained before aborting. Correctly routed malformed JSON remains a metered
-model failure and enters deterministic fallback.
+Provider fallback, model/provider substitution and over-cap cost were retained before
+abort. Correctly routed malformed JSON remained a metered model failure and entered the
+deterministic fallback boundary. Network retry was disabled.
 
-## Call and cost ceilings
+The final checked-in limits were:
 
 ```text
 Logical selector runs:                    30 maximum
@@ -119,37 +143,61 @@ Whole protected-run cost:               USD 5.00 maximum
 | GPT-5.6 Sol | USD 0.15 | USD 4.51 |
 | Nex N2 Mini | USD 0.01 | USD 0.31 |
 
-Budget checks occur before every request and after reported cost. Network retry is
-disabled and only one transport attempt is allowed per logical provider call.
+These values are retained historical limits, not authority for another run.
 
-## Decisive early stopping
+## Protected attempt 1
 
-Both model gates require at least 14 accepted runs out of 15. After two fully metered
-model fallbacks, that model cannot pass the acceptance gate.
+Run `30771922641` at trusted SHA
+`dff2f609343be96c76ad646b8e2eaa97ad8e3b3e` passed the exact GPT/OpenAI route probe.
+The first corpus call then used 35,806 input tokens, exhausted its output allowance and
+cost USD 0.23914375 against the fixed USD 0.12 ceiling.
 
-- Two quality-model fallbacks stop the comparison and yield
-  `remove-model-selector-from-active-roadmap`; Nex is not called.
-- Two deployment-candidate fallbacks yield
-  `research-only-no-deployment-selector`.
-- Catalogue, route, identity, metering, policy or other infrastructure failures remain
-  `inconclusive-infrastructure` and are never converted into model-quality failure.
+No second corpus call and no Nex call occurred.
 
-A complete passing comparison may yield `retain-bounded-selector-candidate`, but the
-workflow cannot promote or enable the model. A separately reviewed decision issue and
-pull request remain mandatory.
+```text
+Classification: inconclusive-infrastructure
+Protected artifact: 8840792374
+Digest: sha256:a0c4d542d6fdfac5cc03a1167aca62da9ab675f40dd7b91618932571f70a3629
+```
 
-## Calibration history
+## Protected attempt 2 — final run
 
-Protected run `30771922641` validated the exact OpenAI route but showed that the original
-full JSON transport was not viable: the first corpus request used 35,806 input tokens,
-reached the 512-token completion cap and cost USD 0.23914375. It was recorded as
-infrastructure-inconclusive. The compact projection, model-specific output cap, revised
-ceilings and decisive stop are the reviewed corrective response; the run is not treated
-as model-quality evidence.
+Run `30777564268` at trusted SHA
+`40c9fd533dd79bb4b4a6c8bd1f232646bf1f37c5` passed the exact route and secret-free
+preparation.
 
-## Artefact retention
+Three complete GPT repeats were retained for one case:
 
-Prepared inputs are retained for seven days. Protected outputs are retained for thirty
-days and include canonical and compact request identities, raw completions, hashes,
-validations, repairs, fallbacks, per-run scores, aggregate JSON, reviewer CSV and
-decision-input Markdown. Nothing is committed or published automatically.
+| Repeat | Outcome | Precision | Recall | F1 | Cost |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1 | Accepted initial | 28.57% | 25.00% | 26.67% | USD 0.1424575 |
+| 2 | Deterministic fallback | 0% | 0% | 0% | USD 0.040352 |
+| 3 | Accepted initial | 42.86% | 37.50% | 40.00% | USD 0.033482 |
+
+The next exact-route call cost USD 0.15841625 against the fixed USD 0.15 ceiling. It was
+persisted before the run failed closed. No later GPT call and no Nex call occurred. Total
+reported final-run spend was USD 0.37542275.
+
+```text
+Classification: inconclusive-infrastructure
+Prepared artifact: 8842553997
+Prepared digest: sha256:6b39ca56a84bbdc3dcd63e438fce0b5401e75da95dbeae3c5a3a46f108c72204
+Protected artifact: 8842583436
+Protected digest: sha256:a40c94efcc7c125026abfc69d942eeb7ae70e210f81c366b4319dcecab7e54c7
+```
+
+The three completed rows are diagnostic only and do not constitute a formal Gate A
+result.
+
+## Final operational boundary
+
+- Deterministic selection is the sole active selector.
+- No bounded model selector is enabled for production or scheduling.
+- No further paid Phase 6 run is authorised.
+- The paid workflow entry point is archived.
+- Automatic generation and publication remain disabled and separately governed.
+- Historical implementation and evidence remain retained for audit and research.
+
+A future investigation requires a new phase, reviewed corpus and criteria, realistic
+transport calibration, explicit model/provider identities, a new cost plan, stop-loss and
+separate authority for paid execution and operational enablement.
