@@ -2,18 +2,21 @@
 
 > **Mode:** Reference  
 > **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
-> **Outcome:** Look up the Phase 7 Stage 0 models, request, routing controls, cost ceilings, classifications and evidence boundary.
+> **Outcome:** Look up the completed Phase 7 Stage 0 contract, protected result and archival boundary.
 
 ## Status
 
-Phase 7 Stage 0 is a compatibility and cost screen governed by issues #314 and #315.
-It does not reopen Phase 6, enable model selection, choose a winner or authorise the
-five-case Stage 1 comparison.
+Phase 7 Stage 0 is complete as a one-run compatibility and cost screen governed by
+issues #314, #315, #317 and #321.
 
-The deterministic Phase 6 selector remains the sole active selector throughout this
-screen.
+Protected run `30780938812` executed at trusted commit
+`c5e22c35ab23d0ff43b0801e2d1675216d5cbc2b`. The temporary paid workflow was removed
+after evidence retention. No second Stage 0 run is authorised.
 
-## Canonical artefacts
+The run did not approve Stage 1, choose a winner or enable a model selector. The
+deterministic Phase 6 selector remains the sole active selector.
+
+## Retained implementation
 
 | Artefact | Path |
 | --- | --- |
@@ -21,41 +24,57 @@ screen.
 | Strict configuration loader | [`llm_analysis/candidate_selector_stage0_config.py`](../../llm_analysis/candidate_selector_stage0_config.py) |
 | Preparation and execution | [`llm_analysis/candidate_selector_stage0.py`](../../llm_analysis/candidate_selector_stage0.py) |
 | Protected CLI | [`llm_analysis/candidate_selector_stage0_runner.py`](../../llm_analysis/candidate_selector_stage0_runner.py) |
-| Temporary workflow | [`.github/workflows/governed-low-cost-selector-stage-0.yml`](../../.github/workflows/governed-low-cost-selector-stage-0.yml) |
 | Evaluation record | [`evaluation/phase-07/low-cost-selector-stage-0/`](../../evaluation/phase-07/low-cost-selector-stage-0/) |
+
+The former workflow path was:
+
+```text
+.github/workflows/governed-low-cost-selector-stage-0.yml
+```
+
+It is intentionally absent from `main`. Git history preserves its reviewed read-only,
+trusted-main and protected-environment implementation.
 
 ## Fixed models
 
-| Model | Approved provider | Role |
+| Model | Approved provider | Stage 0 result |
 | --- | --- | --- |
-| `deepseek/deepseek-v4-flash-0731` | `DeepSeek` | primary quality/cost candidate |
-| `openai/gpt-oss-120b` | `DeepInfra` | lowest-cost serious control |
-| `inception/mercury-2` | `Inception` | low-latency single-provider control |
+| `deepseek/deepseek-v4-flash-0731` | `DeepSeek` | `route-ineligible` |
+| `openai/gpt-oss-120b` | `DeepInfra` | `inconclusive-infrastructure` |
+| `inception/mercury-2` | `Inception` | `inconclusive-infrastructure` |
 
-The current OpenRouter catalogue must still advertise `response_format` and
-`structured_outputs` at execution time. Each request pins one reviewed provider.
-Provider fallback, model fallback and aliases are prohibited.
+All three catalogue records were available and inside the reviewed catalogue-price
+caps when checked on 2026-08-03. Each advertised both `response_format` and
+`structured_outputs`.
+
+The route results were:
+
+- DeepSeek V4 Flash 0731: no endpoint could satisfy the exact reviewed parameters and
+  provider lock;
+- GPT-OSS 120B: the route probe returned without usable `message.content`;
+- Mercury 2: the route probe returned without usable `message.content`.
+
+No model reached the real selector generation. Therefore Stage 0 contains no
+candidate-selection quality, latency, token or validity result for any model.
 
 ## Real request boundary
 
-Secret-free preparation regenerates the Phase 6 `historical-degraded-sparse` case from
-trusted repository inputs. The case contains 201 candidates.
+Secret-free preparation regenerated the Phase 6 `historical-degraded-sparse` case from
+trusted repository inputs. The case contained 201 candidates.
 
-The provider receives the retained compact projection rather than a toy prompt or a
-post-hoc shortlist. The projection preserves:
+```text
+Candidate count:       201
+Compact request bytes: 46,022
+Compact request ID:    sha256:7ecd536db61a99a33eea0a90cc667935c381d58ff93684bbc953eb0c4b308ce0
+```
 
-- every complete candidate ID;
-- canonical candidate ordering;
-- the canonical request identity;
-- bounded editorial fields and feature codes;
-- the existing maximum selection count and section/intent limits.
+The compact projection retained every full candidate ID in canonical order, the
+canonical request identity, bounded editorial fields and the existing selection limits.
+No toy shortlist or post-hoc candidate filtering was used.
 
-Evidence IDs, source prose and free-form rationale remain outside the provider request.
-Repository validation continues to use the complete canonical candidate catalogue.
+## Reviewed execution boundary
 
-## Call boundary
-
-Each model may receive:
+Each model was permitted:
 
 ```text
 exact-route probes:       1 maximum
@@ -66,16 +85,28 @@ provider fallback:        false
 cross-model fallback:     false
 ```
 
-Whole-screen maxima are three route probes, three selector generations and six paid
-calls.
+The whole screen permitted three route probes, three selector generations, six paid
+calls and a USD 0.060 ceiling.
 
-The route probe uses a minimal strict schema. A route must preserve the requested model,
-resolve to the approved provider, satisfy required parameters and report trustworthy
-cost before the real selector call is allowed.
+The run completed with:
+
+```text
+Route probes:          3
+Selector generations:  0
+Paid-call ledger:      3
+Reserved total cost:   USD 0.020
+Semantic repairs:      0
+Network retries:       0
+Compatible models:     0
+```
+
+The ledger reserved the reviewed route ceiling whenever trustworthy usage or cost was
+not available. The USD 0.020 value is therefore the governed accounting amount, not a
+claim that OpenRouter necessarily charged exactly that amount.
 
 ## Provider policy
 
-Every route and selector request uses:
+Every route and selector request was configured with:
 
 ```json
 {
@@ -87,37 +118,11 @@ Every route and selector request uses:
 }
 ```
 
-The explicit `zdr: false` exception applies only to the existing public-market and
+The explicit `zdr: false` exception applied only to the existing public-market and
 evaluation-only input profile. Customer, personal, credential, internal, confidential
-and sensitive inputs remain prohibited.
+and sensitive inputs remained prohibited.
 
-The selector response format is strict JSON Schema and contains one property only:
-
-```json
-{
-  "selected_candidate_ids": [
-    "claim-candidate:sha256:..."
-  ]
-}
-```
-
-## Cost ceilings
-
-```text
-DeepSeek V4 Flash route + selector: USD 0.015
-GPT-OSS 120B route + selector:      USD 0.015
-Mercury 2 route + selector:         USD 0.030
-Whole Stage 0:                       USD 0.060
-```
-
-Budget checks run before calls and after observed cost. A networked response without
-trustworthy usage or cost reserves the reviewed call ceiling and stops that model.
-Metered responses are persisted and charged before model identity, provider identity or
-selection validation.
-
-## Classifications
-
-Each model receives one terminal Stage 0 classification:
+## Stage 0 classifications
 
 | Classification | Meaning |
 | --- | --- |
@@ -129,32 +134,34 @@ Each model receives one terminal Stage 0 classification:
 | `inconclusive-infrastructure` | Route, usage or cost evidence was insufficient for another classification. |
 | `model-output-invalid` | The exact metered route completed, but its single candidate-ID response failed the existing contract. |
 
-A compatible result is not a quality conclusion. One response cannot establish repeat
-stability, corpus recall, incremental value or production suitability. An invalid result
-receives no repair in Stage 0.
+A route-level `inconclusive-infrastructure` result is not model-quality evidence. It
+must not be interpreted as a failed candidate selection.
 
-## Retained evidence
+## Protected evidence
 
-The protected workflow retains:
+Prepared input artefact:
 
-- trusted-main SHA;
-- current catalogue eligibility;
-- route evidence and actual provider/model identity;
-- canonical and compact request identities;
-- provider request and completion hashes;
-- raw completion;
-- input, output and reasoning tokens;
-- latency and cost;
-- selection diagnostics;
-- reconstructed plan and rendered-output hashes for compatible responses;
-- machine-readable model results and a reviewer-readable summary.
+```text
+Artifact ID: 8843606111
+Digest: sha256:a25004953c6fa46bc40157a7dc1cca482c1d3f8210c376235892c2ec6b7e387e
+Retention: 7 days from 2026-08-03
+```
 
-Raw provider output remains a protected Actions artefact. It is not committed, rendered
-on the public site or used to change repository state.
+Protected result artefact:
 
-## Decision boundary
+```text
+Artifact ID: 8843610508
+Digest: sha256:416171e18ea8ef5253dbc7154b7df58f6dbba7fe8f0ca1c7dad0340fcce64c91
+Retention: 30 days from 2026-08-03
+```
 
-The workflow always records:
+The protected result retains catalogue checks, route records, trusted SHA, compact
+request identity, classifications and the machine-readable summary. No raw provider
+selection completion exists because no selector generation occurred.
+
+## Permanent decision boundary
+
+The Stage 0 result records:
 
 ```text
 stage1_authorized: false
@@ -164,6 +171,6 @@ publication: false
 repository_write: false
 ```
 
-After the one protected run, the temporary paid workflow must be deleted through a
-separate reviewed pull request. A separate reviewed decision may then identify which
-models, if any, are eligible for a newly budgeted Stage 1 comparison.
+No Stage 1 run follows automatically. A future low-cost model investigation requires a
+newly reviewed model/provider route plan, explicit execution budget and separate
+repository-owner authority. It must not reuse the completed Stage 0 nonce or workflow.
