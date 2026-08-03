@@ -37,104 +37,38 @@ jobs:
           set -euo pipefail
           printf '%s  %s\n' \
             '3dab056c742b4faeae1b1c626346b8a7828fbdadfa3c8b4f69581280b78d9051' \
-            'llm_analysis/evaluation.py' \
-            | sha256sum --check --strict
+            'llm_analysis/evaluation.py' | sha256sum --check --strict
           printf '%s  %s\n' \
             'a0a07767f3a1d887118fe240c1e6b2f11da0628b749b7b55be508e4775b83652' \
-            'tests/test_llm_analysis_evaluation.py' \
-            | sha256sum --check --strict
+            'tests/test_llm_analysis_evaluation.py' | sha256sum --check --strict
 
       - name: Apply exact source transformations
+        env:
+          OLD_B64: ICAgICAgICAgICAgICAgICAgICByZWNvcmQgPSBSdW5SZWNvcmQobW9kZWwua2V5LCBtb2RlbC5tb2RlbCwgY2FzZS5rZXksIHJlcGVhdCwgImluZWxpZ2libGUiLCBGYWxzZSwgIm1vZGVsX2luZWxpZ2libGUiLCB2YWxpZGF0aW9uLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBOb25lLCBydW5fZGlyLnJlbGF0aXZlX3RvKG91dHB1dCkuYXNfcG9zaXgoKSkK
+          NEW_B64: ICAgICAgICAgICAgICAgICAgICByZWNvcmQgPSBSdW5SZWNvcmQoCiAgICAgICAgICAgICAgICAgICAgICAgIG1vZGVsX2tleT1tb2RlbC5rZXksCiAgICAgICAgICAgICAgICAgICAgICAgIHJlcXVlc3RlZF9tb2RlbD1tb2RlbC5tb2RlbCwKICAgICAgICAgICAgICAgICAgICAgICAgY2FzZV9rZXk9Y2FzZS5rZXksCiAgICAgICAgICAgICAgICAgICAgICAgIHJlcGVhdD1yZXBlYXQsCiAgICAgICAgICAgICAgICAgICAgICAgIHN0YXR1cz0iaW5lbGlnaWJsZSIsCiAgICAgICAgICAgICAgICAgICAgICAgIGhhcmRfcGFzcz1GYWxzZSwKICAgICAgICAgICAgICAgICAgICAgICAgZmFpbHVyZV9jb2RlPSJtb2RlbF9pbmVsaWdpYmxlIiwKICAgICAgICAgICAgICAgICAgICAgICAgdmFsaWRhdGlvbj12YWxpZGF0aW9uLAogICAgICAgICAgICAgICAgICAgICAgICBhY3R1YWxfbW9kZWw9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgYWN0dWFsX3Byb3ZpZGVyPU5vbmUsCiAgICAgICAgICAgICAgICAgICAgICAgIHByb3ZpZGVyX2ZhbGxiYWNrX3VzZWQ9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgY3Jvc3NfbW9kZWxfZmFsbGJhY2tfdXNlZD1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBsYXRlbmN5X21zPU5vbmUsCiAgICAgICAgICAgICAgICAgICAgICAgIGlucHV0X3Rva2Vucz1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBvdXRwdXRfdG9rZW5zPU5vbmUsCiAgICAgICAgICAgICAgICAgICAgICAgIHRvdGFsX3Rva2Vucz1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBlc3RpbWF0ZWRfY29zdF91c2Q9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgZ2VuZXJhdGlvbl9pZD1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBhbmFseXNpc19zaGEyNTY9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgY29tcGxldGlvbl9zaGEyNTY9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgcmVhZGFiaWxpdHlfcHJveHk9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgdXNlZnVsbmVzc19wcm94eT1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBjbGFpbV9jb3VudD1Ob25lLAogICAgICAgICAgICAgICAgICAgICAgICBldmlkZW5jZV9yZWZlcmVuY2VfY291bnQ9Tm9uZSwKICAgICAgICAgICAgICAgICAgICAgICAgb3V0cHV0X2Rpcj1ydW5fZGlyLnJlbGF0aXZlX3RvKG91dHB1dCkuYXNfcG9zaXgoKSwKICAgICAgICAgICAgICAgICAgICApCg==
+          ANCHOR_B64: ICAgICAgICAgICAgc2VsZi5hc3NlcnROb3RJbigic2VjcmV0IiwgKG91dHB1dCAvICJldmFsdWF0aW9uLXN1bW1hcnkuanNvbiIpLnJlYWRfdGV4dCgpKQoK
+          REG_B64: ICAgIGRlZiB0ZXN0X2V4ZWN1dGVfcmVjb3Jkc19jb21wbGV0ZV9pbmVsaWdpYmxlX3J1bnNfd2l0aG91dF9wcm92aWRlcl9jbGllbnQoc2VsZikgLT4gTm9uZToKICAgICAgICB3aXRoIHRlbXBmaWxlLlRlbXBvcmFyeURpcmVjdG9yeSgpIGFzIHRtcDoKICAgICAgICAgICAgcm9vdCA9IFBhdGgodG1wKSAvICJyZXBvIgogICAgICAgICAgICBwcmVwYXJlZCA9IFBhdGgodG1wKSAvICJwcmVwYXJlZCIKICAgICAgICAgICAgb3V0cHV0ID0gUGF0aCh0bXApIC8gIm91dHB1dCIKICAgICAgICAgICAgc2hhID0gZml4dHVyZV9yZXBvKHJvb3QsIDEpCiAgICAgICAgICAgIHByZXBhcmVfZXZhbHVhdGlvbigKICAgICAgICAgICAgICAgIHJlcG9zaXRvcnlfcm9vdD1yb290LAogICAgICAgICAgICAgICAgY29uZmlnX3BhdGg9ImNvbmZpZy9sbG0tZXZhbHVhdGlvbi55bWwiLAogICAgICAgICAgICAgICAgb3V0cHV0X2Rpcj1wcmVwYXJlZCwKICAgICAgICAgICAgICAgIGJ1bmRsZV9idWlsZGVyPUZha2VCdWlsZGVyKHNoYSksCiAgICAgICAgICAgICkKICAgICAgICAgICAgaW5lbGlnaWJsZSA9IGNvcHkuZGVlcGNvcHkoY2F0YWxvZ3VlKCkpCiAgICAgICAgICAgIGZvciByb3cgaW4gaW5lbGlnaWJsZVsiZGF0YSJdOgogICAgICAgICAgICAgICAgcm93WyJzdXBwb3J0ZWRfcGFyYW1ldGVycyJdID0gWyJyZXNwb25zZV9mb3JtYXQiXQoKICAgICAgICAgICAgZGVmIGZhaWxfY2xpZW50X2ZhY3RvcnkoX2NvbmZpZyk6CiAgICAgICAgICAgICAgICBzZWxmLmZhaWwoInByb3ZpZGVyIGNsaWVudCBtdXN0IG5vdCBiZSBjcmVhdGVkIGZvciBhbiBpbmVsaWdpYmxlIG1vZGVsIikKCiAgICAgICAgICAgIHN1bW1hcnkgPSBleGVjdXRlX2V2YWx1YXRpb24oCiAgICAgICAgICAgICAgICByZXBvc2l0b3J5X3Jvb3Q9cm9vdCwKICAgICAgICAgICAgICAgIGNvbmZpZ19wYXRoPSJjb25maWcvbGxtLWV2YWx1YXRpb24ueW1sIiwKICAgICAgICAgICAgICAgIHByZXBhcmVkX2Rpcj1wcmVwYXJlZCwKICAgICAgICAgICAgICAgIG91dHB1dF9kaXI9b3V0cHV0LAogICAgICAgICAgICAgICAgYXBpX2tleT0ic2VjcmV0IiwKICAgICAgICAgICAgICAgIGNhdGFsb2d1ZV9sb2FkZXI9bGFtYmRhOiBpbmVsaWdpYmxlLAogICAgICAgICAgICAgICAgY2xpZW50X2ZhY3Rvcnk9ZmFpbF9jbGllbnRfZmFjdG9yeSwKICAgICAgICAgICAgKQoKICAgICAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChzdW1tYXJ5WyJkZWNpc2lvbiJdWyJkZWNpc2lvbiJdLCAibm8tZ28iKQogICAgICAgICAgICByZWNvcmRzID0gWwogICAgICAgICAgICAgICAganNvbi5sb2FkcyhwYXRoLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKSkKICAgICAgICAgICAgICAgIGZvciBwYXRoIGluIG91dHB1dC5nbG9iKCJydW5zLyoqL3J1bi1yZWNvcmQuanNvbiIpCiAgICAgICAgICAgIF0KICAgICAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChsZW4ocmVjb3JkcyksIDYpCiAgICAgICAgICAgIGZvciByZWNvcmQgaW4gcmVjb3JkczoKICAgICAgICAgICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVjb3JkWyJzdGF0dXMiXSwgImluZWxpZ2libGUiKQogICAgICAgICAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChyZWNvcmRbImZhaWx1cmVfY29kZSJdLCAibW9kZWxfaW5lbGlnaWJsZSIpCiAgICAgICAgICAgICAgICBzZWxmLmFzc2VydElzTm9uZShyZWNvcmRbImV2aWRlbmNlX3JlZmVyZW5jZV9jb3VudCJdKQogICAgICAgICAgICAgICAgc2VsZi5hc3NlcnRUcnVlKHJlY29yZFsib3V0cHV0X2RpciJdLnN0YXJ0c3dpdGgoInJ1bnMvIikpCgo=
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
           evaluation_path = Path('llm_analysis/evaluation.py')
           test_path = Path('tests/test_llm_analysis_evaluation.py')
+          old = base64.b64decode(os.environ['OLD_B64']).decode('utf-8')
+          new = base64.b64decode(os.environ['NEW_B64']).decode('utf-8')
+          anchor = base64.b64decode(os.environ['ANCHOR_B64']).decode('utf-8')
+          regression = base64.b64decode(os.environ['REG_B64']).decode('utf-8')
 
           evaluation = evaluation_path.read_text(encoding='utf-8')
-          legacy_constructor = '                    record = RunRecord(model.key, model.model, case.key, repeat, "ineligible", False, "model_ineligible", validation, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, run_dir.relative_to(output).as_posix())\n'
-          explicit_constructor = '''                    record = RunRecord(
-              model_key=model.key,
-              requested_model=model.model,
-              case_key=case.key,
-              repeat=repeat,
-              status="ineligible",
-              hard_pass=False,
-              failure_code="model_ineligible",
-              validation=validation,
-              actual_model=None,
-              actual_provider=None,
-              provider_fallback_used=None,
-              cross_model_fallback_used=None,
-              latency_ms=None,
-              input_tokens=None,
-              output_tokens=None,
-              total_tokens=None,
-              estimated_cost_usd=None,
-              generation_id=None,
-              analysis_sha256=None,
-              completion_sha256=None,
-              readability_proxy=None,
-              usefulness_proxy=None,
-              claim_count=None,
-              evidence_reference_count=None,
-              output_dir=run_dir.relative_to(output).as_posix(),
-          )
-          '''
-          if evaluation.count(legacy_constructor) != 1:
-              raise SystemExit(f'expected one legacy constructor, found {evaluation.count(legacy_constructor)}')
-          evaluation_path.write_text(
-              evaluation.replace(legacy_constructor, explicit_constructor),
-              encoding='utf-8',
-          )
+          if evaluation.count(old) != 1:
+              raise SystemExit(f'expected one legacy constructor, found {evaluation.count(old)}')
+          evaluation_path.write_text(evaluation.replace(old, new), encoding='utf-8')
 
           tests = test_path.read_text(encoding='utf-8')
-          anchor = '            self.assertNotIn("secret", (output / "evaluation-summary.json").read_text())\n\n'
-          regression = '''    def test_execute_records_complete_ineligible_runs_without_provider_client(self) -> None:
-              with tempfile.TemporaryDirectory() as tmp:
-                  root = Path(tmp) / "repo"
-                  prepared = Path(tmp) / "prepared"
-                  output = Path(tmp) / "output"
-                  sha = fixture_repo(root, 1)
-                  prepare_evaluation(
-                      repository_root=root,
-                      config_path="config/llm-evaluation.yml",
-                      output_dir=prepared,
-                      bundle_builder=FakeBuilder(sha),
-                  )
-                  ineligible = copy.deepcopy(catalogue())
-                  for row in ineligible["data"]:
-                      row["supported_parameters"] = ["response_format"]
-
-                  def fail_client_factory(_config):
-                      self.fail("provider client must not be created for an ineligible model")
-
-                  summary = execute_evaluation(
-                      repository_root=root,
-                      config_path="config/llm-evaluation.yml",
-                      prepared_dir=prepared,
-                      output_dir=output,
-                      api_key="secret",
-                      catalogue_loader=lambda: ineligible,
-                      client_factory=fail_client_factory,
-                  )
-
-                  self.assertEqual(summary["decision"]["decision"], "no-go")
-                  records = [
-                      json.loads(path.read_text(encoding="utf-8"))
-                      for path in output.glob("runs/**/run-record.json")
-                  ]
-                  self.assertEqual(len(records), 6)
-                  for record in records:
-                      self.assertEqual(record["status"], "ineligible")
-                      self.assertEqual(record["failure_code"], "model_ineligible")
-                      self.assertIsNone(record["evidence_reference_count"])
-                      self.assertTrue(record["output_dir"].startswith("runs/"))
-
-          '''
           if tests.count(anchor) != 1:
               raise SystemExit(f'expected one regression anchor, found {tests.count(anchor)}')
           test_path.write_text(tests.replace(anchor, anchor + regression), encoding='utf-8')
@@ -146,12 +80,10 @@ jobs:
           set -euo pipefail
           printf '%s  %s\n' \
             'f2432d5b7567181f96c6753ea9ac6c49343eb1b6c3a6f7d05a6136ffe18561f3' \
-            'llm_analysis/evaluation.py' \
-            | sha256sum --check --strict
+            'llm_analysis/evaluation.py' | sha256sum --check --strict
           printf '%s  %s\n' \
             '82013dafbdf6bb1f6f76a0139bbf7d0536679b2efef6da6742633dfd0a66c853' \
-            'tests/test_llm_analysis_evaluation.py' \
-            | sha256sum --check --strict
+            'tests/test_llm_analysis_evaluation.py' | sha256sum --check --strict
           mapfile -t changed < <(git diff --name-only | sort)
           expected=(
             'llm_analysis/evaluation.py'
