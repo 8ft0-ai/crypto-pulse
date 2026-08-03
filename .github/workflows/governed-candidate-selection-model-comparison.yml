@@ -2,6 +2,8 @@ name: Governed candidate selection model comparison
 
 on:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -12,7 +14,14 @@ concurrency:
 
 jobs:
   guard:
-    name: Require trusted main dispatch
+    name: Require trusted one-time manual dispatch
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.action == 'created' &&
+       github.event.issue.number == 295 &&
+       github.event.comment.user.login == '8ft0-ai' &&
+       github.event.comment.body == '/run-phase6-slice6-final-20260803-c596c1f6')
     runs-on: ubuntu-24.04
     steps:
       - name: Reject non-main workflow refs
