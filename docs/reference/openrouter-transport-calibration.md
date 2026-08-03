@@ -2,6 +2,7 @@
 
 > **Mode:** Reference  
 > **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
+> **Outcome:** Look up the Phase 8 real-request discovery and pinned-provider reproduction contract.  
 > **Status:** Phase 8 execution contract under issue #325
 
 ## Decision question
