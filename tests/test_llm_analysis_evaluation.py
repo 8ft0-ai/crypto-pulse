@@ -170,6 +170,47 @@ class EvaluationTests(unittest.TestCase):
             self.assertTrue((output / "reviewer-scorecard.csv").is_file())
             self.assertNotIn("secret", (output / "evaluation-summary.json").read_text())
 
+    def test_execute_records_complete_ineligible_runs_without_provider_client(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            prepared = Path(tmp) / "prepared"
+            output = Path(tmp) / "output"
+            sha = fixture_repo(root, 1)
+            prepare_evaluation(
+                repository_root=root,
+                config_path="config/llm-evaluation.yml",
+                output_dir=prepared,
+                bundle_builder=FakeBuilder(sha),
+            )
+            ineligible = copy.deepcopy(catalogue())
+            for row in ineligible["data"]:
+                row["supported_parameters"] = ["response_format"]
+
+            def fail_client_factory(_config):
+                self.fail("provider client must not be created for an ineligible model")
+
+            summary = execute_evaluation(
+                repository_root=root,
+                config_path="config/llm-evaluation.yml",
+                prepared_dir=prepared,
+                output_dir=output,
+                api_key="secret",
+                catalogue_loader=lambda: ineligible,
+                client_factory=fail_client_factory,
+            )
+
+            self.assertEqual(summary["decision"]["decision"], "no-go")
+            records = [
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in output.glob("runs/**/run-record.json")
+            ]
+            self.assertEqual(len(records), 6)
+            for record in records:
+                self.assertEqual(record["status"], "ineligible")
+                self.assertEqual(record["failure_code"], "model_ineligible")
+                self.assertIsNone(record["evidence_reference_count"])
+                self.assertTrue(record["output_dir"].startswith("runs/"))
+
     def test_no_go_when_every_model_hard_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); fixture_repo(root, 1); plan = load_evaluation_plan(root, "config/llm-evaluation.yml")

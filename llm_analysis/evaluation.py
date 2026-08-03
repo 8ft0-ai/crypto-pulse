@@ -519,7 +519,33 @@ def execute_evaluation(*, repository_root: str | Path, config_path: str | Path, 
                     run_dir = output / "runs" / model.key / case.key / f"repeat-{repeat}"
                     run_dir.mkdir(parents=True, exist_ok=True)
                     validation = _failure("model_ineligible", by_key[model.key].reason or "model is ineligible")
-                    record = RunRecord(model.key, model.model, case.key, repeat, "ineligible", False, "model_ineligible", validation, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, run_dir.relative_to(output).as_posix())
+                    record = RunRecord(
+                        model_key=model.key,
+                        requested_model=model.model,
+                        case_key=case.key,
+                        repeat=repeat,
+                        status="ineligible",
+                        hard_pass=False,
+                        failure_code="model_ineligible",
+                        validation=validation,
+                        actual_model=None,
+                        actual_provider=None,
+                        provider_fallback_used=None,
+                        cross_model_fallback_used=None,
+                        latency_ms=None,
+                        input_tokens=None,
+                        output_tokens=None,
+                        total_tokens=None,
+                        estimated_cost_usd=None,
+                        generation_id=None,
+                        analysis_sha256=None,
+                        completion_sha256=None,
+                        readability_proxy=None,
+                        usefulness_proxy=None,
+                        claim_count=None,
+                        evidence_reference_count=None,
+                        output_dir=run_dir.relative_to(output).as_posix(),
+                    )
                     _write_json(run_dir / "validation-report.json", validation)
                     _write_json(run_dir / "run-record.json", asdict(record))
                     records.append(record)
