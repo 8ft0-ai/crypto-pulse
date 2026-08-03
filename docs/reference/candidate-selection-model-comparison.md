@@ -1,6 +1,6 @@
 # Governed bounded-selector model comparison
 
-> **Mode:** Historical reference  
+> **Mode:** Reference  
 > **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
 > **Outcome:** Understand the completed Phase 6 Slice 6 comparison contract, retained evidence and final archival boundary.
 
