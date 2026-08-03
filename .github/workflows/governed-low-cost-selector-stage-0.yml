@@ -2,6 +2,8 @@ name: Governed low-cost selector Stage 0
 
 on:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -12,15 +14,22 @@ concurrency:
 
 jobs:
   guard:
-    name: Require trusted main dispatch
+    name: Require trusted main or exact owner nonce
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.action == 'created' &&
+       github.event.issue.number == 315 &&
+       github.event.comment.user.login == '8ft0-ai' &&
+       github.event.comment.body == '/run-phase7-stage0-low-cost-screen-20260803')
     runs-on: ubuntu-24.04
     steps:
-      - name: Reject non-main workflow refs
+      - name: Reject non-main manual workflow refs
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "This workflow must be dispatched from main." >&2
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Manual dispatch must use main." >&2
             exit 1
           fi
 
