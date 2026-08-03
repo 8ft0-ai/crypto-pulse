@@ -5,51 +5,41 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/governed-openrouter-transport-calibration.yml"
+REFERENCE = ROOT / "docs/reference/openrouter-transport-calibration.md"
+EVALUATION = ROOT / "evaluation/phase-08/openrouter-transport-calibration/README.md"
 
 
-class GovernedOpenRouterTransportCalibrationWorkflowTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.text = WORKFLOW.read_text(encoding="utf-8")
+class ArchivedOpenRouterTransportCalibrationWorkflowTests(unittest.TestCase):
+    def test_paid_workflow_remains_archived(self) -> None:
+        self.assertFalse(WORKFLOW.exists())
 
-    def test_workflow_is_manual_trusted_main_and_read_only(self) -> None:
-        text = self.text
-        self.assertIn("workflow_dispatch:", text)
-        self.assertNotIn("schedule:", text)
-        self.assertNotIn("push:\n", text)
-        self.assertNotIn("issue_comment:", text)
-        self.assertIn("permissions:\n  contents: read", text)
-        self.assertIn('if [[ "$GITHUB_REF" != "refs/heads/main" ]]', text)
-        self.assertIn("ref: main", text)
-        self.assertIn("persist-credentials: false", text)
-        self.assertIn("ref: ${{ needs.prepare.outputs.trusted_sha }}", text)
-        self.assertIn('test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"', text)
-
-    def test_prepare_is_secret_free_and_calibration_is_protected(self) -> None:
-        prepare_section, calibrate_section = self.text.split("  calibrate:\n", 1)
-        self.assertNotIn("OPENROUTER_API_KEY", prepare_section)
-        self.assertIn("environment: governed-llm-dry-run", calibrate_section)
-        self.assertIn("OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}", calibrate_section)
-        self.assertIn("openrouter_transport_calibration_runner prepare", prepare_section)
-        self.assertIn("openrouter_transport_calibration_runner run", calibrate_section)
-        self.assertIn("continue-on-error: true", calibrate_section)
-        self.assertIn("if: always()", calibrate_section)
-        self.assertIn("retention-days: 30", calibrate_section)
-
-    def test_workflow_cannot_write_publish_or_retry(self) -> None:
-        text = self.text
-        for prohibited in (
-            "contents: write",
-            "pull-requests: write",
-            "git push",
-            "gh pr",
-            "site_generator",
-            "_site/",
-            "repository_dispatch",
+    def test_auditable_implementation_remains_retained(self) -> None:
+        for path in (
+            ROOT / "config/openrouter-transport-calibration-v1.yml",
+            ROOT / "llm_analysis/openrouter_transport_calibration.py",
+            ROOT / "llm_analysis/openrouter_transport_calibration_runner.py",
+            ROOT / "tests/test_openrouter_transport_calibration.py",
+            REFERENCE,
+            EVALUATION,
         ):
-            self.assertNotIn(prohibited, text)
-        self.assertIn("config/openrouter-transport-calibration-v1.yml", text)
-        self.assertIn("Run real-request discovery and reproduction", text)
+            self.assertTrue(path.is_file(), path)
+
+    def test_historical_records_retain_exact_run_and_artifacts(self) -> None:
+        combined = REFERENCE.read_text(encoding="utf-8") + EVALUATION.read_text(
+            encoding="utf-8"
+        )
+        for required in (
+            "30784874599",
+            "8844907236",
+            "sha256:14c8560c565c49547e5e32fa88f5d7c9ca32c98d337b3009b7c30c7401ca0f7d",
+            "8844924119",
+            "sha256:ac3af0e5e825d21cdf62f7266d6db3342514ae35437a4e1015de6d128a1ab295",
+            "openai/gpt-oss-120b",
+            "deepinfra",
+            "USD 0.007966518",
+            "no rerun",
+        ):
+            self.assertIn(required, combined)
 
 
 if __name__ == "__main__":
