@@ -12,23 +12,14 @@ class GovernedOpenRouterTransportCalibrationWorkflowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_workflow_accepts_only_manual_main_or_the_exact_owner_nonce(self) -> None:
+    def test_workflow_is_manual_trusted_main_and_read_only(self) -> None:
         text = self.text
         self.assertIn("workflow_dispatch:", text)
-        self.assertIn("issue_comment:\n    types: [created]", text)
         self.assertNotIn("schedule:", text)
         self.assertNotIn("push:\n", text)
+        self.assertNotIn("issue_comment:", text)
         self.assertIn("permissions:\n  contents: read", text)
-        self.assertIn('if [[ "$EVENT_NAME" == "workflow_dispatch" ]]', text)
         self.assertIn('if [[ "$GITHUB_REF" != "refs/heads/main" ]]', text)
-        self.assertIn('"$EVENT_NAME" != "issue_comment"', text)
-        self.assertIn('"$EVENT_ACTION" != "created"', text)
-        self.assertIn('"$ISSUE_NUMBER" != "325"', text)
-        self.assertIn('"$COMMENT_AUTHOR" != "8ft0-ai"', text)
-        self.assertIn(
-            '"$COMMENT_BODY" != "/run-phase8-observable-transport-calibration-20260803"',
-            text,
-        )
         self.assertIn("ref: main", text)
         self.assertIn("persist-credentials: false", text)
         self.assertIn("ref: ${{ needs.prepare.outputs.trusted_sha }}", text)
