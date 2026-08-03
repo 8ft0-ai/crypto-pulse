@@ -1,0 +1,209 @@
+name: Apply issue 279 hash-guarded fix
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-fix:
+    name: Apply exact hash-guarded issue 279 transformation
+    if: >-
+      github.event.issue.number == 279 &&
+      github.event.comment.user.login == '8ft0-ai' &&
+      github.event.comment.body == '/apply-issue-279-hash-guarded-fix-20260804'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git identity and scoped branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B agent/fix-legacy-ineligible-run-record origin/main
+
+      - name: Verify exact pre-change source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            '3dab056c742b4faeae1b1c626346b8a7828fbdadfa3c8b4f69581280b78d9051' \
+            'llm_analysis/evaluation.py' \
+            | sha256sum --check --strict
+          printf '%s  %s\n' \
+            'a0a07767f3a1d887118fe240c1e6b2f11da0628b749b7b55be508e4775b83652' \
+            'tests/test_llm_analysis_evaluation.py' \
+            | sha256sum --check --strict
+
+      - name: Apply exact source transformations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          evaluation_path = Path('llm_analysis/evaluation.py')
+          test_path = Path('tests/test_llm_analysis_evaluation.py')
+
+          evaluation = evaluation_path.read_text(encoding='utf-8')
+          legacy_constructor = '                    record = RunRecord(model.key, model.model, case.key, repeat, "ineligible", False, "model_ineligible", validation, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, run_dir.relative_to(output).as_posix())\n'
+          explicit_constructor = '''                    record = RunRecord(
+              model_key=model.key,
+              requested_model=model.model,
+              case_key=case.key,
+              repeat=repeat,
+              status="ineligible",
+              hard_pass=False,
+              failure_code="model_ineligible",
+              validation=validation,
+              actual_model=None,
+              actual_provider=None,
+              provider_fallback_used=None,
+              cross_model_fallback_used=None,
+              latency_ms=None,
+              input_tokens=None,
+              output_tokens=None,
+              total_tokens=None,
+              estimated_cost_usd=None,
+              generation_id=None,
+              analysis_sha256=None,
+              completion_sha256=None,
+              readability_proxy=None,
+              usefulness_proxy=None,
+              claim_count=None,
+              evidence_reference_count=None,
+              output_dir=run_dir.relative_to(output).as_posix(),
+          )
+          '''
+          if evaluation.count(legacy_constructor) != 1:
+              raise SystemExit(f'expected one legacy constructor, found {evaluation.count(legacy_constructor)}')
+          evaluation_path.write_text(
+              evaluation.replace(legacy_constructor, explicit_constructor),
+              encoding='utf-8',
+          )
+
+          tests = test_path.read_text(encoding='utf-8')
+          anchor = '            self.assertNotIn("secret", (output / "evaluation-summary.json").read_text())\n\n'
+          regression = '''    def test_execute_records_complete_ineligible_runs_without_provider_client(self) -> None:
+              with tempfile.TemporaryDirectory() as tmp:
+                  root = Path(tmp) / "repo"
+                  prepared = Path(tmp) / "prepared"
+                  output = Path(tmp) / "output"
+                  sha = fixture_repo(root, 1)
+                  prepare_evaluation(
+                      repository_root=root,
+                      config_path="config/llm-evaluation.yml",
+                      output_dir=prepared,
+                      bundle_builder=FakeBuilder(sha),
+                  )
+                  ineligible = copy.deepcopy(catalogue())
+                  for row in ineligible["data"]:
+                      row["supported_parameters"] = ["response_format"]
+
+                  def fail_client_factory(_config):
+                      self.fail("provider client must not be created for an ineligible model")
+
+                  summary = execute_evaluation(
+                      repository_root=root,
+                      config_path="config/llm-evaluation.yml",
+                      prepared_dir=prepared,
+                      output_dir=output,
+                      api_key="secret",
+                      catalogue_loader=lambda: ineligible,
+                      client_factory=fail_client_factory,
+                  )
+
+                  self.assertEqual(summary["decision"]["decision"], "no-go")
+                  records = [
+                      json.loads(path.read_text(encoding="utf-8"))
+                      for path in output.glob("runs/**/run-record.json")
+                  ]
+                  self.assertEqual(len(records), 6)
+                  for record in records:
+                      self.assertEqual(record["status"], "ineligible")
+                      self.assertEqual(record["failure_code"], "model_ineligible")
+                      self.assertIsNone(record["evidence_reference_count"])
+                      self.assertTrue(record["output_dir"].startswith("runs/"))
+
+          '''
+          if tests.count(anchor) != 1:
+              raise SystemExit(f'expected one regression anchor, found {tests.count(anchor)}')
+          test_path.write_text(tests.replace(anchor, anchor + regression), encoding='utf-8')
+          PY
+
+      - name: Verify exact post-change identities and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            'f2432d5b7567181f96c6753ea9ac6c49343eb1b6c3a6f7d05a6136ffe18561f3' \
+            'llm_analysis/evaluation.py' \
+            | sha256sum --check --strict
+          printf '%s  %s\n' \
+            '82013dafbdf6bb1f6f76a0139bbf7d0536679b2efef6da6742633dfd0a66c853' \
+            'tests/test_llm_analysis_evaluation.py' \
+            | sha256sum --check --strict
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(
+            'llm_analysis/evaluation.py'
+            'tests/test_llm_analysis_evaluation.py'
+          )
+          if [[ "${changed[*]}" != "${expected[*]}" ]]; then
+            printf 'Unexpected changed files: %s\n' "${changed[*]}" >&2
+            exit 1
+          fi
+
+      - name: Run focused validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install pyyaml
+          python -m py_compile \
+            llm_analysis/evaluation.py \
+            tests/test_llm_analysis_evaluation.py
+          python -m unittest tests.test_llm_analysis_evaluation -v
+
+      - name: Commit and push scoped source fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add llm_analysis/evaluation.py tests/test_llm_analysis_evaluation.py
+          git commit -m "Fix legacy ineligible RunRecord construction"
+          git push --force-with-lease origin agent/fix-legacy-ineligible-run-record
+
+      - name: Open scoped source pull request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = 'agent/fix-legacy-ineligible-run-record';
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${head}`,
+              base: 'main',
+            });
+            const title = 'Fix legacy ineligible RunRecord construction';
+            const body = `Closes #279.\n\nReplaces the retained legacy positional RunRecord constructor with explicit keyword fields and adds a regression proving ineligible models create complete records without constructing a provider client.\n\nThe transformation was guarded by exact pre- and post-change SHA-256 identities. No evaluation policy, model, provider, workflow, cost, generation or publication behavior changes.`;
+            if (existing.data.length > 0) {
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: existing.data[0].number,
+                title,
+                body,
+              });
+            } else {
+              await github.rest.pulls.create({owner, repo, title, body, head, base: 'main'});
+            }
