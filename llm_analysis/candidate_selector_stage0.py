@@ -307,6 +307,18 @@ def _runtime_config(
 
 def _failure_classification(message: str, code: str | None, *, route: bool) -> str:
     text = f"{code or ''} {message}".lower()
+    if any(
+        token in text
+        for token in (
+            "trustworthy usage",
+            "usage metadata",
+            "missing usage",
+            "missing cost",
+            "complete metering",
+            "metering",
+        )
+    ):
+        return "inconclusive-infrastructure"
     if any(token in text for token in ("cost", "price", "budget", "ceiling")):
         return "cost-ineligible"
     if any(
@@ -340,9 +352,8 @@ def _failure_classification(message: str, code: str | None, *, route: bool) -> s
         for token in (
             "no endpoints",
             "no endpoint",
-            "routing",
-            "route",
-            "ineligible",
+            "ineligible_routing",
+            "routing failed",
             "provider unavailable",
             "404",
             "403",
@@ -582,7 +593,7 @@ def execute_stage0(
             message = " ".join(str(exc).split())[:500].replace(api_key, "[REDACTED]")
             calls = [item.protected_dict() for item in provider_client.call_records]
             result["provider_calls"] = _safe_call_records(calls)
-            result["selector_call_count"] = max(1, len(calls))
+            result["selector_call_count"] = len(calls)
             result["observed_cost_usd"] = ledger.model_costs[model.key]
             result["classification"] = _failure_classification(
                 message,
