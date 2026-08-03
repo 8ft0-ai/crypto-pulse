@@ -12,24 +12,14 @@ class GovernedLowCostSelectorStage0WorkflowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_workflow_is_exact_owner_nonce_or_trusted_manual_dispatch(self) -> None:
+    def test_workflow_is_manual_trusted_main_and_read_only(self) -> None:
         text = self.text
         self.assertIn("workflow_dispatch:", text)
-        self.assertIn("issue_comment:", text)
-        self.assertIn("types: [created]", text)
         self.assertNotIn("schedule:", text)
         self.assertNotIn("push:", text)
-        self.assertIn("github.event.issue.number == 315", text)
-        self.assertIn("github.event.comment.user.login == '8ft0-ai'", text)
-        self.assertIn(
-            "github.event.comment.body == '/run-phase7-stage0-low-cost-screen-20260803'",
-            text,
-        )
+        self.assertNotIn("issue_comment:", text)
         self.assertIn("permissions:\n  contents: read", text)
-        self.assertIn(
-            'if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]',
-            text,
-        )
+        self.assertIn('if [[ "$GITHUB_REF" != "refs/heads/main" ]]', text)
         self.assertIn("ref: main", text)
         self.assertIn("persist-credentials: false", text)
         self.assertIn("ref: ${{ needs.prepare.outputs.trusted_sha }}", text)
