@@ -2,8 +2,6 @@ name: Governed OpenRouter transport calibration
 
 on:
   workflow_dispatch:
-  issue_comment:
-    types: [created]
 
 permissions:
   contents: read
@@ -14,32 +12,15 @@ concurrency:
 
 jobs:
   guard:
-    name: Require trusted main or exact owner nonce
+    name: Require trusted main dispatch
     runs-on: ubuntu-24.04
     steps:
-      - name: Authorise exact one-time execution event
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
+      - name: Reject non-main workflow refs
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-              echo "Manual dispatch must use main." >&2
-              exit 1
-            fi
-            exit 0
-          fi
-          if [[ "$EVENT_NAME" != "issue_comment" \
-             || "$EVENT_ACTION" != "created" \
-             || "$ISSUE_NUMBER" != "325" \
-             || "$COMMENT_AUTHOR" != "8ft0-ai" \
-             || "$COMMENT_BODY" != "/run-phase8-observable-transport-calibration-20260803" ]]; then
-            echo "This issue comment is not the authorised Phase 8 nonce." >&2
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from main." >&2
             exit 1
           fi
 
