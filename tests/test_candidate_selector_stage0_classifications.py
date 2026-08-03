@@ -172,7 +172,7 @@ class CandidateSelectorStage0ClassificationTests(unittest.TestCase):
             )
             self.assertEqual(summary["completed_route_probes"], 3)
             self.assertEqual(summary["completed_selector_generations"], 0)
-            self.assertAlmostEqual(summary["observed_total_cost_usd"], 0.06)
+            self.assertAlmostEqual(summary["observed_total_cost_usd"], 0.02)
 
 
 if __name__ == "__main__":
