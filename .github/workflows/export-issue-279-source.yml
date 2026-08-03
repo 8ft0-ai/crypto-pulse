@@ -1,0 +1,41 @@
+name: Export issue 279 source files
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/export-issue-279-source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record exported source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/issue-279-source/llm_analysis" "$RUNNER_TEMP/issue-279-source/tests"
+          cp llm_analysis/evaluation.py "$RUNNER_TEMP/issue-279-source/llm_analysis/evaluation.py"
+          cp tests/test_llm_analysis_evaluation.py "$RUNNER_TEMP/issue-279-source/tests/test_llm_analysis_evaluation.py"
+          git rev-parse HEAD > "$RUNNER_TEMP/issue-279-source/main-sha.txt"
+          sha256sum \
+            llm_analysis/evaluation.py \
+            tests/test_llm_analysis_evaluation.py \
+            > "$RUNNER_TEMP/issue-279-source/source-sha256.txt"
+
+      - name: Upload exact source files
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-279-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue-279-source/
+          if-no-files-found: error
+          retention-days: 7
