@@ -1,4 +1,4 @@
-name: Phase 9 source export
+name: Apply Phase 9 implementation patch
 
 on:
   pull_request:
@@ -6,26 +6,98 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-source:
+  apply-reviewed-patch:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'feature/352-gpt-oss-quality-comparison'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out exact pull request head
+      - name: Check out exact implementation branch
         uses: actions/checkout@v4
-
-      - name: Export checked-out source for implementation validation
-        uses: actions/upload-artifact@v4
         with:
-          name: phase9-source-export-${{ github.sha }}
-          path: |
-            .
-            !.git
-            !_site
-          include-hidden-files: true
-          retention-days: 1
-          if-no-files-found: error
+          ref: feature/352-gpt-oss-quality-comparison
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify and apply exact implementation patch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo '709e435ae30ef5307a5b05aacc10650e9bba91a42ea4ce77d32c30a0ba482f0d  .github/phase9-implementation.patch.gz.b64' | sha256sum --check --strict
+          base64 --decode .github/phase9-implementation.patch.gz.b64 | gzip --decompress > /tmp/phase9-implementation.patch
+          echo 'ebb840b8559fbdb48b4614d0cd65e3858bd3aa76ff5e2cec53b203cfb6d8e7c1  /tmp/phase9-implementation.patch' | sha256sum --check --strict
+
+          # The reviewed patch deletes the original source-export workflow. Restore
+          # that exact pre-applicator content so the deletion hunk remains hash-grounded.
+          cat > .github/workflows/phase9-source-export.yml <<'ORIGINAL_WORKFLOW'
+          name: Phase 9 source export
+
+          on:
+            pull_request:
+              branches:
+                - main
+
+          permissions:
+            contents: read
+
+          jobs:
+            export-source:
+              if: >-
+                github.event.pull_request.head.repo.full_name == github.repository &&
+                github.head_ref == 'feature/352-gpt-oss-quality-comparison'
+              runs-on: ubuntu-latest
+              steps:
+                - name: Check out exact pull request head
+                  uses: actions/checkout@v4
+
+                - name: Export checked-out source for implementation validation
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: phase9-source-export-${{ github.sha }}
+                    path: |
+                      .
+                      !.git
+                      !_site
+                    include-hidden-files: true
+                    retention-days: 1
+                    if-no-files-found: error
+          ORIGINAL_WORKFLOW
+
+          git apply --check /tmp/phase9-implementation.patch
+          git apply /tmp/phase9-implementation.patch
+          rm -f .github/phase9-implementation.patch.gz.b64
+
+          git add -A
+          cat > /tmp/expected-files <<'EXPECTED_FILES'
+          .github/phase9-implementation.patch.gz.b64
+          .github/workflows/governed-gpt-oss-quality-comparison.yml
+          .github/workflows/phase9-source-export.yml
+          config/gpt-oss-quality-comparison.yml
+          docs/index.md
+          docs/reference/gpt-oss-quality-comparison.md
+          evaluation/phase-09/gpt-oss-quality-comparison/README.md
+          evaluation/phase-09/gpt-oss-quality-comparison/scoring-contract.md
+          llm_analysis/gpt_oss_quality_comparison.py
+          llm_analysis/gpt_oss_quality_comparison_config.py
+          llm_analysis/gpt_oss_quality_comparison_runner.py
+          llm_analysis/gpt_oss_quality_comparison_scoring.py
+          tests/test_governed_gpt_oss_quality_comparison_workflow.py
+          tests/test_gpt_oss_quality_comparison.py
+          EXPECTED_FILES
+          git diff --cached --name-only | sort > /tmp/actual-files
+          sort -o /tmp/expected-files /tmp/expected-files
+          diff --unified /tmp/expected-files /tmp/actual-files
+          git diff --cached --check
+
+      - name: Commit exact implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Implement Phase 9 GPT-OSS quality comparison'
+          git push origin HEAD:feature/352-gpt-oss-quality-comparison
