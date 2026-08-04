@@ -1,0 +1,31 @@
+name: Phase 9 source export
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feature/352-gpt-oss-quality-comparison'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+
+      - name: Export checked-out source for implementation validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-source-export-${{ github.sha }}
+          path: |
+            .
+            !.git
+            !_site
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
