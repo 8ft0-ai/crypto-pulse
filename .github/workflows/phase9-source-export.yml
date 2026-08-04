@@ -27,11 +27,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          base64 --decode .github/phase9-implementation.patch.gz.b64 | gzip --decompress > /tmp/phase9-implementation.patch
+          python - <<'PY'
+          from pathlib import Path
+          import string
+
+          path = Path('.github/phase9-implementation.patch.gz.b64')
+          value = path.read_text(encoding='utf-8')
+          alphabet = set(string.ascii_letters + string.digits + '+/=\r\n')
+          invalid = [(index, repr(character)) for index, character in enumerate(value) if character not in alphabet]
+          print(f'wrapper_bytes={path.stat().st_size}')
+          print(f'wrapper_characters={len(value)}')
+          print(f'wrapper_mod4={len(value.replace(chr(10), "").replace(chr(13), "")) % 4}')
+          print(f'invalid_characters={invalid[:20]}')
+          print(f'wrapper_tail={value[-80:]!r}')
+          PY
+          sha256sum .github/phase9-implementation.patch.gz.b64
+          base64 --decode --ignore-garbage .github/phase9-implementation.patch.gz.b64 > /tmp/phase9-implementation.patch.gz
+          gzip --decompress --stdout /tmp/phase9-implementation.patch.gz > /tmp/phase9-implementation.patch
           echo 'ebb840b8559fbdb48b4614d0cd65e3858bd3aa76ff5e2cec53b203cfb6d8e7c1  /tmp/phase9-implementation.patch' | sha256sum --check --strict
 
-          # The reviewed patch deletes the original source-export workflow. Restore
-          # that exact pre-applicator content so the deletion hunk remains grounded.
           python - <<'PY'
           from pathlib import Path
 
@@ -67,14 +81,8 @@ jobs:
                     retention-days: 1
                     if-no-files-found: error
           """
-          content = content.replace(
-              "__GITHUB_SHA_EXPRESSION__",
-              "$" + "{{ github.sha }}",
-          )
-          Path(".github/workflows/phase9-source-export.yml").write_text(
-              content,
-              encoding="utf-8",
-          )
+          content = content.replace('__GITHUB_SHA_EXPRESSION__', '$' + '{{ github.sha }}')
+          Path('.github/workflows/phase9-source-export.yml').write_text(content, encoding='utf-8')
           PY
 
           git apply --check /tmp/phase9-implementation.patch
