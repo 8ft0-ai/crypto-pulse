@@ -70,7 +70,9 @@ def stable_majority(
     selections: Sequence[Sequence[str]], *, minimum_frequency: int = 2
 ) -> tuple[set[str], Mapping[str, int]]:
     counts = Counter(identifier for selected in selections for identifier in set(selected))
-    return {identifier for identifier, count in counts.items() if count >= minimum_frequency}, dict(sorted(counts.items()))
+    return {
+        identifier for identifier, count in counts.items() if count >= minimum_frequency
+    }, dict(sorted(counts.items()))
 
 
 def summarize_complete_corpus(
@@ -108,9 +110,14 @@ def summarize_complete_corpus(
         pairs = _pairwise(selections)
         all_pairs.extend(pairs)
         total_pairs += len(pairs)
-        exact_pairs += sum(1 for left, right in combinations(selections, 2) if set(left) == set(right))
+        exact_pairs += sum(
+            1
+            for left, right in combinations(selections, 2)
+            if set(left) == set(right)
+        )
         stable, frequencies = stable_majority(
-            selections, minimum_frequency=plan.promotion_gates.stable_majority_frequency
+            selections,
+            minimum_frequency=plan.promotion_gates.stable_majority_frequency,
         )
         baseline = set(baseline_selected)
         useful_set = set(useful)
@@ -162,7 +169,9 @@ def summarize_complete_corpus(
     aggregate = micro_score(scored_rows)
     case_index = {row["case_key"]: row for row in case_summaries}
     non_adversarial = [
-        row for row in case_summaries if not str(row["case_key"]).startswith("adversarial-")
+        row
+        for row in case_summaries
+        if not str(row["case_key"]).startswith("adversarial-")
     ]
     gates = {
         "completion_and_governance": all(
@@ -172,13 +181,16 @@ def summarize_complete_corpus(
         "minimum_recall": aggregate["recall"] >= plan.promotion_gates.minimum_recall,
         "minimum_f1": aggregate["f1"] >= plan.promotion_gates.minimum_f1,
         "case_f1_protection": all(
-            float(row["f1_regression"]) <= plan.promotion_gates.maximum_case_f1_regression + 1e-12
+            float(row["f1_regression"])
+            <= plan.promotion_gates.maximum_case_f1_regression + 1e-12
             for row in non_adversarial
         ),
         "material_move_required_coverage": all(
             case_index["historical-material-move"]["required_coverage"].values()
         ),
-        "prompt_injection_safe": not case_index["adversarial-prompt-injection"]["prohibited_selected_candidate_ids"],
+        "prompt_injection_safe": not case_index[
+            "adversarial-prompt-injection"
+        ]["prohibited_selected_candidate_ids"],
         "source_disagreement_required_coverage": all(
             case_index["adversarial-source-disagreement"]["required_coverage"].values()
         ),
@@ -211,22 +223,86 @@ def summarize_complete_corpus(
     }
 
 
+def _diagnostic_partial_pairs(
+    records: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    indexed = {
+        (str(row["case_key"]), int(row["repeat_index"])): row
+        for row in records
+    }
+    result: list[dict[str, Any]] = []
+    for case_key in FROZEN_CASE_ORDER:
+        for left_repeat, right_repeat in combinations((1, 2, 3), 2):
+            left = indexed.get((case_key, left_repeat))
+            right = indexed.get((case_key, right_repeat))
+            left_selection = (
+                left.get("selected_candidate_ids")
+                if isinstance(left, Mapping)
+                else None
+            )
+            right_selection = (
+                right.get("selected_candidate_ids")
+                if isinstance(right, Mapping)
+                else None
+            )
+            calculated = isinstance(left_selection, list) and isinstance(
+                right_selection, list
+            )
+            result.append(
+                {
+                    "case_key": case_key,
+                    "left_repeat_index": left_repeat,
+                    "right_repeat_index": right_repeat,
+                    "status": "calculated" if calculated else "not_applicable",
+                    "jaccard": (
+                        jaccard(left_selection, right_selection)
+                        if calculated
+                        else None
+                    ),
+                    "left_classification": (
+                        left.get("classification")
+                        if isinstance(left, Mapping)
+                        else "not_attempted"
+                    ),
+                    "right_classification": (
+                        right.get("classification")
+                        if isinstance(right, Mapping)
+                        else "not_attempted"
+                    ),
+                }
+            )
+    return result
+
+
 def summarize_partial(
     plan: Phase9Plan,
     records: Sequence[Mapping[str, Any]],
     planned_schedule: Sequence[Mapping[str, Any]],
     outcome_key: str,
 ) -> dict[str, Any]:
-    attempted = {(str(row["case_key"]), int(row["repeat_index"])) for row in records}
+    attempted = {
+        (str(row["case_key"]), int(row["repeat_index"])) for row in records
+    }
+    diagnostic_pairs = _diagnostic_partial_pairs(records)
+    calculated_values = [
+        float(row["jaccard"])
+        for row in diagnostic_pairs
+        if row["status"] == "calculated"
+    ]
     return {
         "status": "partial-non-adjudicable",
         "outcome": plan.outcomes[outcome_key],
         "attempted_calls": len(records),
-        "accepted_calls": sum(row.get("classification") == "completed" for row in records),
+        "accepted_calls": sum(
+            row.get("classification") == "completed" for row in records
+        ),
         "unattempted": [
             dict(item)
             for item in planned_schedule
             if (str(item["case_key"]), int(item["repeat_index"])) not in attempted
         ],
+        "diagnostic_pairwise_jaccard": diagnostic_pairs,
+        "diagnostic_calculated_pair_count": len(calculated_values),
+        "diagnostic_median_pairwise_jaccard": _median(calculated_values),
         "promotion_gates": "not_adjudicable",
     }
