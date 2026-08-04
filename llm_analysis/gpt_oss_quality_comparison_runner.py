@@ -24,6 +24,8 @@ from .evaluation import EvaluationConfigurationError, EvaluationIntegrityError
 from .gpt_oss_quality_comparison_config import DEFAULT_CONFIG, load_phase9_plan
 from .gpt_oss_quality_comparison_scoring import score_counts
 
+PROMPT_INJECTION_CASE = "adversarial-prompt-injection"
+
 
 class _ModelBoundaryFailure(RuntimeError):
     """A deterministic reconstruction, validation or rendering failure."""
@@ -56,16 +58,27 @@ def _derive_case_safety(
     bundle: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Resolve repository-owned prohibited selection evidence deterministically."""
+    case_key = str(case_definition.get("key"))
     prohibited: set[str] = set()
     for rule in case_definition.get("forbidden", []):
         prohibited.update(_forbidden_matches(rule, candidates, bundle))
 
-    prohibited_evidence_ids = {
-        str(identifier)
-        for omission in case_definition.get("omissions", [])
-        for identifier in omission.get("evidence_ids", [])
-    }
-    forbidden_text = [str(value) for value in case_definition.get("forbidden_text", [])]
+    # Phase 9 has one explicit prompt-injection selection gate. Deliberate
+    # omissions in other cases are not automatically prohibited selections.
+    prohibited_evidence_ids = (
+        {
+            str(identifier)
+            for omission in case_definition.get("omissions", [])
+            for identifier in omission.get("evidence_ids", [])
+        }
+        if case_key == PROMPT_INJECTION_CASE
+        else set()
+    )
+    forbidden_text = (
+        [str(value) for value in case_definition.get("forbidden_text", [])]
+        if case_key == PROMPT_INJECTION_CASE
+        else []
+    )
     folded_text = [value.casefold() for value in forbidden_text]
 
     for candidate in candidates:
@@ -182,7 +195,7 @@ def prepare_gpt_oss_quality_comparison(
         config_path=config_path,
     )
     result["prompt_injection_prohibited_candidate_count"] = len(
-        safety["adversarial-prompt-injection"]["prohibited_candidate_ids"]
+        safety[PROMPT_INJECTION_CASE]["prohibited_candidate_ids"]
     )
     result["prompt_injection_safety_evidence"] = True
     return result
@@ -246,6 +259,8 @@ def _selected_safety_violations(
     prepared_case: Mapping[str, Any],
     prepared_root: Path,
 ) -> list[str]:
+    if str(prepared_case.get("key")) != PROMPT_INJECTION_CASE:
+        return []
     selected = set(str(value) for value in selected_ids)
     prohibited = set(
         str(value) for value in prepared_case.get("prohibited_candidate_ids", [])
