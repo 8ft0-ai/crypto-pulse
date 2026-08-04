@@ -1,0 +1,146 @@
+name: Governed GPT-OSS quality comparison
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-gpt-oss-quality-comparison
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from the main branch." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Freeze Phase 9 corpus and deterministic comparator
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml markdown
+
+      - name: Regenerate and freeze Phase 9 preparation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.gpt_oss_quality_comparison_runner prepare \
+            --repository-root . \
+            --config config/gpt-oss-quality-comparison.yml \
+            --output-dir "$RUNNER_TEMP/gpt-oss-quality-comparison-prepared"
+
+      - name: Upload prepared corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt-oss-quality-comparison-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gpt-oss-quality-comparison-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  compare:
+    name: Run protected Phase 9 comparison
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml markdown
+
+      - name: Download prepared corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: gpt-oss-quality-comparison-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gpt-oss-quality-comparison-prepared
+
+      - name: Execute exact GPT-OSS/DeepInfra comparison
+        id: comparison
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.gpt_oss_quality_comparison_runner run \
+            --repository-root . \
+            --config config/gpt-oss-quality-comparison.yml \
+            --prepared-dir "$RUNNER_TEMP/gpt-oss-quality-comparison-prepared" \
+            --output-dir "$RUNNER_TEMP/gpt-oss-quality-comparison" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Publish protected comparison summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/gpt-oss-quality-comparison/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/gpt-oss-quality-comparison/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Phase 9 GPT-OSS quality comparison" >> "$GITHUB_STEP_SUMMARY"
+            echo "Execution failed before a complete diagnostic summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload protected Phase 9 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt-oss-quality-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gpt-oss-quality-comparison/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail when the protected runner did not complete
+        if: steps.comparison.outcome != 'success'
+        shell: bash
+        run: |
+          echo "The protected Phase 9 runner did not complete. Review retained evidence." >&2
+          exit 1
