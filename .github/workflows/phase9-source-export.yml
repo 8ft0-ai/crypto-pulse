@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Verify and apply exact implementation patch
+      - name: Verify and apply non-workflow implementation patch
         shell: bash
         run: |
           set -euo pipefail
@@ -45,8 +45,6 @@ jobs:
           base64 --decode /tmp/phase9-implementation.patch.gz.b64 | gzip --decompress > /tmp/phase9-implementation.patch
           echo 'ebb840b8559fbdb48b4614d0cd65e3858bd3aa76ff5e2cec53b203cfb6d8e7c1  /tmp/phase9-implementation.patch' | sha256sum --check --strict
 
-          # The reviewed patch deletes the original source-export workflow. Restore
-          # that exact pre-applicator content so the deletion hunk remains grounded.
           python - <<'PY'
           from pathlib import Path
 
@@ -88,6 +86,12 @@ jobs:
 
           git apply --check /tmp/phase9-implementation.patch
           git apply /tmp/phase9-implementation.patch
+
+          # Workflow-file changes are applied separately through the owner-authorised
+          # GitHub connector because GITHUB_TOKEN has no workflows permission.
+          rm -f .github/workflows/governed-gpt-oss-quality-comparison.yml
+          git checkout HEAD -- .github/workflows/phase9-source-export.yml
+
           rm -f \
             .github/phase9-implementation.patch.gz.b64 \
             .github/phase9-patch.part00 \
@@ -102,8 +106,6 @@ jobs:
           .github/phase9-patch.part01
           .github/phase9-patch.part02
           .github/phase9-patch.part03mid
-          .github/workflows/governed-gpt-oss-quality-comparison.yml
-          .github/workflows/phase9-source-export.yml
           config/gpt-oss-quality-comparison.yml
           docs/index.md
           docs/reference/gpt-oss-quality-comparison.md
@@ -121,11 +123,11 @@ jobs:
           diff --unified /tmp/expected-files /tmp/actual-files
           git diff --cached --check
 
-      - name: Commit exact implementation
+      - name: Commit exact non-workflow implementation
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Implement Phase 9 GPT-OSS quality comparison'
+          git commit -m 'Implement Phase 9 comparison core'
           git push origin HEAD:feature/352-gpt-oss-quality-comparison
