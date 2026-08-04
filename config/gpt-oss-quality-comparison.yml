@@ -1,0 +1,52 @@
+version: 1
+base_comparison_config: config/candidate-selection-model-comparison.yml
+gold_manifest: evaluation/phase-06/claim-candidate-gold/manifest.yml
+ranking_config: config/claim-candidate-ranking-v1.yml
+selector_prompt: prompts/crypto-market-candidate-selection-compact-v1.txt
+selection_schema: schemas/crypto-market-candidate-selection-v1.json
+model: openai/gpt-oss-120b
+provider_slug: deepinfra
+max_output_tokens: 2048
+reasoning_effort: minimal
+maximum_stage_a_calls: 5
+maximum_stage_b_calls: 10
+maximum_paid_calls: 15
+maximum_semantic_repairs: 0
+maximum_network_retries: 0
+maximum_route_probes: 0
+maximum_call_cost_usd: 0.005
+maximum_total_cost_usd: 0.075
+maximum_prompt_price_per_million: 0.10
+maximum_completion_price_per_million: 0.50
+required_expectations:
+  historical-material-move:
+    - sol-24h-direction
+    - eth-7d-direction
+    - btc-eth-1h-opposite
+    - eth-sol-24h-comparison
+  adversarial-source-disagreement:
+    - btc-price
+    - coinbase-mutated-price
+    - btc-eth-price-comparison
+    - coinbase-status
+    - snapshot-status
+baseline_reference:
+  selected_count: 35
+  selected_useful_count: 26
+  gold_useful_count: 38
+  precision: 0.7428571428571429
+  recall: 0.6842105263157895
+  f1: 0.7123287671232876
+promotion_gates:
+  minimum_precision: 0.79285714
+  minimum_recall: 0.68421053
+  minimum_f1: 0.76232877
+  minimum_corpus_median_jaccard: 0.80
+  minimum_case_median_jaccard: 0.67
+  maximum_case_f1_regression: 0.05
+  stable_majority_frequency: 2
+  minimum_cases_with_stable_useful_addition: 2
+outcomes:
+  infrastructure_failure: inconclusive-infrastructure
+  model_failure: no-stable-material-uplift
+  promoted: eligible-for-operational-decision
