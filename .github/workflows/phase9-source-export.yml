@@ -27,25 +27,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          python - <<'PY'
-          from pathlib import Path
-          import string
+          echo 'e890f33eec9fb975caef3e747cbf641a7cb003227628f086ad9059e2500b1dae  .github/phase9-patch.part00' | sha256sum --check --strict
+          echo 'c7d3ca50e3de6fcc7e20c4a4b532bf70fd61f7943d7a53a8f83d74816505e6b2  .github/phase9-patch.part01' | sha256sum --check --strict
+          echo 'b73a3ececadceee83bc833071feb93030f6c57fe243002280fef2ba6c111fabe  .github/phase9-patch.part02' | sha256sum --check --strict
+          echo '0fe770f8f79f74aa5054633e33d1d16e46bc72973b4bce682cd600afb4d08d0e  .github/phase9-patch.part03mid' | sha256sum --check --strict
+          echo 'a33b72106788bec87e1e64f7a20c41125ad062ea7b6211bcde12005419d5c693  .github/phase9-implementation.patch.gz.b64' | sha256sum --check --strict
 
-          path = Path('.github/phase9-implementation.patch.gz.b64')
-          value = path.read_text(encoding='utf-8')
-          alphabet = set(string.ascii_letters + string.digits + '+/=\r\n')
-          invalid = [(index, repr(character)) for index, character in enumerate(value) if character not in alphabet]
-          print(f'wrapper_bytes={path.stat().st_size}')
-          print(f'wrapper_characters={len(value)}')
-          print(f'wrapper_mod4={len(value.replace(chr(10), "").replace(chr(13), "")) % 4}')
-          print(f'invalid_characters={invalid[:20]}')
-          print(f'wrapper_tail={value[-80:]!r}')
-          PY
-          sha256sum .github/phase9-implementation.patch.gz.b64
-          base64 --decode --ignore-garbage .github/phase9-implementation.patch.gz.b64 > /tmp/phase9-implementation.patch.gz
-          gzip --decompress --stdout /tmp/phase9-implementation.patch.gz > /tmp/phase9-implementation.patch
+          cat \
+            .github/phase9-patch.part00 \
+            .github/phase9-patch.part01 \
+            .github/phase9-patch.part02 \
+            .github/phase9-patch.part03mid \
+            > /tmp/phase9-implementation.patch.gz.b64
+          tail -c 10000 .github/phase9-implementation.patch.gz.b64 >> /tmp/phase9-implementation.patch.gz.b64
+          echo '709e435ae30ef5307a5b05aacc10650e9bba91a42ea4ce77d32c30a0ba482f0d  /tmp/phase9-implementation.patch.gz.b64' | sha256sum --check --strict
+
+          base64 --decode /tmp/phase9-implementation.patch.gz.b64 | gzip --decompress > /tmp/phase9-implementation.patch
           echo 'ebb840b8559fbdb48b4614d0cd65e3858bd3aa76ff5e2cec53b203cfb6d8e7c1  /tmp/phase9-implementation.patch' | sha256sum --check --strict
 
+          # The reviewed patch deletes the original source-export workflow. Restore
+          # that exact pre-applicator content so the deletion hunk remains grounded.
           python - <<'PY'
           from pathlib import Path
 
@@ -87,11 +88,20 @@ jobs:
 
           git apply --check /tmp/phase9-implementation.patch
           git apply /tmp/phase9-implementation.patch
-          rm -f .github/phase9-implementation.patch.gz.b64
+          rm -f \
+            .github/phase9-implementation.patch.gz.b64 \
+            .github/phase9-patch.part00 \
+            .github/phase9-patch.part01 \
+            .github/phase9-patch.part02 \
+            .github/phase9-patch.part03mid
 
           git add -A
           cat > /tmp/expected-files <<'EXPECTED_FILES'
           .github/phase9-implementation.patch.gz.b64
+          .github/phase9-patch.part00
+          .github/phase9-patch.part01
+          .github/phase9-patch.part02
+          .github/phase9-patch.part03mid
           .github/workflows/governed-gpt-oss-quality-comparison.yml
           .github/workflows/phase9-source-export.yml
           config/gpt-oss-quality-comparison.yml
