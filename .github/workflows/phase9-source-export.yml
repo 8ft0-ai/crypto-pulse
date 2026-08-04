@@ -27,14 +27,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo '709e435ae30ef5307a5b05aacc10650e9bba91a42ea4ce77d32c30a0ba482f0d  .github/phase9-implementation.patch.gz.b64' | sha256sum --check --strict
           base64 --decode .github/phase9-implementation.patch.gz.b64 | gzip --decompress > /tmp/phase9-implementation.patch
           echo 'ebb840b8559fbdb48b4614d0cd65e3858bd3aa76ff5e2cec53b203cfb6d8e7c1  /tmp/phase9-implementation.patch' | sha256sum --check --strict
 
           # The reviewed patch deletes the original source-export workflow. Restore
-          # that exact pre-applicator content so the deletion hunk remains hash-grounded.
-          cat > .github/workflows/phase9-source-export.yml <<'ORIGINAL_WORKFLOW'
-          name: Phase 9 source export
+          # that exact pre-applicator content so the deletion hunk remains grounded.
+          python - <<'PY'
+          from pathlib import Path
+
+          content = """name: Phase 9 source export
 
           on:
             pull_request:
@@ -57,7 +58,7 @@ jobs:
                 - name: Export checked-out source for implementation validation
                   uses: actions/upload-artifact@v4
                   with:
-                    name: phase9-source-export-${{ github.sha }}
+                    name: phase9-source-export-__GITHUB_SHA_EXPRESSION__
                     path: |
                       .
                       !.git
@@ -65,7 +66,16 @@ jobs:
                     include-hidden-files: true
                     retention-days: 1
                     if-no-files-found: error
-          ORIGINAL_WORKFLOW
+          """
+          content = content.replace(
+              "__GITHUB_SHA_EXPRESSION__",
+              "$" + "{{ github.sha }}",
+          )
+          Path(".github/workflows/phase9-source-export.yml").write_text(
+              content,
+              encoding="utf-8",
+          )
+          PY
 
           git apply --check /tmp/phase9-implementation.patch
           git apply /tmp/phase9-implementation.patch
