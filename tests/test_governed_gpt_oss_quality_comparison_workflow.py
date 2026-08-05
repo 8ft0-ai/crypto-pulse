@@ -119,6 +119,7 @@ class GovernedGPTOSSQualityComparisonRemediationTests(unittest.TestCase):
                 {
                     "requested_model": "openai/gpt-oss-120b",
                     "actual_model": "openai/gpt-oss-120b",
+                    "cross_model_fallback_used": False,
                     "openrouter_metadata": {
                         "attempts": [
                             {
@@ -162,6 +163,15 @@ class GovernedGPTOSSQualityComparisonRemediationTests(unittest.TestCase):
                 result["failure_code"],
                 "provider_attempt_model_identity_mismatch",
             )
+            self.assertTrue(result["cross_model_fallback_used"])
+            self.assertFalse(result["router_attempt_model_identity_preserved"])
+            self.assertEqual(
+                result["router_attempt_model"], "openai/gpt-oss-20b"
+            )
+            retained = json.loads(
+                (call_dir / "result.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(retained, result)
 
     def test_unexpected_outer_failure_retains_exact_infrastructure_outcome(
         self,
