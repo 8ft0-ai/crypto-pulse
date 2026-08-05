@@ -246,10 +246,12 @@ def _write_terminal_result(
     kind: str,
     code: str,
     message: str,
+    base_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     call_dir = _call_dir(output, schedule)
     call_dir.mkdir(parents=True, exist_ok=True)
     base = _interpreted_base(call_dir)
+    base.update(dict(base_overrides or {}))
     result = _core._failure(
         schedule=schedule,
         kind=kind,
@@ -340,9 +342,9 @@ def _sanitise_raw_body(raw_body: str) -> tuple[str, bool]:
     )
 
 
-def _attempt_model_identity_failure(
+def _attempt_model_identity_evidence(
     *, call_dir: Path, expected_model: str
-) -> str | None:
+) -> tuple[dict[str, Any], str | None] | None:
     interpreted_path = call_dir / "interpreted-response.json"
     if not interpreted_path.is_file():
         return None
@@ -355,12 +357,19 @@ def _attempt_model_identity_failure(
     if not isinstance(attempt, Mapping):
         return None
     actual = attempt.get("model")
-    if actual != expected_model:
-        return (
-            "Router attempt evidence did not preserve the exact requested model; "
-            f"expected {expected_model!r}, observed {actual!r}"
-        )
-    return None
+    preserved = actual == expected_model
+    evidence = {
+        "router_attempt_model": actual,
+        "router_attempt_model_identity_preserved": preserved,
+        "cross_model_fallback_used": not preserved,
+    }
+    if preserved:
+        return evidence, None
+    return (
+        evidence,
+        "Router attempt evidence did not preserve the exact requested model; "
+        f"expected {expected_model!r}, observed {actual!r}",
+    )
 
 
 def _retained_records(
@@ -600,19 +609,23 @@ def _patched_core_execution() -> Iterator[None]:
         if result.get("classification") != "completed":
             return result
 
-        attempt_failure = _attempt_model_identity_failure(
+        attempt_evidence = _attempt_model_identity_evidence(
             call_dir=call_dir,
             expected_model=str(kwargs["plan"].model),
         )
-        if attempt_failure is not None:
-            return _write_terminal_result(
-                output=output,
-                schedule=schedule,
-                prepared_case=prepared_case,
-                kind="infrastructure",
-                code="provider_attempt_model_identity_mismatch",
-                message=attempt_failure,
-            )
+        if attempt_evidence is not None:
+            identity_fields, attempt_failure = attempt_evidence
+            result.update(identity_fields)
+            if attempt_failure is not None:
+                return _write_terminal_result(
+                    output=output,
+                    schedule=schedule,
+                    prepared_case=prepared_case,
+                    kind="infrastructure",
+                    code="provider_attempt_model_identity_mismatch",
+                    message=attempt_failure,
+                    base_overrides=identity_fields,
+                )
 
         violations = _selected_safety_violations(
             selected_ids=list(result.get("selected_candidate_ids", [])),
