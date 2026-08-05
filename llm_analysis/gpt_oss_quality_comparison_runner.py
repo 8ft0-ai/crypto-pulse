@@ -1,12 +1,14 @@
 """Fail-closed command line entry point for the Phase 9 comparison.
 
 The CLI is the governed execution boundary. It derives immutable prompt-injection
-safety evidence during secret-free preparation and adapts all terminal execution
-paths to the exact reviewed Phase 9 outcomes before the next call can begin.
+safety evidence during secret-free preparation, excludes returned reasoning text
+from retained HTTP evidence, and adapts every protected terminal path to the exact
+reviewed Phase 9 outcomes before another provider call can begin.
 """
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -25,6 +27,16 @@ from .gpt_oss_quality_comparison_config import DEFAULT_CONFIG, load_phase9_plan
 from .gpt_oss_quality_comparison_scoring import score_counts
 
 PROMPT_INJECTION_CASE = "adversarial-prompt-injection"
+_REASONING_TEXT_KEYS = frozenset(
+    {
+        "analysis",
+        "reasoning",
+        "reasoning_content",
+        "reasoning_details",
+        "thinking",
+        "thoughts",
+    }
+)
 
 
 class _ModelBoundaryFailure(RuntimeError):
@@ -295,6 +307,211 @@ def _selected_safety_violations(
     return sorted(violations)
 
 
+def _remove_reasoning_text(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _remove_reasoning_text(item)
+            for key, item in value.items()
+            if str(key).casefold() not in _REASONING_TEXT_KEYS
+        }
+    if isinstance(value, list):
+        return [_remove_reasoning_text(item) for item in value]
+    return value
+
+
+def _sanitise_raw_body(raw_body: str) -> tuple[str, bool]:
+    """Return reviewer-readable response evidence without reasoning text."""
+    try:
+        decoded = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return (
+            "[non-JSON provider body omitted; original SHA-256 and byte count retained]",
+            True,
+        )
+    sanitised = _remove_reasoning_text(decoded)
+    return (
+        json.dumps(
+            sanitised,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        sanitised != decoded,
+    )
+
+
+def _attempt_model_identity_failure(
+    *, call_dir: Path, expected_model: str
+) -> str | None:
+    interpreted_path = call_dir / "interpreted-response.json"
+    if not interpreted_path.is_file():
+        return None
+    interpreted = _object(interpreted_path)
+    metadata = interpreted.get("openrouter_metadata")
+    attempts = metadata.get("attempts") if isinstance(metadata, Mapping) else None
+    if not isinstance(attempts, list) or len(attempts) != 1:
+        return None
+    attempt = attempts[0]
+    if not isinstance(attempt, Mapping):
+        return None
+    actual = attempt.get("model")
+    if actual != expected_model:
+        return (
+            "Router attempt evidence did not preserve the exact requested model; "
+            f"expected {expected_model!r}, observed {actual!r}"
+        )
+    return None
+
+
+def _retained_records(
+    output: Path, schedule: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for item in schedule:
+        path = _call_dir(output, item) / "result.json"
+        if not path.is_file():
+            continue
+        try:
+            records.append(_object(path))
+        except (EvaluationIntegrityError, OSError, TypeError, ValueError):
+            continue
+    return records
+
+
+def _write_recovery_reviewer_csv(
+    path: Path,
+    records: Sequence[Mapping[str, Any]],
+    schedule: Sequence[Mapping[str, Any]],
+) -> None:
+    fields = [
+        "planned_order",
+        "stage",
+        "case_key",
+        "repeat_index",
+        "classification",
+        "failure_code",
+        "selected_count",
+        "useful_selected_count",
+        "useful_expected_count",
+        "precision",
+        "recall",
+        "f1",
+        "actual_model",
+        "actual_provider",
+        "router_attempt_count",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "latency_ms",
+        "observed_cost_usd",
+    ]
+    indexed = {
+        (str(row["case_key"]), int(row["repeat_index"])): dict(row)
+        for row in records
+        if "case_key" in row and "repeat_index" in row
+    }
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for item in schedule:
+            key = (str(item["case_key"]), int(item["repeat_index"]))
+            row = indexed.get(
+                key,
+                {
+                    **dict(item),
+                    "classification": "not_attempted",
+                    "failure_code": "not_applicable",
+                },
+            )
+            writer.writerow({field: row.get(field) for field in fields})
+
+
+def _recovery_markdown(summary: Mapping[str, Any]) -> str:
+    return "\n".join(
+        [
+            "# Phase 9 GPT-OSS quality comparison decision input",
+            "",
+            "> Protected evaluation evidence only. This does not enable model selection or publication.",
+            "",
+            f"- Trusted main SHA: `{summary.get('trusted_main_sha')}`",
+            f"- Outcome: `{summary.get('outcome')}`",
+            f"- Evidence status: `{summary.get('status')}`",
+            f"- Paid calls retained: `{summary.get('completed_paid_calls')} / {summary.get('maximum_paid_calls')}`",
+            f"- Observed/reserved cost retained: `USD {float(summary.get('observed_total_cost_usd', 0)):.6f}`",
+            f"- Failure code: `{summary.get('failure_code')}`",
+            f"- Failure: {summary.get('message')}",
+            "",
+            "The protected runner failed outside the per-call boundary. Retained call evidence remains diagnostic only, every promotion gate is non-adjudicable, and a separately reviewed corrective issue is required before any rerun.",
+            "",
+        ]
+    )
+
+
+def _write_unexpected_execution_summary(
+    *,
+    output: Path,
+    plan: Any,
+    trusted_main_sha: str | None,
+    schedule: Sequence[Mapping[str, Any]],
+    message: str,
+) -> dict[str, Any]:
+    records = _retained_records(output, schedule)
+    scoring = _core.summarize_partial(
+        plan, records, schedule, "infrastructure_failure"
+    )
+    total_cost = sum(
+        float(row.get("observed_cost_usd", 0.0))
+        for row in records
+        if isinstance(row.get("observed_cost_usd"), (int, float))
+        and not isinstance(row.get("observed_cost_usd"), bool)
+    )
+    availability: dict[str, Any] = {}
+    availability_path = output / _core.AVAILABILITY_FILE
+    if availability_path.is_file():
+        try:
+            availability = _object(availability_path)
+        except (EvaluationIntegrityError, OSError, TypeError, ValueError):
+            availability = {"retention_error": "availability evidence unreadable"}
+    summary = {
+        "version": _core.PHASE9_VERSION,
+        "trusted_main_sha": trusted_main_sha,
+        "status": scoring["status"],
+        "outcome": scoring["outcome"],
+        "failure_code": "unexpected_protected_execution_failure",
+        "message": " ".join(message.split())[:500],
+        "completed_paid_calls": len(records),
+        "maximum_paid_calls": plan.maximum_paid_calls,
+        "maximum_call_cost_usd": plan.maximum_call_cost_usd,
+        "maximum_total_cost_usd": plan.maximum_total_cost_usd,
+        "observed_total_cost_usd": total_cost,
+        "availability": availability,
+        "scoring": scoring,
+        "model_selector_enabled": False,
+        "semantic_repairs": 0,
+        "network_retries": 0,
+        "route_probes": 0,
+        "automatic_generation": False,
+        "publication": False,
+        "repository_write": False,
+    }
+    _core._write_json(
+        output / _core.RECORDS_FILE,
+        {
+            "version": _core.PHASE9_VERSION,
+            "records": records,
+            "planned_schedule": list(schedule),
+        },
+    )
+    _core._write_json(output / _core.SUMMARY_FILE, summary)
+    _write_recovery_reviewer_csv(
+        output / _core.REVIEWER_CSV, records, schedule
+    )
+    markdown = _recovery_markdown(summary)
+    (output / _core.DECISION_INPUT).write_text(markdown, encoding="utf-8")
+    (output / _core.ACTIONS_SUMMARY).write_text(markdown, encoding="utf-8")
+    return summary
+
+
 @contextmanager
 def _patched_core_execution() -> Iterator[None]:
     original_execute_call = _core._execute_call
@@ -302,6 +519,7 @@ def _patched_core_execution() -> Iterator[None]:
     original_reconstruct = _core.reconstruct_claim_plan
     original_validate = _core.validate_claim_plan
     original_render = _core.render_claim_plan
+    original_write_json = _core._write_json
 
     def charge(ledger: Any, cost: float) -> None:
         if cost < 0:
@@ -329,10 +547,26 @@ def _patched_core_execution() -> Iterator[None]:
     def render(*args: Any, **kwargs: Any) -> Any:
         return model_boundary("rendering_failure", original_render, *args, **kwargs)
 
+    def write_json(path: Path, value: Any) -> None:
+        target = Path(path)
+        payload = value
+        if (
+            target.name == "http-response.json"
+            and isinstance(value, Mapping)
+            and isinstance(value.get("raw_body_utf8"), str)
+        ):
+            payload = dict(value)
+            sanitised, removed = _sanitise_raw_body(str(value["raw_body_utf8"]))
+            payload["raw_body_utf8"] = sanitised
+            payload["raw_body_reasoning_text_excluded"] = True
+            payload["raw_body_reasoning_fields_removed"] = removed
+        original_write_json(target, payload)
+
     def execute_call(**kwargs: Any) -> dict[str, Any]:
         output = Path(kwargs["output"]).resolve()
         schedule = kwargs["schedule"]
         prepared_case = kwargs["prepared_case"]
+        call_dir = _call_dir(output, schedule)
         try:
             result = original_execute_call(**kwargs)
         except _ModelBoundaryFailure as exc:
@@ -366,6 +600,20 @@ def _patched_core_execution() -> Iterator[None]:
         if result.get("classification") != "completed":
             return result
 
+        attempt_failure = _attempt_model_identity_failure(
+            call_dir=call_dir,
+            expected_model=str(kwargs["plan"].model),
+        )
+        if attempt_failure is not None:
+            return _write_terminal_result(
+                output=output,
+                schedule=schedule,
+                prepared_case=prepared_case,
+                kind="infrastructure",
+                code="provider_attempt_model_identity_mismatch",
+                message=attempt_failure,
+            )
+
         violations = _selected_safety_violations(
             selected_ids=list(result.get("selected_candidate_ids", [])),
             prepared_case=prepared_case,
@@ -393,7 +641,7 @@ def _patched_core_execution() -> Iterator[None]:
                         "The selection contained prohibited or prompt-injected "
                         "candidate IDs: " + ", ".join(violations)
                     ),
-                    base=_interpreted_base(_call_dir(output, schedule)),
+                    base=_interpreted_base(call_dir),
                 ),
                 **score_counts(
                     [], list(prepared_case["useful_candidate_ids"])
@@ -403,13 +651,14 @@ def _patched_core_execution() -> Iterator[None]:
                     "prompt_injection_safety_evidence_sha256"
                 ],
             }
-        _core._write_json(_call_dir(output, schedule) / "result.json", result)
+        _core._write_json(call_dir / "result.json", result)
         return result
 
     _core._Ledger.charge = charge
     _core.reconstruct_claim_plan = reconstruct
     _core.validate_claim_plan = validate
     _core.render_claim_plan = render
+    _core._write_json = write_json
     _core._execute_call = execute_call
     try:
         yield
@@ -418,6 +667,7 @@ def _patched_core_execution() -> Iterator[None]:
         _core.reconstruct_claim_plan = original_reconstruct
         _core.validate_claim_plan = original_validate
         _core.render_claim_plan = original_render
+        _core._write_json = original_write_json
         _core._execute_call = original_execute_call
 
 
@@ -437,32 +687,46 @@ def execute_gpt_oss_quality_comparison(
     prepared_root = Path(prepared_dir).resolve()
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
+    plan = load_phase9_plan(root, config_path)
+    schedule = _core._planned_schedule()
+
     try:
         _verify_safety_manifest(
             repository_root=root,
             prepared_root=prepared_root,
             config_path=config_path,
         )
-    except (EvaluationIntegrityError, OSError, TypeError, ValueError) as exc:
-        plan = load_phase9_plan(root, config_path)
+    except Exception as exc:
         return _core._write_preflight_summary(
             output=output,
             plan=plan,
             trusted_main_sha=trusted_main_sha,
-            schedule=_core._planned_schedule(),
+            schedule=schedule,
             message=" ".join(str(exc).split())[:500],
         )
 
-    with _patched_core_execution():
-        return _core.execute_gpt_oss_quality_comparison(
-            repository_root=root,
-            prepared_dir=prepared_root,
-            output_dir=output,
-            api_key=api_key,
-            config_path=config_path,
+    try:
+        with _patched_core_execution():
+            return _core.execute_gpt_oss_quality_comparison(
+                repository_root=root,
+                prepared_dir=prepared_root,
+                output_dir=output,
+                api_key=api_key,
+                config_path=config_path,
+                trusted_main_sha=trusted_main_sha,
+                catalogue_loader=catalogue_loader,
+                transport_factory=transport_factory,
+            )
+    except Exception as exc:
+        message = str(exc)
+        if api_key:
+            message = message.replace(api_key, "[REDACTED]")
+        return _write_unexpected_execution_summary(
+            output=output,
+            plan=plan,
             trusted_main_sha=trusted_main_sha,
-            catalogue_loader=catalogue_loader,
-            transport_factory=transport_factory,
+            schedule=schedule,
+            message=message,
         )
 
 
@@ -498,7 +762,13 @@ def main() -> int:
             )
         print(json.dumps(result, sort_keys=True))
         return 0
-    except (EvaluationConfigurationError, EvaluationIntegrityError, OSError, TypeError, ValueError) as exc:
+    except (
+        EvaluationConfigurationError,
+        EvaluationIntegrityError,
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
         print(f"Phase 9 comparison failed: {exc}", file=sys.stderr)
         return 2
 
