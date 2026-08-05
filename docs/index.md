@@ -54,6 +54,7 @@ Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow sou
 - [Look up the governed bounded-selector model comparison](reference/candidate-selection-model-comparison.md) for the completed Slice 6 contract, protected evidence and archival decision boundary.
 - [Look up the low-cost candidate-selector Stage 0 screen](reference/low-cost-candidate-selector-stage-0.md) for the Phase 7 models, real request, route/schema controls, cost ceilings and compatibility classifications.
 - [Look up observable OpenRouter transport calibration](reference/openrouter-transport-calibration.md) for the Phase 8 real-request discovery, evidence-first response capture and pinned-provider reproduction boundary.
+- [Look up the GPT-OSS candidate-selection quality comparison](reference/gpt-oss-quality-comparison.md) for the Phase 9 frozen corpus, staged execution, scoring, stability and operational decision boundary.
 - [Look up semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md) for exact repository-owned values, formatting, templates and fail-closed rules.
 - [Look up the semantic claim-plan benchmark](reference/semantic-plan-benchmark.md) for protected workflow boundaries, retained artefacts and qualification fields.
 - [Review the historical five-model catalogue screen](governed-semantic-plan-model-catalogue-screen.md) for the retained compatibility evidence and exclusions.
@@ -109,6 +110,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Governed bounded-selector model comparison](reference/candidate-selection-model-comparison.md)
 - [Low-cost candidate-selector Stage 0](reference/low-cost-candidate-selector-stage-0.md)
 - [Observable OpenRouter transport calibration](reference/openrouter-transport-calibration.md)
+- [GPT-OSS candidate-selection quality comparison](reference/gpt-oss-quality-comparison.md)
 - [Semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md)
 - [Semantic claim-plan benchmark](reference/semantic-plan-benchmark.md)
 - [Governed LLM workflows](reference/governed-llm-workflows.md)
