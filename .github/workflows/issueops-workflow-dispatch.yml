@@ -1,0 +1,214 @@
+name: IssueOps workflow dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: issueops-comment-${{ github.event.comment.id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve reviewed dispatch authority
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      authorised: ${{ steps.resolve.outputs.authorised }}
+      authorisation_id: ${{ steps.resolve.outputs.authorisation_id }}
+      execution_tag: ${{ steps.resolve.outputs.execution_tag }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+    steps:
+      - name: Reject non-canonical dispatcher context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVENT_NAME" = "issue_comment"
+          test "$EVENT_ACTION" = "created"
+          test "$RUN_ATTEMPT" = "1"
+          test "$WORKFLOW_SHA" = "$SOURCE_SHA"
+
+      - name: Check out exact created-event source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dispatcher dependency
+        run: pip install pyyaml
+
+      - name: Resolve exact source-controlled authority
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m issueops_dispatch.runner resolve \
+            --event "$GITHUB_EVENT_PATH" \
+            --config .github/issueops-workflow-dispatch.yml \
+            --dispatcher-workflow .github/workflows/issueops-workflow-dispatch.yml \
+            --source-sha "$GITHUB_SHA" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+  consume-and-dispatch:
+    name: Atomically consume and dispatch
+    needs: resolve
+    if: needs.resolve.outputs.authorised == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: issueops-dispatch-${{ needs.resolve.outputs.authorisation_id }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: write
+      issues: read
+    outputs:
+      target_run_id: ${{ steps.dispatch.outputs.target_run_id }}
+      target_run_url: ${{ steps.dispatch.outputs.target_run_url }}
+    steps:
+      - name: Reject rerun or source drift
+        env:
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUN_ATTEMPT" = "1"
+          test "$WORKFLOW_SHA" = "$SOURCE_SHA"
+          test "$RESOLVED_SHA" = "$SOURCE_SHA"
+
+      - name: Check out exact authorised source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dispatcher dependency
+        run: pip install pyyaml
+
+      - name: Consume one-time authority and dispatch once
+        id: dispatch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m issueops_dispatch.runner consume \
+            --event "$GITHUB_EVENT_PATH" \
+            --config .github/issueops-workflow-dispatch.yml \
+            --dispatcher-workflow .github/workflows/issueops-workflow-dispatch.yml \
+            --source-sha "$GITHUB_SHA" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --repository "$GITHUB_REPOSITORY" \
+            --token "$GITHUB_TOKEN"
+
+  sign-dispatch-receipt:
+    name: Sign exact target-run receipt
+    needs: [resolve, consume-and-dispatch]
+    if: needs.consume-and-dispatch.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+      issues: read
+    steps:
+      - name: Reject rerun or source drift
+        env:
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RESOLVED_SHA: ${{ needs.resolve.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUN_ATTEMPT" = "1"
+          test "$WORKFLOW_SHA" = "$SOURCE_SHA"
+          test "$RESOLVED_SHA" = "$SOURCE_SHA"
+
+      - name: Check out exact authorised source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dispatcher dependency
+        run: pip install pyyaml
+
+      - name: Revalidate exact target run and prepare canonical receipt
+        id: receipt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_RUN_ID: ${{ needs.consume-and-dispatch.outputs.target_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m issueops_dispatch.runner prepare-attestation \
+            --event "$GITHUB_EVENT_PATH" \
+            --config .github/issueops-workflow-dispatch.yml \
+            --dispatcher-workflow .github/workflows/issueops-workflow-dispatch.yml \
+            --source-sha "$GITHUB_SHA" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --repository "$GITHUB_REPOSITORY" \
+            --token "$GITHUB_TOKEN" \
+            --target-run-id "$TARGET_RUN_ID" \
+            --dispatcher-run-id "$GITHUB_RUN_ID" \
+            --output-dir "$RUNNER_TEMP/issueops-dispatch-receipt"
+
+      - name: Create signed dispatcher attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ steps.receipt.outputs.subject_path }}
+          predicate-type: ${{ steps.receipt.outputs.predicate_type }}
+          predicate-path: ${{ steps.receipt.outputs.predicate_path }}
+          create-storage-record: false
+          show-summary: true
+
+      - name: Publish dispatcher receipt summary
+        env:
+          AUTH_ID: ${{ needs.resolve.outputs.authorisation_id }}
+          EXECUTION_TAG: ${{ needs.resolve.outputs.execution_tag }}
+          TARGET_RUN_ID: ${{ needs.consume-and-dispatch.outputs.target_run_id }}
+          TARGET_RUN_URL: ${{ needs.consume-and-dispatch.outputs.target_run_url }}
+          SUBJECT_SHA256: ${{ steps.receipt.outputs.subject_sha256 }}
+        shell: bash
+        run: |
+          {
+            echo "# IssueOps workflow dispatch"
+            echo
+            echo "- Authorisation: \`$AUTH_ID\`"
+            echo "- Execution tag: \`$EXECUTION_TAG\`"
+            echo "- Target run: [$TARGET_RUN_ID]($TARGET_RUN_URL)"
+            echo "- Canonical subject SHA-256: \`$SUBJECT_SHA256\`"
+            echo "- Dispatcher run attempt: \`$GITHUB_RUN_ATTEMPT\`"
+          } >> "$GITHUB_STEP_SUMMARY"
