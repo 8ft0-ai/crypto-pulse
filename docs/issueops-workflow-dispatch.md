@@ -25,7 +25,9 @@ refs/tags/issueops/dispatch/<id>--sha-<S>
 
 The tag is a lightweight reference directly to `<S>`. The side-effect job validates the target workflow and exact runtime-observable execution-tag ruleset, rejects a pre-existing tag, then re-fetches and revalidates the triggering comment immediately before tag creation. The live comment must retain its exact issue relationship, body, actor, association and unedited timestamps.
 
-Exactly one `POST /git/refs` is available in dispatcher code. Only HTTP `201` followed by exact ref read-back owns continuation. Timeout, reset, non-`201`, conflicting/pre-existing tag or ambiguous result fails closed. Tag creation is never retried and authority is never restored after consumption.
+Exactly one `POST /git/refs` is available in dispatcher code. Only HTTP `201` with a verifiable returned ref followed by exact ref read-back owns continuation. Timeout, reset, malformed/lost success data or any other ambiguous create result never grants continuation and never causes a second create. The dispatcher performs exactly one bounded read-only lookup of the canonical ref for classification only: an existing exact ref is classified as consumed, a conflicting ref as consumed/conflicted, and an absent or unavailable ref still ends the run without dispatch.
+
+After an unambiguous create winner and exact tag read-back, the dispatcher fetches and validates the same frozen execution-tag ruleset again before the sole workflow-dispatch write. Any post-consumption drift in the observable ruleset state fails closed with zero dispatch attempts. The already-created tag remains consumed; failure never restores authority.
 
 The separately provisioned v1 ruleset must expose exactly this runtime condition:
 
@@ -38,7 +40,7 @@ It must be active for tags, restrict update and deletion, and must not restrict 
 
 ## Dispatch and run binding
 
-After consumption, exactly one Actions write endpoint is available:
+After consumption and the post-consumption ruleset re-check, exactly one Actions write endpoint is available:
 
 ```text
 POST /actions/workflows/{frozen_numeric_id}/dispatches
@@ -88,7 +90,7 @@ The privileged runtime installs no Python package from the network. Registry par
 
 Every dispatcher resolution, side-effect and signing boundary requires attempt 1 and the canonical source/workflow SHA. A workflow or job rerun cannot legitimately create another execution tag, issue another target dispatch or sign a new receipt.
 
-A later edit or deletion after successful tag consumption does not restore, revoke or duplicate consumed authority. API timeouts, resets, 4xx/5xx responses, malformed direct dispatch success data, signing failure or target failure never cause an automatic second dispatch.
+A later edit or deletion after successful tag consumption does not restore, revoke or duplicate consumed authority. API timeouts, resets, 4xx/5xx responses, malformed direct dispatch success data, signing failure or target failure never cause an automatic second dispatch. Ambiguous tag creation is reconciled read-only for classification only and likewise never produces a blind retry or continuation winner.
 
 ## Target-side verification remains separately governed
 
