@@ -19,8 +19,10 @@ AUTHOR_ASSOCIATION = "OWNER"
 DISPATCHER_WORKFLOW_PATH = ".github/workflows/issueops-workflow-dispatch.yml"
 CONSUMPTION_MECHANISM = "execution_tag_v1"
 PROVENANCE_MECHANISM = "dispatch_attestation_v1"
+ATTESTATION_SCHEMA = "dispatch_attestation_v1"
 PREDICATE_TYPE = "https://github.com/8ft0-ai/crypto-pulse/issueops/dispatch-attestation/v1"
 TARGET_REF_POLICY = "consumed_execution_tag_v1"
+RULESET_REF_INCLUDE = "refs/tags/issueops/dispatch/*"
 AUTHORISATION_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,48}$")
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -52,6 +54,20 @@ RECORD_KEYS = frozenset(
     }
 )
 SUBJECT_KEYS = (
+    "schema",
+    "repository",
+    "repository_id",
+    "authorisation_id",
+    "authorisation_sha",
+    "execution_ref",
+    "target_workflow_id",
+    "target_workflow_path",
+    "target_run_id",
+    "target_ref",
+    "target_sha",
+)
+PREDICATE_KEYS = (
+    "schema",
     "repository",
     "repository_id",
     "repository_owner_id",
@@ -74,8 +90,9 @@ SUBJECT_KEYS = (
     "target_run_id",
     "target_ref",
     "target_sha",
+    "target_event",
+    "fixed_inputs_sha256",
 )
-PREDICATE_KEYS = SUBJECT_KEYS + ("target_event", "fixed_inputs_sha256")
 
 
 class ContractError(ValueError):
@@ -164,8 +181,10 @@ def validate_record(record: Mapping[str, Any], *, now: datetime) -> dict[str, An
         raise ContractError("maximum_dispatch_attempts must equal 1")
     if not isinstance(item["enabled"], bool):
         raise ContractError("enabled must be boolean")
-    _rfc3339(item["not_before"], name="not_before")
-    _rfc3339(item["expires_at"], name="expires_at")
+    not_before = _rfc3339(item["not_before"], name="not_before")
+    expires_at = _rfc3339(item["expires_at"], name="expires_at")
+    if not_before is not None and expires_at is not None and not_before >= expires_at:
+        raise ContractError("not_before must be earlier than expires_at")
     if item["consumption_mechanism"] != CONSUMPTION_MECHANISM:
         raise ContractError("unsupported consumption_mechanism")
     if item["provenance_mechanism"] != PROVENANCE_MECHANISM:
@@ -200,10 +219,25 @@ def validate_registry(registry: Mapping[str, Any], *, now: datetime) -> list[dic
     return validated
 
 
+def _authorisation_changed_at_source(
+    record: Mapping[str, Any], parent_registry: Mapping[str, Any], *, now: datetime
+) -> bool:
+    parent_records = validate_registry(parent_registry, now=now)
+    matching_parent = [
+        item for item in parent_records if item["authorisation_id"] == record["authorisation_id"]
+    ]
+    if not matching_parent:
+        return True
+    if len(matching_parent) != 1:
+        raise ContractError("parent registry contains duplicate authorisation_id")
+    return canonical_json_bytes(matching_parent[0]) != canonical_json_bytes(record)
+
+
 def resolve_event(
     *,
     event: Mapping[str, Any],
     registry: Mapping[str, Any],
+    parent_registry: Mapping[str, Any],
     source_sha: str,
     dispatcher_workflow_bytes: bytes,
     run_attempt: int,
@@ -248,6 +282,10 @@ def resolve_event(
     if len(matches) != 1:
         raise ContractError("created comment resolves to more than one authorisation")
     record = matches[0]
+    if not _authorisation_changed_at_source(record, parent_registry, now=now):
+        raise ContractError(
+            "selected authorisation was not added or modified at the exact created-event SHA"
+        )
     workflow_hash = sha256_bytes(dispatcher_workflow_bytes)
     if workflow_hash != record["dispatcher_workflow_sha256"]:
         raise ContractError("dispatcher workflow hash does not match source-controlled authority")
@@ -264,25 +302,57 @@ def resolve_event(
     )
 
 
-def ensure_comment_unchanged(event: Mapping[str, Any], live_comment: Mapping[str, Any], resolution: Resolution) -> None:
+def ensure_comment_unchanged(
+    event: Mapping[str, Any], live_comment: Mapping[str, Any], resolution: Resolution
+) -> None:
     comment = event["comment"]
     issue = event["issue"]
+    issue_number = issue.get("number")
     if live_comment.get("id") != comment.get("id"):
         raise ContractError("triggering comment identity changed")
     if live_comment.get("body") != resolution.record["command"]:
         raise ContractError("triggering comment body changed")
-    if live_comment.get("html_url") and f"/issues/{issue['number']}#" not in live_comment["html_url"]:
-        raise ContractError("triggering comment moved outside the governing issue")
+    expected_issue_url = f"https://api.github.com/repos/{REPOSITORY}/issues/{issue_number}"
+    expected_html_prefix = f"https://github.com/{REPOSITORY}/issues/{issue_number}#issuecomment-"
+    issue_url = live_comment.get("issue_url")
+    html_url = live_comment.get("html_url")
+    if issue_url != expected_issue_url or not isinstance(html_url, str) or not html_url.startswith(expected_html_prefix):
+        raise ContractError("triggering comment relationship to governing issue is missing or changed")
     user = live_comment.get("user") or {}
     if user.get("id") != ACTOR_USER_ID or user.get("login") != ACTOR_LOGIN:
         raise ContractError("triggering actor changed")
     if live_comment.get("author_association") != AUTHOR_ASSOCIATION:
         raise ContractError("triggering author association changed")
-    if live_comment.get("created_at") != live_comment.get("updated_at"):
+    created_at = live_comment.get("created_at")
+    updated_at = live_comment.get("updated_at")
+    if not isinstance(created_at, str) or not isinstance(updated_at, str):
+        raise ContractError("triggering comment timestamps are missing")
+    if created_at != updated_at:
         raise ContractError("edited command cannot consume authority")
 
 
 def canonical_subject(
+    *, resolution: Resolution, target_run: Mapping[str, Any]
+) -> dict[str, Any]:
+    data = {
+        "schema": ATTESTATION_SCHEMA,
+        "repository": REPOSITORY,
+        "repository_id": REPOSITORY_ID,
+        "authorisation_id": resolution.record["authorisation_id"],
+        "authorisation_sha": resolution.source_sha,
+        "execution_ref": resolution.execution_ref,
+        "target_workflow_id": resolution.record["target_workflow_id"],
+        "target_workflow_path": resolution.record["target_workflow_path"],
+        "target_run_id": target_run["id"],
+        "target_ref": resolution.execution_ref,
+        "target_sha": resolution.source_sha,
+    }
+    if tuple(data) != SUBJECT_KEYS:
+        raise AssertionError("canonical subject field order drift")
+    return data
+
+
+def canonical_predicate(
     *,
     resolution: Resolution,
     event: Mapping[str, Any],
@@ -291,6 +361,7 @@ def canonical_subject(
     target_run: Mapping[str, Any],
 ) -> dict[str, Any]:
     data = {
+        "schema": ATTESTATION_SCHEMA,
         "repository": REPOSITORY,
         "repository_id": REPOSITORY_ID,
         "repository_owner_id": REPOSITORY_OWNER_ID,
@@ -313,16 +384,9 @@ def canonical_subject(
         "target_run_id": target_run["id"],
         "target_ref": resolution.execution_ref,
         "target_sha": resolution.source_sha,
+        "target_event": "workflow_dispatch",
+        "fixed_inputs_sha256": resolution.fixed_inputs_sha256,
     }
-    if tuple(data) != SUBJECT_KEYS:
-        raise AssertionError("canonical subject field order drift")
-    return data
-
-
-def canonical_predicate(subject: Mapping[str, Any], *, fixed_inputs_sha256: str) -> dict[str, Any]:
-    data = dict(subject)
-    data["target_event"] = "workflow_dispatch"
-    data["fixed_inputs_sha256"] = fixed_inputs_sha256
     if tuple(data) != PREDICATE_KEYS:
         raise AssertionError("canonical predicate field order drift")
     return data
