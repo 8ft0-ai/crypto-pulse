@@ -1,2 +1,4 @@
-schema_version: 2
-authorisations: []
+{
+  "schema_version": 2,
+  "authorisations": []
+}
