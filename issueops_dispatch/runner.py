@@ -6,6 +6,7 @@ import argparse
 import base64
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -14,10 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 from issueops_dispatch.core import (
     ContractError,
+    RULESET_REF_INCLUDE,
     Resolution,
     canonical_json_bytes,
     canonical_predicate,
@@ -29,6 +29,7 @@ from issueops_dispatch.core import (
 
 API_VERSION = "2026-03-10"
 ACCEPT = "application/vnd.github+json"
+EMPTY_REGISTRY: Mapping[str, Any] = {"schema_version": 2, "authorisations": []}
 
 
 class GitHubAPI:
@@ -66,7 +67,9 @@ class GitHubAPI:
             status = exc.code
             payload = exc.read()
         except (TimeoutError, urllib.error.URLError) as exc:
-            raise ContractError(f"ambiguous GitHub API response for {method} {path}: {exc}") from exc
+            raise ContractError(
+                f"ambiguous GitHub API response for {method} {path}: {exc}"
+            ) from exc
         if status not in expected:
             detail = payload.decode("utf-8", errors="replace")[:1000]
             raise ContractError(f"GitHub API {method} {path} returned {status}: {detail}")
@@ -87,7 +90,9 @@ class GitHubAPI:
 
     def get_contents(self, path: str, ref: str) -> Mapping[str, Any]:
         quoted = urllib.parse.quote(path, safe="/")
-        _, payload = self._request("GET", f"/contents/{quoted}?ref={urllib.parse.quote(ref, safe='')}")
+        _, payload = self._request(
+            "GET", f"/contents/{quoted}?ref={urllib.parse.quote(ref, safe='')}"
+        )
         return _mapping(payload, "contents")
 
     def get_ruleset(self, ruleset_id: int) -> Mapping[str, Any]:
@@ -105,7 +110,7 @@ class GitHubAPI:
         return _mapping(payload, "tag ref")
 
     def create_tag_once(self, execution_ref: str, source_sha: str) -> Mapping[str, Any]:
-        # This is the sole Git-reference write in the implementation.
+        # Sole Git-reference write. No update/delete/content write exists.
         _, payload = self._request(
             "POST",
             "/git/refs",
@@ -114,8 +119,10 @@ class GitHubAPI:
         )
         return _mapping(payload, "created tag")
 
-    def dispatch_once(self, workflow_id: int, execution_tag: str, fixed_inputs: Mapping[str, Any]) -> Mapping[str, Any]:
-        # This is the sole Actions write endpoint in the implementation.
+    def dispatch_once(
+        self, workflow_id: int, execution_tag: str, fixed_inputs: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
+        # Sole Actions write endpoint; no other Actions mutation is implemented.
         _, payload = self._request(
             "POST",
             f"/actions/workflows/{workflow_id}/dispatches",
@@ -125,7 +132,9 @@ class GitHubAPI:
         return _mapping(payload, "workflow dispatch response")
 
     def get_run_attempt(self, run_id: int, attempt: int = 1) -> Mapping[str, Any]:
-        _, payload = self._request("GET", f"/actions/runs/{run_id}/attempts/{attempt}")
+        _, payload = self._request(
+            "GET", f"/actions/runs/{run_id}/attempts/{attempt}"
+        )
         return _mapping(payload, "workflow run")
 
 
@@ -136,10 +145,57 @@ def _mapping(value: Any, name: str) -> Mapping[str, Any]:
 
 
 def load_registry(path: Path) -> Mapping[str, Any]:
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    """Load the registry as JSON, a strict YAML 1.2 subset, using stdlib only."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ContractError(
+            "authorisation registry must use the canonical JSON/YAML-subset serialisation"
+        ) from exc
     if not isinstance(payload, Mapping):
         raise ContractError("authorisation registry is not an object")
     return payload
+
+
+def load_registry_bytes(payload: bytes) -> Mapping[str, Any]:
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ContractError("parent authorisation registry is not canonical JSON") from exc
+    if not isinstance(value, Mapping):
+        raise ContractError("parent authorisation registry is not an object")
+    return value
+
+
+def load_parent_registry(config: Path, source_sha: str) -> Mapping[str, Any]:
+    """Read the config at the exact source commit's first parent from local git."""
+    try:
+        parent = subprocess.run(
+            ["git", "rev-parse", f"{source_sha}^1"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError as exc:
+        raise ContractError("cannot prove exact source commit first parent") from exc
+    if not parent:
+        raise ContractError("exact source commit first parent is missing")
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{parent}:{config.as_posix()}"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        raise ContractError("cannot inspect first-parent authorisation registry") from exc
+    if result.returncode == 0:
+        return load_registry_bytes(result.stdout)
+    stderr = result.stderr.decode("utf-8", errors="replace")
+    if "does not exist in" in stderr or "exists on disk, but not in" in stderr:
+        return EMPTY_REGISTRY
+    raise ContractError("cannot prove first-parent authorisation registry state")
 
 
 def load_event(path: Path) -> Mapping[str, Any]:
@@ -151,11 +207,14 @@ def load_event(path: Path) -> Mapping[str, Any]:
 
 def resolve_from_files(args: argparse.Namespace) -> Resolution | None:
     event = load_event(Path(args.event))
-    registry = load_registry(Path(args.config))
+    config_path = Path(args.config)
+    registry = load_registry(config_path)
+    parent_registry = load_parent_registry(config_path, args.source_sha)
     workflow_bytes = Path(args.dispatcher_workflow).read_bytes()
     return resolve_event(
         event=event,
         registry=registry,
+        parent_registry=parent_registry,
         source_sha=args.source_sha,
         dispatcher_workflow_bytes=workflow_bytes,
         run_attempt=args.run_attempt,
@@ -171,8 +230,30 @@ def _decode_contents(item: Mapping[str, Any]) -> bytes:
         raise ContractError("target workflow content is missing")
     try:
         return base64.b64decode(content, validate=False)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         raise ContractError("target workflow content is invalid base64") from exc
+
+
+def _has_top_level_workflow_dispatch(text: str) -> bool:
+    """Recognise workflow_dispatch within the top-level `on:` mapping only."""
+    lines = text.splitlines()
+    in_on = False
+    on_indent = 0
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if not in_on:
+            if indent == 0 and stripped == "on:":
+                in_on = True
+                on_indent = indent
+            continue
+        if indent <= on_indent:
+            return False
+        if stripped.startswith("workflow_dispatch:"):
+            return True
+    return False
 
 
 def validate_target_workflow(api: GitHubAPI, resolution: Resolution) -> None:
@@ -184,15 +265,16 @@ def validate_target_workflow(api: GitHubAPI, resolution: Resolution) -> None:
         raise ContractError("target workflow path mismatch")
     if workflow.get("state") != "active":
         raise ContractError("target workflow is not active")
-    content = _decode_contents(api.get_contents(record["target_workflow_path"], resolution.source_sha))
+    content = _decode_contents(
+        api.get_contents(record["target_workflow_path"], resolution.source_sha)
+    )
     if sha256_bytes(content) != record["target_workflow_sha256"]:
         raise ContractError("target workflow file hash mismatch")
-    text = content.decode("utf-8")
-    document = yaml.safe_load(text)
-    if not isinstance(document, Mapping):
-        raise ContractError("target workflow YAML is not an object")
-    trigger = document.get("on") if "on" in document else document.get(True)
-    if not isinstance(trigger, Mapping) or "workflow_dispatch" not in trigger:
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ContractError("target workflow is not UTF-8") from exc
+    if not _has_top_level_workflow_dispatch(text):
         raise ContractError("target workflow is not workflow_dispatch-enabled")
 
 
@@ -217,43 +299,36 @@ def validate_runtime_ruleset(ruleset: Mapping[str, Any], resolution: Resolution)
     if ruleset.get("target") != "tag" or ruleset.get("enforcement") != "active":
         raise ContractError("execution-tag ruleset is not active for tags")
     conditions = ruleset.get("conditions")
-    if not isinstance(conditions, Mapping):
-        raise ContractError("execution-tag ruleset conditions are missing")
+    if not isinstance(conditions, Mapping) or set(conditions) != {"ref_name"}:
+        raise ContractError("execution-tag ruleset conditions drifted")
     ref_name = conditions.get("ref_name")
-    if not isinstance(ref_name, Mapping):
-        raise ContractError("execution-tag ref-name condition is missing")
+    if not isinstance(ref_name, Mapping) or set(ref_name) != {"include", "exclude"}:
+        raise ContractError("execution-tag ref-name condition drifted")
     includes = ref_name.get("include")
     excludes = ref_name.get("exclude")
-    if not isinstance(includes, list) or not all(isinstance(item, str) for item in includes):
-        raise ContractError("execution-tag include conditions are malformed")
-    if excludes is None:
-        excludes = []
-    if not isinstance(excludes, list) or not all(isinstance(item, str) for item in excludes):
-        raise ContractError("execution-tag exclude conditions are malformed")
-    canonical_patterns = {
-        "refs/tags/issueops/dispatch/*",
-        "issueops/dispatch/*",
-        "~ALL",
-    }
-    if not any(pattern in canonical_patterns for pattern in includes):
-        raise ContractError("ruleset does not visibly cover IssueOps execution tags")
-    if any(resolution.execution_ref == excluded for excluded in excludes):
-        raise ContractError("execution tag is excluded from the ruleset")
+    if includes != [RULESET_REF_INCLUDE]:
+        raise ContractError("execution-tag include namespace is not the exact reviewed value")
+    if excludes != []:
+        raise ContractError("execution-tag exclusions are not permitted in v1")
     rule_types = _rule_types(ruleset)
     if "update" not in rule_types or "deletion" not in rule_types:
         raise ContractError("ruleset must restrict tag update and deletion")
     if "creation" in rule_types:
         raise ContractError("v1 execution-tag ruleset must not restrict creation")
-    # bypass_actors is deliberately not interpreted here: GitHub omits it for
-    # callers without ruleset-write authority. Full bypass review is a separate
-    # provisioning-time governance control.
+    # bypass_actors is deliberately not interpreted here: GitHub may omit it
+    # for callers without ruleset-write authority. Complete bypass review is a
+    # separate provisioning-time governance control.
 
 
 def validate_tag_ref(tag: Mapping[str, Any], resolution: Resolution) -> None:
     if tag.get("ref") != resolution.execution_ref:
         raise ContractError("execution tag read-back ref mismatch")
     obj = tag.get("object")
-    if not isinstance(obj, Mapping) or obj.get("type") != "commit" or obj.get("sha") != resolution.source_sha:
+    if (
+        not isinstance(obj, Mapping)
+        or obj.get("type") != "commit"
+        or obj.get("sha") != resolution.source_sha
+    ):
         raise ContractError("execution tag does not point directly to the authorised commit")
 
 
@@ -276,10 +351,7 @@ def validate_target_run(run: Mapping[str, Any], resolution: Resolution) -> None:
 
 
 def consume_and_dispatch(
-    *,
-    api: GitHubAPI,
-    event: Mapping[str, Any],
-    resolution: Resolution,
+    *, api: GitHubAPI, event: Mapping[str, Any], resolution: Resolution
 ) -> Mapping[str, Any]:
     validate_target_workflow(api, resolution)
     ruleset = api.get_ruleset(resolution.record["execution_tag_ruleset_id"])
@@ -288,9 +360,7 @@ def consume_and_dispatch(
     if api.get_tag(resolution.execution_tag) is not None:
         raise ContractError("execution tag already exists; authorisation is consumed or conflicted")
 
-    # Re-fetch the created-event comment at the last possible point before the
-    # atomic consumption write. Later edits/deletions cannot restore or revoke
-    # an authority that this tag creation has already consumed.
+    # Re-fetch at the last possible point before the atomic consumption write.
     live_comment = api.get_comment(int(event["comment"]["id"]))
     ensure_comment_unchanged(event, live_comment, resolution)
 
@@ -309,7 +379,11 @@ def consume_and_dispatch(
     run_id = response.get("workflow_run_id")
     run_url = response.get("run_url")
     html_url = response.get("html_url")
-    if not isinstance(run_id, int) or not isinstance(run_url, str) or not isinstance(html_url, str):
+    if (
+        not isinstance(run_id, int)
+        or not isinstance(run_url, str)
+        or not isinstance(html_url, str)
+    ):
         raise ContractError("workflow dispatch did not return direct run identity")
     run = api.get_run_attempt(run_id, 1)
     validate_target_run(run, resolution)
@@ -333,14 +407,14 @@ def write_attestation_inputs(
     if dispatcher_run_attempt != 1:
         raise ContractError("dispatcher rerun may not sign")
     validate_target_run(target_run, resolution)
-    subject = canonical_subject(
+    subject = canonical_subject(resolution=resolution, target_run=target_run)
+    predicate = canonical_predicate(
         resolution=resolution,
         event=event,
         dispatcher_run_id=dispatcher_run_id,
         dispatcher_run_attempt=dispatcher_run_attempt,
         target_run=target_run,
     )
-    predicate = canonical_predicate(subject, fixed_inputs_sha256=resolution.fixed_inputs_sha256)
     output_dir.mkdir(parents=True, exist_ok=True)
     subject_path = output_dir / "issueops-dispatch-target-run.json"
     predicate_path = output_dir / "issueops-dispatch-predicate.json"
@@ -387,7 +461,6 @@ def command_prepare_attestation(args: argparse.Namespace) -> int:
     event = load_event(Path(args.event))
     api = GitHubAPI(args.repository, args.token)
     # Do not re-authorise against mutable comment state after consumption.
-    # The unique execution tag already froze the accepted created-event command.
     run = api.get_run_attempt(args.target_run_id, 1)
     validate_target_run(run, resolution)
     subject, predicate = write_attestation_inputs(
