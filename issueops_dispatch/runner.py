@@ -17,6 +17,8 @@ from typing import Any, Mapping
 
 from issueops_dispatch.core import (
     ContractError,
+    REPOSITORY,
+    REPOSITORY_ID,
     RULESET_REF_INCLUDE,
     Resolution,
     canonical_json_bytes,
@@ -342,10 +344,23 @@ def validate_tag_ref(tag: Mapping[str, Any], resolution: Resolution) -> None:
         raise ContractError("execution tag does not point directly to the authorised commit")
 
 
-def validate_target_run(run: Mapping[str, Any], resolution: Resolution) -> None:
+def validate_target_run(
+    run: Mapping[str, Any],
+    resolution: Resolution,
+    *,
+    expected_run_id: int | None = None,
+) -> None:
     record = resolution.record
-    if run.get("id") is None or not isinstance(run.get("id"), int):
+    run_id = run.get("id")
+    if not isinstance(run_id, int):
         raise ContractError("target run id is missing")
+    if expected_run_id is not None and run_id != expected_run_id:
+        raise ContractError("target run id does not match direct dispatch identity")
+    repository = run.get("repository")
+    if not isinstance(repository, Mapping):
+        raise ContractError("target run repository identity is missing")
+    if repository.get("full_name") != REPOSITORY or repository.get("id") != REPOSITORY_ID:
+        raise ContractError("target run repository identity mismatch")
     if run.get("workflow_id") != record["target_workflow_id"]:
         raise ContractError("target run workflow id mismatch")
     if run.get("path") != record["target_workflow_path"]:
@@ -409,17 +424,33 @@ def consume_and_dispatch(
         _reconcile_ambiguous_tag_creation(api, resolution, exc)
         raise AssertionError("ambiguous reconciliation must terminate")
 
-    validate_tag_ref(created, resolution)
+    try:
+        validate_tag_ref(created, resolution)
+    except ContractError as exc:
+        ambiguity = AmbiguousGitHubResponse(
+            "create-reference returned an unverifiable HTTP 201 response body"
+        )
+        ambiguity.__cause__ = exc
+        _reconcile_ambiguous_tag_creation(api, resolution, ambiguity)
+        raise AssertionError("ambiguous reconciliation must terminate")
+
     read_back = api.get_tag(resolution.execution_tag)
     if read_back is None:
         raise ContractError("execution tag disappeared after creation")
     validate_tag_ref(read_back, resolution)
 
     # The immutable execution tag and its reviewed update/deletion rules are
-    # the durable one-time authority primitive. Re-observe the exact ruleset
-    # after tag consumption and before the sole dispatch write.
+    # the durable one-time authority primitive. Re-observe both the exact
+    # ruleset and exact tag target after consumption and before dispatch.
     validate_runtime_ruleset(api.get_ruleset(ruleset_id), resolution)
-    validate_tag_ref(read_back, resolution)
+    final_tag = api.get_tag(resolution.execution_tag)
+    if final_tag is None:
+        raise ContractError("execution tag disappeared before dispatch")
+    validate_tag_ref(final_tag, resolution)
+
+    # Phase C begins only after authority has been durably consumed. Re-prove
+    # the exact target workflow identity/state at S immediately before dispatch.
+    validate_target_workflow(api, resolution)
 
     response = api.dispatch_once(
         resolution.record["target_workflow_id"],
@@ -436,7 +467,7 @@ def consume_and_dispatch(
     ):
         raise ContractError("workflow dispatch did not return direct run identity")
     run = api.get_run_attempt(run_id, 1)
-    validate_target_run(run, resolution)
+    validate_target_run(run, resolution, expected_run_id=run_id)
     return {
         "workflow_run_id": run_id,
         "run_url": run_url,
@@ -512,7 +543,7 @@ def command_prepare_attestation(args: argparse.Namespace) -> int:
     api = GitHubAPI(args.repository, args.token)
     # Do not re-authorise against mutable comment state after consumption.
     run = api.get_run_attempt(args.target_run_id, 1)
-    validate_target_run(run, resolution)
+    validate_target_run(run, resolution, expected_run_id=args.target_run_id)
     subject, predicate = write_attestation_inputs(
         event=event,
         resolution=resolution,
