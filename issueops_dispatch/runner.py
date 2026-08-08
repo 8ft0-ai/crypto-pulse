@@ -32,6 +32,10 @@ ACCEPT = "application/vnd.github+json"
 EMPTY_REGISTRY: Mapping[str, Any] = {"schema_version": 2, "authorisations": []}
 
 
+class AmbiguousGitHubResponse(ContractError):
+    """A write may have reached GitHub but continuation ownership is unknown."""
+
+
 class GitHubAPI:
     def __init__(self, repository: str, token: str) -> None:
         self.repository = repository
@@ -67,7 +71,7 @@ class GitHubAPI:
             status = exc.code
             payload = exc.read()
         except (TimeoutError, urllib.error.URLError) as exc:
-            raise ContractError(
+            raise AmbiguousGitHubResponse(
                 f"ambiguous GitHub API response for {method} {path}: {exc}"
             ) from exc
         if status not in expected:
@@ -78,7 +82,9 @@ class GitHubAPI:
         try:
             return status, json.loads(payload)
         except json.JSONDecodeError as exc:
-            raise ContractError(f"GitHub API {method} {path} returned non-JSON") from exc
+            raise AmbiguousGitHubResponse(
+                f"GitHub API {method} {path} returned malformed success data"
+            ) from exc
 
     def get_comment(self, comment_id: int) -> Mapping[str, Any]:
         _, payload = self._request("GET", f"/issues/comments/{comment_id}")
@@ -117,7 +123,15 @@ class GitHubAPI:
             body={"ref": execution_ref, "sha": source_sha},
             expected=(201,),
         )
-        return _mapping(payload, "created tag")
+        try:
+            return _mapping(payload, "created tag")
+        except ContractError as exc:
+            # GitHub returned the expected success status but not the exact body
+            # needed to identify the winner. The ref may already exist, so this
+            # is classification-only and must never grant continuation.
+            raise AmbiguousGitHubResponse(
+                "create-reference succeeded without a verifiable response body"
+            ) from exc
 
     def dispatch_once(
         self, workflow_id: int, execution_tag: str, fixed_inputs: Mapping[str, Any]
@@ -132,9 +146,7 @@ class GitHubAPI:
         return _mapping(payload, "workflow dispatch response")
 
     def get_run_attempt(self, run_id: int, attempt: int = 1) -> Mapping[str, Any]:
-        _, payload = self._request(
-            "GET", f"/actions/runs/{run_id}/attempts/{attempt}"
-        )
+        _, payload = self._request("GET", f"/actions/runs/{run_id}/attempts/{attempt}")
         return _mapping(payload, "workflow run")
 
 
@@ -304,11 +316,9 @@ def validate_runtime_ruleset(ruleset: Mapping[str, Any], resolution: Resolution)
     ref_name = conditions.get("ref_name")
     if not isinstance(ref_name, Mapping) or set(ref_name) != {"include", "exclude"}:
         raise ContractError("execution-tag ref-name condition drifted")
-    includes = ref_name.get("include")
-    excludes = ref_name.get("exclude")
-    if includes != [RULESET_REF_INCLUDE]:
+    if ref_name.get("include") != [RULESET_REF_INCLUDE]:
         raise ContractError("execution-tag include namespace is not the exact reviewed value")
-    if excludes != []:
+    if ref_name.get("exclude") != []:
         raise ContractError("execution-tag exclusions are not permitted in v1")
     rule_types = _rule_types(ruleset)
     if "update" not in rule_types or "deletion" not in rule_types:
@@ -350,12 +360,41 @@ def validate_target_run(run: Mapping[str, Any], resolution: Resolution) -> None:
         raise ContractError("target run ref mismatch")
 
 
+def _reconcile_ambiguous_tag_creation(
+    api: GitHubAPI, resolution: Resolution, cause: AmbiguousGitHubResponse
+) -> None:
+    """Classify one ambiguous create with exactly one read-only exact-ref lookup."""
+    try:
+        reconciled = api.get_tag(resolution.execution_tag)
+    except ContractError as exc:
+        raise ContractError(
+            "ambiguous execution-tag creation; exact-ref reconciliation unavailable; "
+            "no continuation ownership"
+        ) from exc
+    if reconciled is None:
+        raise ContractError(
+            "ambiguous execution-tag creation; canonical ref absent after bounded "
+            "reconciliation; no continuation ownership"
+        ) from cause
+    try:
+        validate_tag_ref(reconciled, resolution)
+    except ContractError as exc:
+        raise ContractError(
+            "ambiguous execution-tag creation; canonical ref exists but is conflicting; "
+            "authority consumed/conflicted and no continuation ownership"
+        ) from exc
+    raise ContractError(
+        "ambiguous execution-tag creation; exact canonical ref exists; authority consumed "
+        "and no continuation ownership"
+    ) from cause
+
+
 def consume_and_dispatch(
     *, api: GitHubAPI, event: Mapping[str, Any], resolution: Resolution
 ) -> Mapping[str, Any]:
     validate_target_workflow(api, resolution)
-    ruleset = api.get_ruleset(resolution.record["execution_tag_ruleset_id"])
-    validate_runtime_ruleset(ruleset, resolution)
+    ruleset_id = resolution.record["execution_tag_ruleset_id"]
+    validate_runtime_ruleset(api.get_ruleset(ruleset_id), resolution)
 
     if api.get_tag(resolution.execution_tag) is not None:
         raise ContractError("execution tag already exists; authorisation is consumed or conflicted")
@@ -364,11 +403,22 @@ def consume_and_dispatch(
     live_comment = api.get_comment(int(event["comment"]["id"]))
     ensure_comment_unchanged(event, live_comment, resolution)
 
-    created = api.create_tag_once(resolution.execution_ref, resolution.source_sha)
+    try:
+        created = api.create_tag_once(resolution.execution_ref, resolution.source_sha)
+    except AmbiguousGitHubResponse as exc:
+        _reconcile_ambiguous_tag_creation(api, resolution, exc)
+        raise AssertionError("ambiguous reconciliation must terminate")
+
     validate_tag_ref(created, resolution)
     read_back = api.get_tag(resolution.execution_tag)
     if read_back is None:
         raise ContractError("execution tag disappeared after creation")
+    validate_tag_ref(read_back, resolution)
+
+    # The immutable execution tag and its reviewed update/deletion rules are
+    # the durable one-time authority primitive. Re-observe the exact ruleset
+    # after tag consumption and before the sole dispatch write.
+    validate_runtime_ruleset(api.get_ruleset(ruleset_id), resolution)
     validate_tag_ref(read_back, resolution)
 
     response = api.dispatch_once(
