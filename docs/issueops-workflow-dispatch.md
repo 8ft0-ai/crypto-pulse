@@ -25,9 +25,9 @@ refs/tags/issueops/dispatch/<id>--sha-<S>
 
 The tag is a lightweight reference directly to `<S>`. The side-effect job validates the target workflow and exact runtime-observable execution-tag ruleset, rejects a pre-existing tag, then re-fetches and revalidates the triggering comment immediately before tag creation. The live comment must retain its exact issue relationship, body, actor, association and unedited timestamps.
 
-Exactly one `POST /git/refs` is available in dispatcher code. Only HTTP `201` with a verifiable returned ref followed by exact ref read-back owns continuation. Timeout, reset, malformed/lost success data or any other ambiguous create result never grants continuation and never causes a second create. The dispatcher performs exactly one bounded read-only lookup of the canonical ref for classification only: an existing exact ref is classified as consumed, a conflicting ref as consumed/conflicted, and an absent or unavailable ref still ends the run without dispatch.
+Exactly one `POST /git/refs` is available in dispatcher code. Only HTTP `201` with a fully verifiable returned ref/object/type/SHA followed by exact ref read-back owns continuation. Timeout, reset, malformed/lost success data, syntactically valid but unverifiable `201` response data, or any other ambiguous create result never grants continuation and never causes a second create. The dispatcher performs exactly one bounded read-only lookup of the canonical ref for classification only: an existing exact ref is classified as consumed, a conflicting ref as consumed/conflicted, and an absent or unavailable ref still ends the run without dispatch.
 
-After an unambiguous create winner and exact tag read-back, the dispatcher fetches and validates the same frozen execution-tag ruleset again before the sole workflow-dispatch write. Any post-consumption drift in the observable ruleset state fails closed with zero dispatch attempts. The already-created tag remains consumed; failure never restores authority.
+After an unambiguous create winner and exact tag read-back, the dispatcher fetches and validates the same frozen execution-tag ruleset again, re-fetches the exact canonical execution tag and requires it still resolves directly to `<S>`, then revalidates the frozen target workflow numeric ID, path, active state, exact file hash at `<S>` and `workflow_dispatch` trigger before the sole workflow-dispatch write. Any post-consumption drift in the observable ruleset, exact tag target or target workflow state fails closed with zero dispatch attempts. The already-created tag remains consumed; failure never restores authority.
 
 The separately provisioned v1 ruleset must expose exactly this runtime condition:
 
@@ -40,7 +40,7 @@ It must be active for tags, restrict update and deletion, and must not restrict 
 
 ## Dispatch and run binding
 
-After consumption and the post-consumption ruleset re-check, exactly one Actions write endpoint is available:
+After consumption and the post-consumption ruleset/tag/target re-checks, exactly one Actions write endpoint is available:
 
 ```text
 POST /actions/workflows/{frozen_numeric_id}/dispatches
@@ -48,7 +48,7 @@ POST /actions/workflows/{frozen_numeric_id}/dispatches
 
 The ref is the derived execution tag and inputs are the frozen source-controlled map. API version `2026-03-10` must return HTTP `200` with direct target run identity. The dispatcher never infers a run from timestamps, actor, ref or search results and never retries an uncertain dispatch.
 
-The returned run is fetched at attempt 1 and must match the frozen workflow ID/path, event `workflow_dispatch`, exact execution tag and exact source SHA.
+The exact returned run ID is fetched at attempt 1 and must equal the direct `workflow_run_id`; the run must also identify repository `8ft0-ai/crypto-pulse` / repository ID `1233729904`, the frozen workflow ID/path, event `workflow_dispatch`, exact execution tag and exact source SHA. Missing or contradictory run/repository identity fails closed and no attestation is created.
 
 ## Signed receipt
 
