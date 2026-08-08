@@ -1,29 +1,40 @@
 # Reusable IssueOps workflow dispatcher
 
-This document describes the source-controlled implementation of issue #356. The dispatcher is a repository control plane for converting one exact, reviewed issue comment into one exact `workflow_dispatch` request. It is not an execution authority by itself and it never receives model/provider secrets.
+This document describes the source-controlled implementation of issue #356. The dispatcher is a repository control plane for converting one exact, reviewed issue comment into one exact `workflow_dispatch` request. It is not protected execution authority by itself and it never receives model/provider secrets.
 
 ## Permanent boundary
 
-The listener is `.github/workflows/issueops-workflow-dispatch.yml`. It reacts only to newly created issue comments. The default registry is `.github/issueops-workflow-dispatch.yml` and contains no active authorisation after the dispatcher implementation is installed.
+The listener is `.github/workflows/issueops-workflow-dispatch.yml`. It reacts only to newly created issue comments. The registry is `.github/issueops-workflow-dispatch.yml` and contains no active authorisation after dispatcher implementation. The file uses canonical JSON syntax, which is a YAML 1.2 subset, so the privileged runtime uses only the Python standard library and does not install a YAML package from the network.
 
-An executable authorisation is a separately reviewed schema-v2 record. It freezes the governing issue and command, immutable owner identity, target workflow numeric ID/path/hash, fixed inputs, one-attempt limit, validity window, execution-tag ruleset identity, dispatcher workflow hash, and the `dispatch_attestation_v1` predicate type.
+An executable authorisation is a separately reviewed schema-v2 record. It freezes the governing issue and command, immutable owner identity, target workflow numeric ID/path/hash, fixed inputs, one-attempt limit, validity window, execution-tag ruleset identity, dispatcher workflow hash and the `dispatch_attestation_v1` predicate type. Comment text cannot choose a workflow, ref, input, model, provider or budget.
 
-Comment text cannot choose a workflow, ref, input, model, provider or budget.
+## Exact-event activation
+
+The dispatcher checks out the exact `issue_comment` event SHA with its first parent. A matching enabled record is executable only when that selected record is absent from, or materially different from, the first-parent registry. An unchanged enabled record carried forward from an earlier commit is rejected. This binds activation to the exact reviewed event snapshot rather than allowing stale authority to survive unrelated `main` changes.
+
+The dispatcher also requires `github.workflow_sha == github.sha`, `github.run_attempt == 1`, the exact owner login and immutable numeric user ID, `OWNER` association, governing issue, exact command and dispatcher-workflow hash.
 
 ## One-time consumption
 
-For authorisation `<id>` at the created-event source commit `<S>`, the runtime derives:
+For authorisation `<id>` at created-event source commit `<S>`, the runtime derives:
 
 ```text
 issueops/dispatch/<id>--sha-<S>
 refs/tags/issueops/dispatch/<id>--sha-<S>
 ```
 
-The tag is a lightweight reference directly to `<S>`. The side-effect job checks the target workflow and runtime-observable execution-tag ruleset, rejects a pre-existing tag, then re-fetches and revalidates the exact triggering comment at the last possible point before tag creation.
+The tag is a lightweight reference directly to `<S>`. The side-effect job validates the target workflow and exact runtime-observable execution-tag ruleset, rejects a pre-existing tag, then re-fetches and revalidates the triggering comment immediately before tag creation. The live comment must retain its exact issue relationship, body, actor, association and unedited timestamps.
 
-Exactly one `POST /git/refs` is available in dispatcher code. Only an HTTP `201` response followed by exact ref read-back owns continuation. A timeout, reset, non-`201`, conflicting/pre-existing tag, or ambiguous result fails closed. The dispatcher never retries tag creation and never restores authority after the tag exists.
+Exactly one `POST /git/refs` is available in dispatcher code. Only HTTP `201` followed by exact ref read-back owns continuation. Timeout, reset, non-`201`, conflicting/pre-existing tag or ambiguous result fails closed. Tag creation is never retried and authority is never restored after consumption.
 
-The separately provisioned tag ruleset is expected to be active for the IssueOps tag namespace, restrict update and deletion, and leave creation unrestricted in v1. Full bypass-actor review belongs to the separately governed provisioning stage because runtime read credentials do not reliably expose that protected field.
+The separately provisioned v1 ruleset must expose exactly this runtime condition:
+
+```text
+include: refs/tags/issueops/dispatch/*
+exclude: []
+```
+
+It must be active for tags, restrict update and deletion, and must not restrict creation. Runtime deliberately does not infer that omitted `bypass_actors` means empty; complete bypass-actor proof remains a separately governed provisioning review.
 
 ## Dispatch and run binding
 
@@ -33,42 +44,56 @@ After consumption, exactly one Actions write endpoint is available:
 POST /actions/workflows/{frozen_numeric_id}/dispatches
 ```
 
-The ref is the derived execution tag and inputs are the frozen source-controlled map. The runtime requires the API `2026-03-10` direct HTTP `200` response containing the target workflow run identity. It does not infer a run from timestamps, actor, ref or search results and it never retries an uncertain dispatch.
+The ref is the derived execution tag and inputs are the frozen source-controlled map. API version `2026-03-10` must return HTTP `200` with direct target run identity. The dispatcher never infers a run from timestamps, actor, ref or search results and never retries an uncertain dispatch.
 
-The returned run is read back and must be attempt 1 of the frozen workflow, event `workflow_dispatch`, at the exact execution tag and source SHA.
+The returned run is fetched at attempt 1 and must match the frozen workflow ID/path, event `workflow_dispatch`, exact execution tag and exact source SHA.
 
 ## Signed receipt
 
-A separate job in the same canonical dispatcher workflow revalidates the exact target run and creates a deterministic JSON subject plus a deterministic custom predicate. Both are compact, key-sorted UTF-8 JSON with one trailing LF.
+A separate job in the same canonical dispatcher workflow revalidates the exact target run and creates deterministic JSON subject and predicate files. Both use key-sorted compact UTF-8 JSON with one trailing LF.
 
-The signed subject binds repository and owner identity, authorisation identity/hash/source SHA, triggering issue/comment/body hash, owner account identity, execution ref, dispatcher workflow/run identity and exact target workflow/run/ref/SHA.
-
-The predicate repeats those cross-checkable values and adds the exact target event and frozen-input hash. Predicate values are claims, not signer identity.
-
-The workflow signs the subject with `actions/attest` pinned to the immutable commit:
+The canonical subject contains exactly:
 
 ```text
-1e69f48acb82d1966a394da916b4c1698aa569d6
+schema
+repository
+repository_id
+authorisation_id
+authorisation_sha
+execution_ref
+target_workflow_id
+target_workflow_path
+target_run_id
+target_ref
+target_sha
 ```
 
-The signing job has read-only Actions/contents/issues access plus only the OIDC and attestation writes needed to create the receipt. It has no `actions: write`, no `contents: write`, no protected environment and no provider secret.
+Its `schema` is `dispatch_attestation_v1`. Richer owner, comment, record-hash and dispatcher-run audit bindings live in the custom predicate, which also has `schema: dispatch_attestation_v1`, `target_event: workflow_dispatch` and the frozen-input hash.
 
-## Reruns
+The workflow signs with `actions/attest` pinned to immutable commit `1e69f48acb82d1966a394da916b4c1698aa569d6`. The signing job has read-only Actions/contents access plus only OIDC and attestation writes. It has no `actions: write`, no `contents: write`, no protected environment and no provider secret.
 
-Every dispatcher side-effect and signing boundary requires `github.run_attempt == 1` and the canonical dispatcher workflow/source SHA. A workflow or job rerun therefore cannot create another execution tag, issue a second target dispatch or sign a new receipt.
+## Frozen executable dependencies
 
-A later edit or deletion of the command after successful tag consumption does not restore, revoke or duplicate the consumed authority.
+Every external action in the dispatcher is pinned by full commit SHA:
 
-## Target-side verification is separately governed
+```text
+actions/checkout   11d5960a326750d5838078e36cf38b85af677262
+actions/setup-python a26af69be951a213d495a4c3e4e4022e16d87065
+actions/attest     1e69f48acb82d1966a394da916b4c1698aa569d6
+```
 
-This implementation does not modify `.github/workflows/governed-gpt-oss-quality-comparison.yml`, repository rulesets, the `governed-llm-dry-run` environment, or any Phase 9 authorisation.
+The privileged runtime installs no Python package from the network. Registry parsing and workflow-trigger inspection use standard-library-only code.
 
-Before a protected target can use this dispatcher, a separate reviewed stage must provision and review the immutable tag ruleset and environment tag policy, harden the target with its attempt-1 provenance gate, install the pinned `gh` v2.97.0 verifier contract from issue #356, add one reviewed authorisation record and only then create an authorised command.
+## Reruns and failures
 
-A direct manual/API dispatch of a future protected execution tag must fail the target provenance gate unless the exact dispatcher-signed target-run receipt independently verifies.
+Every dispatcher resolution, side-effect and signing boundary requires attempt 1 and the canonical source/workflow SHA. A workflow or job rerun cannot legitimately create another execution tag, issue another target dispatch or sign a new receipt.
 
-## Implementation invariants
+A later edit or deletion after successful tag consumption does not restore, revoke or duplicate consumed authority. API timeouts, resets, 4xx/5xx responses, malformed direct dispatch success data, signing failure or target failure never cause an automatic second dispatch.
 
-The deterministic tests enforce the source-controlled schema and owner binding; PR-comment, partial-command, disabled/expired, duplicate and rerun rejection; exact tag derivation; edit rejection before consumption; tag replay/race failure; ruleset update/deletion requirements; target workflow hash and run identity; no inferential dispatch correlation; deterministic receipt serialisation; immutable attestation-action pinning; minimal job permissions; and absence of provider secrets or protected environments.
+## Target-side verification remains separately governed
+
+This implementation does not modify `.github/workflows/governed-gpt-oss-quality-comparison.yml`, repository rulesets, the `governed-llm-dry-run` environment or any Phase 9 authorisation.
+
+Before a protected target can use this dispatcher, a separate reviewed stage must provision and review the immutable tag ruleset and environment tag policy, harden the target with its attempt-1 provenance gate and pinned `gh` v2.97.0 verifier contract from issue #356, add one reviewed authorisation record and only then create an authorised command.
 
 Tests use fake transport only. They do not create a real tag, dispatch a workflow, write an attestation or call a provider.
