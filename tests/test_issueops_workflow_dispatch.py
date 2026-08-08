@@ -127,6 +127,10 @@ def target_run(**updates: object) -> dict[str, object]:
         "run_attempt": 1,
         "head_sha": SOURCE_SHA,
         "head_branch": "issueops/dispatch/phase9-once--sha-" + SOURCE_SHA,
+        "repository": {
+            "id": 1233729904,
+            "full_name": "8ft0-ai/crypto-pulse",
+        },
     }
     value.update(updates)
     return value
@@ -383,6 +387,27 @@ class RuntimeValidationTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(core.ContractError):
                 runner.validate_target_run(target_run(**change), resolve())
 
+    def test_target_run_requires_direct_id_and_exact_repository_identity(self) -> None:
+        with self.assertRaisesRegex(core.ContractError, "direct dispatch identity"):
+            runner.validate_target_run(
+                target_run(id=556), resolve(), expected_run_id=555
+            )
+        with self.assertRaisesRegex(core.ContractError, "repository identity is missing"):
+            missing = target_run()
+            missing.pop("repository")
+            runner.validate_target_run(missing, resolve(), expected_run_id=555)
+        with self.assertRaisesRegex(core.ContractError, "repository identity mismatch"):
+            runner.validate_target_run(
+                target_run(
+                    repository={
+                        "id": 999,
+                        "full_name": "8ft0-ai/other",
+                    }
+                ),
+                resolve(),
+                expected_run_id=555,
+            )
+
 
 class ConsumptionTests(unittest.TestCase):
     class API:
@@ -393,9 +418,12 @@ class ConsumptionTests(unittest.TestCase):
             create_error: Exception | None = None,
             dispatch_response: dict[str, object] | None = None,
             rulesets: list[dict[str, object]] | None = None,
+            workflows: list[dict[str, object]] | None = None,
             materialize_after_create: bool = True,
             created_tag: dict[str, object] | None = None,
             read_back_tag: dict[str, object] | None = None,
+            tags_after_create: list[dict[str, object] | None] | None = None,
+            run_response: dict[str, object] | None = None,
         ) -> None:
             self.existing = existing
             self.create_error = create_error
@@ -403,11 +431,16 @@ class ConsumptionTests(unittest.TestCase):
             self.create_attempts = 0
             self.tag_reads = 0
             self.ruleset_reads = 0
+            self.workflow_reads = 0
             self.create_attempted = False
             self.materialize_after_create = materialize_after_create
             self.created_tag = created_tag
             self.read_back_tag = read_back_tag
+            self.tags_after_create = tags_after_create
+            self.after_create_tag_reads = 0
             self.rulesets = rulesets or [ruleset_response(), ruleset_response()]
+            self.workflows = workflows or [workflow_response(), workflow_response()]
+            self.run_response = run_response or target_run()
             self.dispatch_response = (
                 {"workflow_run_id": 555, "run_url": "api", "html_url": "html"}
                 if dispatch_response is None
@@ -422,7 +455,9 @@ class ConsumptionTests(unittest.TestCase):
             }
 
         def get_workflow(self, _: int):
-            return workflow_response()
+            index = min(self.workflow_reads, len(self.workflows) - 1)
+            self.workflow_reads += 1
+            return copy.deepcopy(self.workflows[index])
 
         def get_contents(self, path: str, ref: str):
             return contents_response()
@@ -439,6 +474,12 @@ class ConsumptionTests(unittest.TestCase):
             self.tag_reads += 1
             if self.existing:
                 return self.good_tag()
+            if self.create_attempted and self.tags_after_create is not None:
+                index = min(
+                    self.after_create_tag_reads, len(self.tags_after_create) - 1
+                )
+                self.after_create_tag_reads += 1
+                return copy.deepcopy(self.tags_after_create[index])
             if self.create_attempted and self.materialize_after_create:
                 return self.read_back_tag or self.good_tag()
             return None
@@ -455,7 +496,7 @@ class ConsumptionTests(unittest.TestCase):
             return self.dispatch_response
 
         def get_run_attempt(self, *_):
-            return target_run()
+            return copy.deepcopy(self.run_response)
 
     def test_preexisting_tag_rejects_without_dispatch(self) -> None:
         api = self.API(existing=True)
@@ -485,6 +526,25 @@ class ConsumptionTests(unittest.TestCase):
         self.assertEqual(api.tag_reads, 2)
         self.assertEqual(api.dispatches, 0)
 
+    def test_unverifiable_201_mapping_reconciles_existing_ref_without_dispatch(self) -> None:
+        api = self.API(created_tag={"ref": resolve().execution_ref})
+        with self.assertRaisesRegex(core.ContractError, "authority consumed"):
+            runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.create_attempts, 1)
+        self.assertEqual(api.tag_reads, 2)
+        self.assertEqual(api.dispatches, 0)
+
+    def test_unverifiable_201_mapping_reconciles_absence_without_dispatch(self) -> None:
+        api = self.API(
+            created_tag={"ref": resolve().execution_ref},
+            materialize_after_create=False,
+        )
+        with self.assertRaisesRegex(core.ContractError, "canonical ref absent"):
+            runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.create_attempts, 1)
+        self.assertEqual(api.tag_reads, 2)
+        self.assertEqual(api.dispatches, 0)
+
     def test_definitive_tag_create_failure_does_not_reconcile_or_dispatch(self) -> None:
         api = self.API(create_error=core.ContractError("HTTP 422"))
         with self.assertRaisesRegex(core.ContractError, "422"):
@@ -493,11 +553,13 @@ class ConsumptionTests(unittest.TestCase):
         self.assertEqual(api.tag_reads, 1)
         self.assertEqual(api.dispatches, 0)
 
-    def test_exact_create_readback_rechecks_ruleset_and_dispatches_once(self) -> None:
+    def test_exact_create_readback_rechecks_ruleset_tag_target_and_target_workflow(self) -> None:
         api = self.API()
         result = runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
         self.assertEqual(api.dispatches, 1)
         self.assertEqual(api.ruleset_reads, 2)
+        self.assertEqual(api.tag_reads, 3)
+        self.assertEqual(api.workflow_reads, 2)
         self.assertEqual(result["workflow_run_id"], 555)
 
     def test_post_consumption_ruleset_drift_rejects_without_dispatch(self) -> None:
@@ -510,6 +572,33 @@ class ConsumptionTests(unittest.TestCase):
         self.assertEqual(api.ruleset_reads, 2)
         self.assertEqual(api.dispatches, 0)
 
+    def test_post_consumption_tag_disappearance_rejects_without_dispatch(self) -> None:
+        api = self.API(tags_after_create=[self.API.good_tag(), None])
+        with self.assertRaisesRegex(core.ContractError, "disappeared before dispatch"):
+            runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.create_attempts, 1)
+        self.assertEqual(api.tag_reads, 3)
+        self.assertEqual(api.dispatches, 0)
+
+    def test_post_consumption_tag_target_drift_rejects_without_dispatch(self) -> None:
+        bad = self.API.good_tag()
+        bad["object"] = {"type": "commit", "sha": "b" * 40}
+        api = self.API(tags_after_create=[self.API.good_tag(), bad])
+        with self.assertRaisesRegex(core.ContractError, "authorised commit"):
+            runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.tag_reads, 3)
+        self.assertEqual(api.dispatches, 0)
+
+    def test_post_consumption_target_workflow_drift_rejects_without_dispatch(self) -> None:
+        disabled = workflow_response()
+        disabled["state"] = "disabled_manually"
+        api = self.API(workflows=[workflow_response(), disabled])
+        with self.assertRaisesRegex(core.ContractError, "not active"):
+            runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.workflow_reads, 2)
+        self.assertEqual(api.create_attempts, 1)
+        self.assertEqual(api.dispatches, 0)
+
     def test_tag_readback_mismatch_rejects_without_dispatch(self) -> None:
         bad = self.API.good_tag()
         bad["object"] = {"type": "commit", "sha": "b" * 40}
@@ -518,6 +607,20 @@ class ConsumptionTests(unittest.TestCase):
             runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
         self.assertEqual(api.dispatches, 0)
         self.assertEqual(api.ruleset_reads, 1)
+
+    def test_direct_run_id_or_repository_mismatch_rejects_after_single_dispatch(self) -> None:
+        variants = [
+            target_run(id=556),
+            target_run(repository={"id": 999, "full_name": "8ft0-ai/other"}),
+        ]
+        for run in variants:
+            with self.subTest(run=run):
+                api = self.API(run_response=run)
+                with self.assertRaises(core.ContractError):
+                    runner.consume_and_dispatch(
+                        api=api, event=event(), resolution=resolve()
+                    )
+                self.assertEqual(api.dispatches, 1)
 
     def test_missing_direct_run_identity_is_not_inferred_or_retried(self) -> None:
         api = self.API(dispatch_response={})
