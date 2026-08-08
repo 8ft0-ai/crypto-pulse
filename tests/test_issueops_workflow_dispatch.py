@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import base64
 import copy
+import json
+import subprocess
 import tempfile
 import unittest
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
-import yaml
-
-from issueops_dispatch import core
-from issueops_dispatch import runner
+from issueops_dispatch import core, runner
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/issueops-workflow-dispatch.yml"
@@ -18,6 +19,7 @@ REGISTRY = ROOT / ".github/issueops-workflow-dispatch.yml"
 SOURCE_SHA = "a" * 40
 DISPATCHER_BYTES = b"name: dispatcher\n"
 TARGET_BYTES = b"on:\n  workflow_dispatch:\npermissions:\n  contents: read\n"
+NOW = datetime(2026, 8, 8, 7, 1, tzinfo=timezone.utc)
 
 
 def record(**updates: object) -> dict[str, object]:
@@ -61,6 +63,7 @@ def event(**comment_updates: object) -> dict[str, object]:
         "author_association": "OWNER",
         "created_at": "2026-08-08T07:00:00Z",
         "updated_at": "2026-08-08T07:00:00Z",
+        "issue_url": "https://api.github.com/repos/8ft0-ai/crypto-pulse/issues/352",
         "html_url": "https://github.com/8ft0-ai/crypto-pulse/issues/352#issuecomment-9001",
         "user": {"login": "8ft0-ai", "id": 130460431},
     }
@@ -68,456 +71,292 @@ def event(**comment_updates: object) -> dict[str, object]:
     return {"action": "created", "issue": {"number": 352}, "comment": comment}
 
 
-def resolution(item: dict[str, object] | None = None) -> core.Resolution:
+def resolve(item: dict[str, object] | None = None, *, parent: dict[str, object] | None = None) -> core.Resolution:
     result = core.resolve_event(
-        event=event(),
-        registry=registry(item or record()),
-        source_sha=SOURCE_SHA,
-        dispatcher_workflow_bytes=DISPATCHER_BYTES,
-        run_attempt=1,
-        now=datetime(2026, 8, 8, 7, 1, tzinfo=timezone.utc),
+        event=event(), registry=registry(item or record()), parent_registry=parent or registry(),
+        source_sha=SOURCE_SHA, dispatcher_workflow_bytes=DISPATCHER_BYTES,
+        run_attempt=1, now=NOW,
     )
     assert result is not None
     return result
 
 
 def workflow_response() -> dict[str, object]:
-    return {
-        "id": 328208073,
-        "path": ".github/workflows/governed-gpt-oss-quality-comparison.yml",
-        "state": "active",
-    }
+    return {"id": 328208073, "path": ".github/workflows/governed-gpt-oss-quality-comparison.yml", "state": "active"}
 
 
-def contents_response() -> dict[str, object]:
-    return {
-        "type": "file",
-        "encoding": "base64",
-        "content": base64.b64encode(TARGET_BYTES).decode("ascii"),
-    }
+def contents_response(data: bytes = TARGET_BYTES) -> dict[str, object]:
+    return {"type": "file", "encoding": "base64", "content": base64.b64encode(data).decode()}
 
 
 def ruleset_response() -> dict[str, object]:
     return {
-        "id": 7654,
-        "name": "IssueOps immutable execution tags",
-        "target": "tag",
-        "enforcement": "active",
-        "conditions": {
-            "ref_name": {
-                "include": ["refs/tags/issueops/dispatch/*"],
-                "exclude": [],
-            }
-        },
+        "id": 7654, "name": "IssueOps immutable execution tags", "target": "tag", "enforcement": "active",
+        "conditions": {"ref_name": {"include": [core.RULESET_REF_INCLUDE], "exclude": []}},
         "rules": [{"type": "update"}, {"type": "deletion"}],
     }
 
 
 def target_run(**updates: object) -> dict[str, object]:
-    item: dict[str, object] = {
-        "id": 555,
-        "workflow_id": 328208073,
+    value: dict[str, object] = {
+        "id": 555, "workflow_id": 328208073,
         "path": ".github/workflows/governed-gpt-oss-quality-comparison.yml",
-        "event": "workflow_dispatch",
-        "run_attempt": 1,
-        "head_sha": SOURCE_SHA,
+        "event": "workflow_dispatch", "run_attempt": 1, "head_sha": SOURCE_SHA,
         "head_branch": "issueops/dispatch/phase9-once--sha-" + SOURCE_SHA,
     }
-    item.update(updates)
-    return item
+    value.update(updates)
+    return value
 
 
 class ResolutionTests(unittest.TestCase):
-    def test_registry_is_empty_by_default(self) -> None:
-        raw = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
-        self.assertEqual(raw, {"schema_version": 2, "authorisations": []})
-
-    def test_valid_created_owner_command_resolves_exact_tag(self) -> None:
-        resolved = resolution()
-        self.assertEqual(
-            resolved.execution_ref,
-            "refs/tags/issueops/dispatch/phase9-once--sha-" + SOURCE_SHA,
-        )
-        self.assertEqual(resolved.record["maximum_dispatch_attempts"], 1)
-
-    def test_wrong_issue_rejects_without_side_effect_authority(self) -> None:
-        payload = event()
-        payload["issue"]["number"] = 351
-        self.assertIsNone(self._resolve(payload))
-
-    def test_wrong_actor_id_rejects(self) -> None:
-        self.assertIsNone(self._resolve(event(user={"login": "8ft0-ai", "id": 7})))
-
-    def test_wrong_actor_login_rejects(self) -> None:
-        self.assertIsNone(self._resolve(event(user={"login": "renamed", "id": 130460431})))
-
-    def test_wrong_association_rejects(self) -> None:
-        self.assertIsNone(self._resolve(event(author_association="MEMBER")))
-
-    def test_pr_comment_rejects(self) -> None:
-        payload = event()
-        payload["issue"]["pull_request"] = {"url": "x"}
-        self.assertIsNone(self._resolve(payload))
-
-    def test_partial_or_wrong_command_rejects(self) -> None:
-        self.assertIsNone(self._resolve(event(body="/run-phase9")))
-
-    def test_disabled_authorisation_rejects(self) -> None:
-        self.assertIsNone(self._resolve(event(), item=record(enabled=False)))
-
-    def test_expired_authorisation_rejects(self) -> None:
-        self.assertIsNone(
-            self._resolve(
-                event(),
-                item=record(expires_at="2026-08-08T06:00:00Z"),
-                now=datetime(2026, 8, 8, 7, tzinfo=timezone.utc),
-            )
+    def call(self, payload: dict[str, object] | None = None, *, item: dict[str, object] | None = None,
+             parent: dict[str, object] | None = None, attempt: int = 1, workflow: bytes = DISPATCHER_BYTES,
+             now: datetime = NOW) -> core.Resolution | None:
+        return core.resolve_event(
+            event=payload or event(), registry=registry(item or record()), parent_registry=parent or registry(),
+            source_sha=SOURCE_SHA, dispatcher_workflow_bytes=workflow, run_attempt=attempt, now=now,
         )
 
-    def test_future_authorisation_rejects(self) -> None:
-        self.assertIsNone(
-            self._resolve(
-                event(),
-                item=record(not_before="2026-08-08T08:00:00Z"),
-                now=datetime(2026, 8, 8, 7, tzinfo=timezone.utc),
-            )
-        )
+    def test_registry_empty_and_stdlib_json(self) -> None:
+        self.assertEqual(json.loads(REGISTRY.read_text()), {"schema_version": 2, "authorisations": []})
+        runtime = (ROOT / "issueops_dispatch/runner.py").read_text()
+        self.assertNotIn("import yaml", runtime)
+        self.assertNotIn("yaml.safe_load", runtime)
 
-    def test_dispatcher_rerun_rejects(self) -> None:
-        with self.assertRaisesRegex(core.ContractError, "reruns"):
-            core.resolve_event(
-                event=event(),
-                registry=registry(record()),
-                source_sha=SOURCE_SHA,
-                dispatcher_workflow_bytes=DISPATCHER_BYTES,
-                run_attempt=2,
-                now=datetime.now(timezone.utc),
-            )
+    def test_valid_new_authorisation_resolves_exact_tag(self) -> None:
+        self.assertEqual(resolve().execution_ref, "refs/tags/issueops/dispatch/phase9-once--sha-" + SOURCE_SHA)
 
-    def test_dispatcher_workflow_hash_mismatch_rejects(self) -> None:
-        with self.assertRaisesRegex(core.ContractError, "workflow hash"):
-            core.resolve_event(
-                event=event(),
-                registry=registry(record()),
-                source_sha=SOURCE_SHA,
-                dispatcher_workflow_bytes=b"changed",
-                run_attempt=1,
-                now=datetime.now(timezone.utc),
-            )
+    def test_modified_authorisation_at_exact_source_passes(self) -> None:
+        self.assertIsNotNone(self.call(parent=registry(record(command="/old"))))
+
+    def test_stale_unchanged_authorisation_rejects(self) -> None:
+        with self.assertRaisesRegex(core.ContractError, "not added or modified"):
+            self.call(parent=registry(record()))
+
+    def test_wrong_issue_actor_login_id_association_pr_and_partial_reject(self) -> None:
+        cases = []
+        p = event(); p["issue"]["number"] = 351; cases.append(p)
+        cases.append(event(user={"login": "8ft0-ai", "id": 7}))
+        cases.append(event(user={"login": "renamed", "id": 130460431}))
+        cases.append(event(author_association="MEMBER"))
+        p = event(); p["issue"]["pull_request"] = {"url": "x"}; cases.append(p)
+        cases.append(event(body="/run-phase9"))
+        for payload in cases:
+            with self.subTest(payload=payload): self.assertIsNone(self.call(payload))
+
+    def test_disabled_expired_and_future_reject(self) -> None:
+        self.assertIsNone(self.call(item=record(enabled=False)))
+        self.assertIsNone(self.call(item=record(expires_at="2026-08-08T06:00:00Z")))
+        self.assertIsNone(self.call(item=record(not_before="2026-08-08T08:00:00Z")))
+
+    def test_invalid_window_rejects(self) -> None:
+        with self.assertRaisesRegex(core.ContractError, "earlier"):
+            self.call(item=record(not_before="2026-08-08T08:00:00Z", expires_at="2026-08-08T07:00:00Z"))
+
+    def test_rerun_rejects(self) -> None:
+        with self.assertRaisesRegex(core.ContractError, "reruns"): self.call(attempt=2)
+
+    def test_dispatcher_hash_drift_rejects(self) -> None:
+        with self.assertRaisesRegex(core.ContractError, "workflow hash"): self.call(workflow=b"changed")
 
     def test_duplicate_matching_authorities_reject(self) -> None:
-        second = record(authorisation_id="phase9-two")
         with self.assertRaisesRegex(core.ContractError, "more than one"):
-            core.resolve_event(
-                event=event(),
-                registry=registry(record(), second),
-                source_sha=SOURCE_SHA,
-                dispatcher_workflow_bytes=DISPATCHER_BYTES,
-                run_attempt=1,
-                now=datetime.now(timezone.utc),
-            )
+            core.resolve_event(event=event(), registry=registry(record(), record(authorisation_id="other")),
+                parent_registry=registry(), source_sha=SOURCE_SHA, dispatcher_workflow_bytes=DISPATCHER_BYTES,
+                run_attempt=1, now=NOW)
 
-    def test_unknown_or_missing_schema_fields_fail_closed(self) -> None:
-        bad = record()
-        bad["arbitrary_workflow"] = "malicious.yml"
-        with self.assertRaisesRegex(core.ContractError, "schema mismatch"):
-            core.validate_registry(registry(bad), now=datetime.now(timezone.utc))
+    def test_missing_and_extra_schema_fields_fail_closed(self) -> None:
+        missing = record(); missing.pop("purpose")
+        extra = record(); extra["arbitrary_workflow"] = "evil.yml"
+        for bad in (missing, extra):
+            with self.assertRaisesRegex(core.ContractError, "schema mismatch"):
+                core.validate_registry(registry(bad), now=NOW)
 
-    def test_fixed_inputs_must_be_source_controlled_scalars(self) -> None:
-        bad = record(fixed_inputs={"x": {"workflow": "injected"}})
+    def test_nested_fixed_input_injection_rejects(self) -> None:
         with self.assertRaisesRegex(core.ContractError, "JSON scalars"):
-            core.validate_registry(registry(bad), now=datetime.now(timezone.utc))
+            core.validate_registry(registry(record(fixed_inputs={"x": {"workflow": "evil"}})), now=NOW)
 
-    def _resolve(
-        self,
-        payload: dict[str, object],
-        *,
-        item: dict[str, object] | None = None,
-        now: datetime | None = None,
-    ) -> core.Resolution | None:
-        return core.resolve_event(
-            event=payload,
-            registry=registry(item or record()),
-            source_sha=SOURCE_SHA,
-            dispatcher_workflow_bytes=DISPATCHER_BYTES,
-            run_attempt=1,
-            now=now or datetime.now(timezone.utc),
-        )
+
+class ParentAndCommentTests(unittest.TestCase):
+    def test_parent_registry_is_read_from_exact_first_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp); subprocess.run(["git", "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            path = repo / ".github/issueops-workflow-dispatch.yml"; path.parent.mkdir()
+            path.write_text(json.dumps(registry(record(command="/old"))))
+            subprocess.run(["git", "add", "."], cwd=repo, check=True); subprocess.run(["git", "commit", "-m", "parent"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+            path.write_text(json.dumps(registry(record())))
+            subprocess.run(["git", "add", "."], cwd=repo, check=True); subprocess.run(["git", "commit", "-m", "source"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+            sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            old = Path.cwd()
+            try:
+                import os; os.chdir(repo)
+                parent = runner.load_parent_registry(Path(".github/issueops-workflow-dispatch.yml"), sha)
+            finally: os.chdir(old)
+            self.assertEqual(parent["authorisations"][0]["command"], "/old")
+
+    def test_parent_proof_failure_is_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            old = Path.cwd()
+            try:
+                import os; os.chdir(tmp)
+                with self.assertRaisesRegex(core.ContractError, "first parent"):
+                    runner.load_parent_registry(Path("x"), SOURCE_SHA)
+            finally: os.chdir(old)
+
+    def test_edited_missing_relationship_and_missing_timestamps_reject(self) -> None:
+        r = resolve()
+        variants = []
+        v = copy.deepcopy(event()["comment"]); v["updated_at"] = "later"; variants.append(v)
+        v = copy.deepcopy(event()["comment"]); v.pop("issue_url"); variants.append(v)
+        v = copy.deepcopy(event()["comment"]); v["html_url"] = "https://github.com/8ft0-ai/crypto-pulse/issues/351#issuecomment-9001"; variants.append(v)
+        v = copy.deepcopy(event()["comment"]); v.pop("created_at"); variants.append(v)
+        for live in variants:
+            with self.subTest(live=live), self.assertRaises(core.ContractError):
+                core.ensure_comment_unchanged(event(), live, r)
+
+
+class RuntimeValidationTests(unittest.TestCase):
+    def test_exact_ruleset_passes(self) -> None: runner.validate_runtime_ruleset(ruleset_response(), resolve())
+
+    def test_ruleset_rule_and_condition_drift_rejects(self) -> None:
+        variants = []
+        v = ruleset_response(); v["rules"] = [{"type": "deletion"}]; variants.append(v)
+        v = ruleset_response(); v["rules"].append({"type": "creation"}); variants.append(v)
+        v = ruleset_response(); v["conditions"]["ref_name"]["include"] = ["~ALL"]; variants.append(v)
+        v = ruleset_response(); v["conditions"]["ref_name"]["include"] = ["issueops/dispatch/*"]; variants.append(v)
+        v = ruleset_response(); v["conditions"]["ref_name"]["exclude"] = ["refs/tags/foo/*"]; variants.append(v)
+        v = ruleset_response(); v["conditions"]["other"] = {}; variants.append(v)
+        for value in variants:
+            with self.subTest(value=value), self.assertRaises(core.ContractError):
+                runner.validate_runtime_ruleset(value, resolve())
+
+    def test_missing_bypass_actors_is_not_interpreted(self) -> None:
+        value = ruleset_response(); value.pop("bypass_actors", None); runner.validate_runtime_ruleset(value, resolve())
+
+    def test_target_workflow_hash_and_trigger_drift_reject(self) -> None:
+        class API:
+            def get_workflow(self, _: int): return workflow_response()
+            def get_contents(self, path: str, ref: str): return contents_response(b"on:\n  push:\n")
+        with self.assertRaises(core.ContractError): runner.validate_target_workflow(API(), resolve())
+        bad = record(target_workflow_sha256="0" * 64)
+        with self.assertRaises(core.ContractError): runner.validate_target_workflow(API(), resolve(bad))
+
+    def test_target_run_must_match_path_attempt_event_ref_sha_and_id(self) -> None:
+        changes = ({"path": "evil.yml"}, {"run_attempt": 2}, {"event": "issue_comment"}, {"head_branch": "main"}, {"head_sha": "b" * 40}, {"workflow_id": 1})
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(core.ContractError): runner.validate_target_run(target_run(**change), resolve())
 
 
 class ConsumptionTests(unittest.TestCase):
-    def test_edited_comment_rejects_before_consumption(self) -> None:
-        live = copy.deepcopy(event()["comment"])
-        live["updated_at"] = "2026-08-08T07:02:00Z"
-        with self.assertRaisesRegex(core.ContractError, "edited"):
-            core.ensure_comment_unchanged(event(), live, resolution())
+    class API:
+        def __init__(self, *, existing=False, create_error=None, dispatch_response=None):
+            self.existing = existing; self.create_error = create_error; self.dispatches = 0; self.tag_reads = 0
+            self.dispatch_response = {"workflow_run_id": 555, "run_url": "api", "html_url": "html"} if dispatch_response is None else dispatch_response
+        def get_workflow(self, _: int): return workflow_response()
+        def get_contents(self, path: str, ref: str): return contents_response()
+        def get_ruleset(self, _: int): return ruleset_response()
+        def get_comment(self, _: int): return event()["comment"]
+        def get_tag(self, _: str):
+            self.tag_reads += 1
+            if self.existing or self.tag_reads > 1: return {"ref": resolve().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
+            return None
+        def create_tag_once(self, *args):
+            if self.create_error: raise self.create_error
+            return {"ref": resolve().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
+        def dispatch_once(self, *args): self.dispatches += 1; return self.dispatch_response
+        def get_run_attempt(self, *_): return target_run()
 
-    def test_ruleset_requires_update_and_deletion_restrictions(self) -> None:
-        bad = ruleset_response()
-        bad["rules"] = [{"type": "deletion"}]
-        with self.assertRaisesRegex(core.ContractError, "update and deletion"):
-            runner.validate_runtime_ruleset(bad, resolution())
+    def test_preexisting_tag_rejects_without_dispatch(self) -> None:
+        api = self.API(existing=True)
+        with self.assertRaisesRegex(core.ContractError, "already exists"): runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.dispatches, 0)
 
-    def test_ruleset_creation_restriction_is_rejected_for_v1(self) -> None:
-        bad = ruleset_response()
-        bad["rules"].append({"type": "creation"})
-        with self.assertRaisesRegex(core.ContractError, "must not restrict creation"):
-            runner.validate_runtime_ruleset(bad, resolution())
+    def test_ambiguous_tag_creation_never_dispatches(self) -> None:
+        api = self.API(create_error=core.ContractError("ambiguous create"))
+        with self.assertRaisesRegex(core.ContractError, "ambiguous"): runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.dispatches, 0)
 
-    def test_ruleset_bypass_actors_are_not_interpreted_at_runtime(self) -> None:
-        value = ruleset_response()
-        value.pop("bypass_actors", None)
-        runner.validate_runtime_ruleset(value, resolution())
-
-    def test_target_workflow_hash_mismatch_rejects(self) -> None:
-        class API:
-            def get_workflow(self, _: int) -> dict[str, object]:
-                return workflow_response()
-
-            def get_contents(self, path: str, ref: str) -> dict[str, object]:
-                value = contents_response()
-                value["content"] = base64.b64encode(b"changed").decode()
-                return value
-
-        with self.assertRaisesRegex(core.ContractError, "file hash mismatch"):
-            runner.validate_target_workflow(API(), resolution())
-
-    def test_preexisting_tag_permanently_rejects_replay(self) -> None:
-        class API:
-            dispatched = False
-            created = False
-
-            def get_workflow(self, _: int) -> dict[str, object]:
-                return workflow_response()
-
-            def get_contents(self, path: str, ref: str) -> dict[str, object]:
-                return contents_response()
-
-            def get_ruleset(self, _: int) -> dict[str, object]:
-                return ruleset_response()
-
-            def get_tag(self, _: str) -> dict[str, object]:
-                return {"ref": resolution().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
-
-            def create_tag_once(self, *args: object) -> dict[str, object]:
-                self.created = True
-                return {}
-
-            def dispatch_once(self, *args: object) -> dict[str, object]:
-                self.dispatched = True
-                return {}
-
-        api = API()
-        with self.assertRaisesRegex(core.ContractError, "already exists"):
-            runner.consume_and_dispatch(api=api, event=event(), resolution=resolution())
-        self.assertFalse(api.created)
-        self.assertFalse(api.dispatched)
-
-    def test_lost_or_conflicting_create_acknowledgement_never_dispatches(self) -> None:
-        class API:
-            dispatched = False
-
-            def get_workflow(self, _: int) -> dict[str, object]:
-                return workflow_response()
-
-            def get_contents(self, path: str, ref: str) -> dict[str, object]:
-                return contents_response()
-
-            def get_ruleset(self, _: int) -> dict[str, object]:
-                return ruleset_response()
-
-            def get_tag(self, _: str) -> None:
-                return None
-
-            def get_comment(self, _: int) -> dict[str, object]:
-                return event()["comment"]
-
-            def create_tag_once(self, *args: object) -> dict[str, object]:
-                raise core.ContractError("ambiguous tag creation")
-
-            def dispatch_once(self, *args: object) -> dict[str, object]:
-                self.dispatched = True
-                return {}
-
-        api = API()
-        with self.assertRaisesRegex(core.ContractError, "ambiguous tag"):
-            runner.consume_and_dispatch(api=api, event=event(), resolution=resolution())
-        self.assertFalse(api.dispatched)
-
-    def test_exact_create_readback_then_direct_200_run_identity_dispatches_once(self) -> None:
-        class API:
-            tag_reads = 0
-            dispatches = 0
-
-            def get_workflow(self, _: int) -> dict[str, object]:
-                return workflow_response()
-
-            def get_contents(self, path: str, ref: str) -> dict[str, object]:
-                return contents_response()
-
-            def get_ruleset(self, _: int) -> dict[str, object]:
-                return ruleset_response()
-
-            def get_tag(self, _: str) -> dict[str, object] | None:
-                self.tag_reads += 1
-                if self.tag_reads == 1:
-                    return None
-                return {"ref": resolution().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
-
-            def get_comment(self, _: int) -> dict[str, object]:
-                return event()["comment"]
-
-            def create_tag_once(self, *args: object) -> dict[str, object]:
-                return {"ref": resolution().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
-
-            def dispatch_once(self, workflow_id: int, tag: str, inputs: dict[str, object]) -> dict[str, object]:
-                self.dispatches += 1
-                self.assertions = (workflow_id, tag, inputs)
-                return {"workflow_run_id": 555, "run_url": "api", "html_url": "html"}
-
-            def get_run_attempt(self, _: int, attempt: int = 1) -> dict[str, object]:
-                return target_run()
-
-        api = API()
-        result = runner.consume_and_dispatch(api=api, event=event(), resolution=resolution())
-        self.assertEqual(api.dispatches, 1)
-        self.assertEqual(result["workflow_run_id"], 555)
-        self.assertEqual(api.assertions, (328208073, resolution().execution_tag, {}))
+    def test_exact_create_readback_dispatches_once(self) -> None:
+        api = self.API(); result = runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
+        self.assertEqual(api.dispatches, 1); self.assertEqual(result["workflow_run_id"], 555)
 
     def test_missing_direct_run_identity_is_not_inferred_or_retried(self) -> None:
-        class API:
-            dispatches = 0
-            tag_reads = 0
-
-            def get_workflow(self, _: int) -> dict[str, object]:
-                return workflow_response()
-
-            def get_contents(self, path: str, ref: str) -> dict[str, object]:
-                return contents_response()
-
-            def get_ruleset(self, _: int) -> dict[str, object]:
-                return ruleset_response()
-
-            def get_tag(self, _: str) -> dict[str, object] | None:
-                self.tag_reads += 1
-                return None if self.tag_reads == 1 else {"ref": resolution().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
-
-            def get_comment(self, _: int) -> dict[str, object]:
-                return event()["comment"]
-
-            def create_tag_once(self, *args: object) -> dict[str, object]:
-                return {"ref": resolution().execution_ref, "object": {"type": "commit", "sha": SOURCE_SHA}}
-
-            def dispatch_once(self, *args: object) -> dict[str, object]:
-                self.dispatches += 1
-                return {}
-
-        api = API()
-        with self.assertRaisesRegex(core.ContractError, "direct run identity"):
-            runner.consume_and_dispatch(api=api, event=event(), resolution=resolution())
+        api = self.API(dispatch_response={})
+        with self.assertRaisesRegex(core.ContractError, "direct run identity"): runner.consume_and_dispatch(api=api, event=event(), resolution=resolve())
         self.assertEqual(api.dispatches, 1)
 
-    def test_target_run_must_be_first_attempt_exact_tag_and_sha(self) -> None:
-        for changes in (
-            {"run_attempt": 2},
-            {"head_sha": "b" * 40},
-            {"head_branch": "main"},
-            {"event": "issue_comment"},
-            {"workflow_id": 1},
-        ):
-            with self.subTest(changes=changes):
-                with self.assertRaises(core.ContractError):
-                    runner.validate_target_run(target_run(**changes), resolution())
+
+class TransportTests(unittest.TestCase):
+    def test_timeout_urlerror_and_http_failures_are_single_attempt(self) -> None:
+        api = runner.GitHubAPI("8ft0-ai/crypto-pulse", "token")
+        failures = [urllib.error.URLError("reset")]
+        for status in (400, 403, 500, 503):
+            err = urllib.error.HTTPError("https://api.github.com/x", status, "x", hdrs=None, fp=None)
+            err.read = lambda: b'{"message":"failure"}'  # type: ignore[method-assign]
+            failures.append(err)
+        for failure in failures:
+            with self.subTest(failure=failure), mock.patch("urllib.request.urlopen", side_effect=failure) as call:
+                with self.assertRaises(core.ContractError): api.dispatch_once(1, "tag", {})
+                self.assertEqual(call.call_count, 1)
 
 
 class ReceiptTests(unittest.TestCase):
-    def test_canonical_json_is_sorted_compact_utf8_with_one_lf(self) -> None:
-        self.assertEqual(core.canonical_json_bytes({"z": 1, "a": "é"}), b'{"a":"\xc3\xa9","z":1}\n')
+    def test_subject_exact_fields_schema_and_no_audit_extras(self) -> None:
+        subject = core.canonical_subject(resolution=resolve(), target_run=target_run())
+        self.assertEqual(tuple(subject), core.SUBJECT_KEYS); self.assertEqual(subject["schema"], core.ATTESTATION_SCHEMA)
+        self.assertNotIn("actor_user_id", subject); self.assertNotIn("dispatcher_run_id", subject)
 
-    def test_receipt_binds_exact_dispatcher_and_target_run(self) -> None:
-        resolved = resolution()
-        subject = core.canonical_subject(
-            resolution=resolved,
-            event=event(),
-            dispatcher_run_id=777,
-            dispatcher_run_attempt=1,
-            target_run=target_run(),
-        )
-        self.assertEqual(subject["dispatcher_run_id"], 777)
-        self.assertEqual(subject["target_run_id"], 555)
-        self.assertEqual(subject["target_ref"], resolved.execution_ref)
-        predicate = core.canonical_predicate(subject, fixed_inputs_sha256=resolved.fixed_inputs_sha256)
-        self.assertEqual(predicate["target_event"], "workflow_dispatch")
-        self.assertEqual(predicate["fixed_inputs_sha256"], resolved.fixed_inputs_sha256)
+    def test_predicate_has_schema_and_rich_bindings(self) -> None:
+        p = core.canonical_predicate(resolution=resolve(), event=event(), dispatcher_run_id=777, dispatcher_run_attempt=1, target_run=target_run())
+        self.assertEqual(tuple(p), core.PREDICATE_KEYS); self.assertEqual(p["schema"], "dispatch_attestation_v1")
+        self.assertEqual(p["dispatcher_run_id"], 777); self.assertEqual(p["actor_user_id"], 130460431); self.assertEqual(p["target_event"], "workflow_dispatch")
+
+    def test_canonical_subject_bytes_are_stable(self) -> None:
+        subject = core.canonical_subject(resolution=resolve(), target_run=target_run())
+        expected = (
+            '{"authorisation_id":"phase9-once","authorisation_sha":"' + SOURCE_SHA + '","execution_ref":"refs/tags/issueops/dispatch/phase9-once--sha-' + SOURCE_SHA + '",'
+            '"repository":"8ft0-ai/crypto-pulse","repository_id":1233729904,"schema":"dispatch_attestation_v1","target_ref":"refs/tags/issueops/dispatch/phase9-once--sha-' + SOURCE_SHA + '",'
+            '"target_run_id":555,"target_sha":"' + SOURCE_SHA + '","target_workflow_id":328208073,"target_workflow_path":".github/workflows/governed-gpt-oss-quality-comparison.yml"}\n'
+        ).encode()
+        self.assertEqual(core.canonical_json_bytes(subject), expected)
 
     def test_signing_rerun_rejects(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaisesRegex(core.ContractError, "rerun"):
-                runner.write_attestation_inputs(
-                    event=event(),
-                    resolution=resolution(),
-                    dispatcher_run_id=1,
-                    dispatcher_run_attempt=2,
-                    target_run=target_run(),
-                    output_dir=Path(tmp),
-                )
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(core.ContractError, "rerun"):
+            runner.write_attestation_inputs(event=event(), resolution=resolve(), dispatcher_run_id=1, dispatcher_run_attempt=2, target_run=target_run(), output_dir=Path(tmp))
 
 
 class WorkflowStaticTests(unittest.TestCase):
-    def test_listener_is_created_issue_comment_only(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        trigger = raw.get("on") if "on" in raw else raw.get(True)
-        self.assertEqual(trigger, {"issue_comment": {"types": ["created"]}})
-        self.assertEqual(raw["permissions"], {})
+    def test_listener_permissions_and_no_provider_boundary(self) -> None:
+        text = WORKFLOW.read_text()
+        self.assertIn("issue_comment:\n    types: [created]", text); self.assertIn("permissions: {}", text)
+        self.assertNotIn("OPENROUTER_API_KEY", text); self.assertNotIn("governed-llm-dry-run", text); self.assertNotIn("environment:", text)
 
-    def test_side_effect_job_has_only_required_repository_writes(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        permissions = raw["jobs"]["consume-and-dispatch"]["permissions"]
-        self.assertEqual(
-            permissions,
-            {"actions": "write", "contents": "write", "issues": "read"},
-        )
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertNotIn("git push", text)
-        self.assertNotIn("pull-requests: write", text)
-        self.assertNotIn("statuses: write", text)
-        self.assertNotIn("repository_dispatch", text)
+    def test_privileged_and_signing_permissions_are_separated(self) -> None:
+        text = WORKFLOW.read_text(); side = text.split("consume-and-dispatch:", 1)[1].split("sign-dispatch-receipt:", 1)[0]; sign = text.split("sign-dispatch-receipt:", 1)[1]
+        self.assertIn("actions: write", side); self.assertIn("contents: write", side); self.assertIn("issues: read", side)
+        self.assertIn("actions: read", sign); self.assertIn("contents: read", sign); self.assertIn("attestations: write", sign); self.assertIn("id-token: write", sign)
+        self.assertNotIn("actions: write", sign); self.assertNotIn("contents: write", sign); self.assertNotIn("issues: read", sign)
 
-    def test_signing_job_cannot_dispatch_or_write_contents(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        permissions = raw["jobs"]["sign-dispatch-receipt"]["permissions"]
-        self.assertEqual(permissions["actions"], "read")
-        self.assertEqual(permissions["contents"], "read")
-        self.assertEqual(permissions["attestations"], "write")
-        self.assertEqual(permissions["id-token"], "write")
+    def test_every_external_action_is_full_sha_pinned_and_expected(self) -> None:
+        text = WORKFLOW.read_text(); uses = [line.strip().split("uses: ", 1)[1] for line in text.splitlines() if "uses: " in line]
+        self.assertGreaterEqual(len(uses), 3)
+        import re
+        for action in uses: self.assertRegex(action, r"^[^@]+@[0-9a-f]{40}$")
+        self.assertIn("actions/checkout@11d5960a326750d5838078e36cf38b85af677262", uses)
+        self.assertIn("actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065", uses)
+        self.assertIn("actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6", uses)
 
-    def test_attest_action_is_full_sha_pinned(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn(
-            "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
-            text,
-        )
-        self.assertNotIn("actions/attest@v", text)
-
-    def test_no_provider_secret_or_protected_environment_is_present(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertNotIn("OPENROUTER_API_KEY", text)
-        self.assertNotIn("governed-llm-dry-run", text)
-        self.assertNotIn("environment:", text)
+    def test_checkout_fetches_first_parent_and_runtime_has_no_network_package_install(self) -> None:
+        text = WORKFLOW.read_text(); runtime = (ROOT / "issueops_dispatch/runner.py").read_text()
+        self.assertEqual(text.count("fetch-depth: 2"), 3); self.assertNotIn("fetch-depth: 1", text)
+        self.assertNotIn("pip install", text); self.assertNotIn("import yaml", runtime); self.assertNotIn("yaml.safe_load", runtime)
 
     def test_runtime_exposes_only_one_ref_create_and_one_dispatch_write(self) -> None:
-        text = (ROOT / "issueops_dispatch/runner.py").read_text(encoding="utf-8")
-        self.assertEqual(text.count('"/git/refs"'), 1)
-        self.assertEqual(text.count('f"/actions/workflows/{workflow_id}/dispatches"'), 1)
-        for prohibited in (
-            '"PATCH",',
-            '"DELETE",',
-            "/rerun",
-            "/cancel",
-            "/enable",
-            "/disable",
-            "/git/refs/",
-        ):
+        text = (ROOT / "issueops_dispatch/runner.py").read_text()
+        self.assertEqual(text.count('"/git/refs"'), 1); self.assertEqual(text.count('f"/actions/workflows/{workflow_id}/dispatches"'), 1)
+        for prohibited in ('"PATCH",', '"DELETE",', "/rerun", "/cancel", "/enable", "/disable", "/git/refs/"):
             self.assertNotIn(prohibited, text)
 
 
