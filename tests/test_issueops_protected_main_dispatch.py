@@ -5,6 +5,7 @@ import copy
 import json
 import tempfile
 import unittest
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
@@ -141,6 +142,20 @@ def dispatcher_run(**updates: object) -> dict[str, object]:
     }
     value.update(updates)
     return value
+
+
+def attestation_page_url(digest: str, page: int) -> str:
+    query = urllib.parse.urlencode(
+        {
+            "predicate_type": core.PREDICATE_TYPE,
+            "per_page": 100,
+            "page": page,
+        }
+    )
+    return (
+        f"https://api.github.com/repos/{core.REPOSITORY}/attestations/"
+        f"sha256:{digest}?{query}"
+    )
 
 
 def verified_payload(
@@ -370,6 +385,8 @@ class AvailabilityAndPaginationTests(unittest.TestCase):
         self.assertEqual(len(sleeps), 11)
 
     def test_authoritative_attestation_pagination_is_exhaustive(self) -> None:
+        digest = "a" * 64
+
         class API(legacy_guard.GitHubReadAPI):
             def __init__(self) -> None:
                 self.repository = core.REPOSITORY
@@ -382,12 +399,7 @@ class AvailabilityAndPaginationTests(unittest.TestCase):
                 if self.calls == 1:
                     return (
                         {"attestations": [{"bundle_url": "https://one"}]},
-                        {
-                            "Link": (
-                                '<https://api.github.com/repos/8ft0-ai/crypto-pulse/'
-                                'attestations/x?page=2>; rel="next"'
-                            )
-                        },
+                        {"Link": f'<{attestation_page_url(digest, 2)}>; rel="next"'},
                     )
                 return (
                     {"attestations": [{"bundle_url": "https://two"}]},
@@ -395,8 +407,11 @@ class AvailabilityAndPaginationTests(unittest.TestCase):
                 )
 
         api = API()
-        items = api.list_attestations("a" * 64)
-        self.assertEqual([x["bundle_url"] for x in items], ["https://one", "https://two"])
+        items = api.list_attestations(digest)
+        self.assertEqual(
+            [x["bundle_url"] for x in items],
+            ["https://one", "https://two"],
+        )
         self.assertEqual(api.calls, 2)
 
     def test_pagination_loop_and_off_domain_next_fail_closed(self) -> None:
@@ -404,6 +419,9 @@ class AvailabilityAndPaginationTests(unittest.TestCase):
             legacy_guard._next_link(
                 '<https://evil.example/page=2>; rel="next"'
             )
+
+        digest = "a" * 64
+        loop_url = attestation_page_url(digest, 2)
 
         class LoopAPI(legacy_guard.GitHubReadAPI):
             def __init__(self) -> None:
@@ -414,11 +432,11 @@ class AvailabilityAndPaginationTests(unittest.TestCase):
             def _request_url(self, url: str):
                 return (
                     {"attestations": []},
-                    {"Link": f'<{url}>; rel="next"'},
+                    {"Link": f'<{loop_url}>; rel="next"'},
                 )
 
         with self.assertRaisesRegex(legacy_guard.GuardError, "loop"):
-            LoopAPI().list_attestations("a" * 64)
+            LoopAPI().list_attestations(digest)
 
 
 class CertificateAndReceiptTests(unittest.TestCase):
