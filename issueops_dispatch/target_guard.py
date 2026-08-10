@@ -249,10 +249,8 @@ def verify_dispatcher_run(
         raise GuardError("dispatcher run actor login mismatch")
     if triggering.get("login") not in (None, ACTOR_LOGIN):
         raise GuardError("dispatcher triggering actor login mismatch")
-    repository = run.get("repository")
-    if repository is not None and _mapping(
-        repository, "dispatcher run repository"
-    ).get("full_name") != REPOSITORY:
+    repository = _mapping(run.get("repository"), "dispatcher run repository")
+    if repository.get("full_name") != REPOSITORY:
         raise GuardError("dispatcher run repository mismatch")
 
 
@@ -354,23 +352,105 @@ def verify_gh_result(
     return dispatcher_run_id
 
 
-def _next_link(value: str | None) -> str | None:
-    if not value:
+def _link_parameter(segment: str) -> tuple[str, str]:
+    if "=" not in segment:
+        raise GuardError("malformed attestation pagination Link parameter")
+    name, raw_value = (item.strip() for item in segment.split("=", 1))
+    token_chars = "!#$%&'*+-.^_`|~"
+    if not name or any(not (char.isalnum() or char in token_chars) for char in name):
+        raise GuardError("malformed attestation pagination Link parameter")
+    if raw_value.startswith('"'):
+        if len(raw_value) < 2 or not raw_value.endswith('"'):
+            raise GuardError("malformed attestation pagination Link parameter")
+        value = raw_value[1:-1]
+        if '"' in value or "\\" in value:
+            raise GuardError("malformed attestation pagination Link parameter")
+    else:
+        if not raw_value or any(
+            char.isspace() or char in '\",;' for char in raw_value
+        ):
+            raise GuardError("malformed attestation pagination Link parameter")
+        value = raw_value
+    return name.lower(), value
+
+
+def _next_link(value: str | None, *, expected_path: str | None = None) -> str | None:
+    if value is None or value == "":
         return None
-    for part in value.split(","):
-        section = part.strip().split(";")
-        if len(section) < 2:
-            continue
-        target = section[0].strip()
-        relations = ";".join(section[1:])
-        if 'rel="next"' in relations:
-            if not (target.startswith("<") and target.endswith(">")):
+    if not isinstance(value, str):
+        raise GuardError("malformed attestation pagination Link header")
+
+    next_urls: list[str] = []
+    for raw_part in value.split(","):
+        part = raw_part.strip()
+        if not part or not part.startswith("<"):
+            raise GuardError("malformed attestation pagination Link header")
+        close = part.find(">")
+        if close <= 1 or "<" in part[1:close]:
+            raise GuardError("malformed attestation pagination Link header")
+        target = part[1:close]
+        remainder = part[close + 1 :].strip()
+        if not remainder.startswith(";"):
+            raise GuardError("malformed attestation pagination Link header")
+
+        parameters: dict[str, str] = {}
+        for raw_parameter in remainder.split(";")[1:]:
+            segment = raw_parameter.strip()
+            if not segment:
                 raise GuardError("malformed attestation pagination Link header")
-            url = target[1:-1]
-            if not url.startswith("https://api.github.com/"):
-                raise GuardError("attestation pagination escaped api.github.com")
-            return url
-    return None
+            name, parameter_value = _link_parameter(segment)
+            if name in parameters:
+                raise GuardError("duplicate attestation pagination Link parameter")
+            parameters[name] = parameter_value
+
+        relation = parameters.get("rel")
+        if relation is None:
+            raise GuardError("attestation pagination Link relation is missing")
+        relations = relation.split()
+        if not relations or any(
+            not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", item)
+            for item in relations
+        ):
+            raise GuardError("malformed attestation pagination Link relation")
+        if "next" not in relations:
+            continue
+
+        parsed = urllib.parse.urlparse(target)
+        if (
+            parsed.scheme != "https"
+            or parsed.netloc != "api.github.com"
+            or parsed.params
+            or parsed.fragment
+        ):
+            raise GuardError("attestation pagination escaped api.github.com")
+        if expected_path is not None and parsed.path != expected_path:
+            raise GuardError("attestation pagination escaped the exact collection path")
+        try:
+            query = urllib.parse.parse_qs(
+                parsed.query, keep_blank_values=True, strict_parsing=True
+            )
+        except ValueError as exc:
+            raise GuardError("malformed attestation pagination query") from exc
+        if expected_path is not None:
+            if set(query) != {"predicate_type", "per_page", "page"}:
+                raise GuardError("attestation pagination query changed")
+            if query.get("predicate_type") != [PREDICATE_TYPE]:
+                raise GuardError("attestation pagination predicate filter changed")
+            if query.get("per_page") != ["100"]:
+                raise GuardError("attestation pagination page size changed")
+            page = query.get("page")
+            if (
+                page is None
+                or len(page) != 1
+                or not page[0].isdigit()
+                or int(page[0]) < 1
+            ):
+                raise GuardError("attestation pagination page is invalid")
+        next_urls.append(target)
+
+    if len(next_urls) > 1:
+        raise GuardError("multiple attestation pagination next links")
+    return next_urls[0] if next_urls else None
 
 
 class GitHubReadAPI:
@@ -431,7 +511,8 @@ class GitHubReadAPI:
         query = urllib.parse.urlencode(
             {"predicate_type": PREDICATE_TYPE, "per_page": 100}
         )
-        url = f"{self.base}/attestations/sha256:{subject_sha256}?{query}"
+        path = f"/repos/{self.repository}/attestations/sha256:{subject_sha256}"
+        url = f"https://api.github.com{path}?{query}"
         results: list[Mapping[str, Any]] = []
         seen: set[str] = set()
         while url:
@@ -442,7 +523,16 @@ class GitHubReadAPI:
             page = _mapping(payload, "attestation collection")
             for item in _list(page.get("attestations"), "attestations"):
                 results.append(_mapping(item, "attestation item"))
-            url = _next_link(headers.get("Link") or headers.get("link"))
+            upper_link = headers.get("Link")
+            lower_link = headers.get("link")
+            if (
+                upper_link is not None
+                and lower_link is not None
+                and upper_link != lower_link
+            ):
+                raise GuardError("conflicting attestation pagination Link headers")
+            link = upper_link if upper_link is not None else lower_link
+            url = _next_link(link, expected_path=path)
         return results
 
     def fetch_bundle(self, url: str) -> bytes:
