@@ -45,7 +45,7 @@ def record() -> dict[str, object]:
         "attestation_predicate_type": core.PREDICATE_TYPE,
         "dispatcher_workflow_path": core.DISPATCHER_WORKFLOW_PATH,
         "dispatcher_workflow_sha256": core.sha256_bytes(DISPATCHER_BYTES),
-        "execution_tag_ruleset_id": 7654,
+        "execution_tag_ruleset_id": 20623136,
         "execution_tag_ruleset_name": "IssueOps immutable execution tags",
         "purpose": "test authority",
     }
@@ -85,7 +85,7 @@ def event() -> dict[str, object]:
 
 def ruleset() -> dict[str, object]:
     return {
-        "id": 7654,
+        "id": 20623136,
         "name": "IssueOps immutable execution tags",
         "target": "tag",
         "enforcement": "active",
