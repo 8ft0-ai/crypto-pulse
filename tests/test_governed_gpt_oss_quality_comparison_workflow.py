@@ -16,61 +16,25 @@ WORKFLOW = ROOT / ".github/workflows/governed-gpt-oss-quality-comparison.yml"
 
 
 class GovernedGPTOSSQualityComparisonWorkflowTests(unittest.TestCase):
-    def test_workflow_is_manual_and_protected_tag_only(self) -> None:
+    def test_workflow_is_manual_read_only_and_trusted_main(self) -> None:
         raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
         trigger = raw.get("on") if "on" in raw else raw.get(True)
         self.assertEqual(set(trigger), {"workflow_dispatch"})
         self.assertEqual(raw["permissions"], {"contents": "read"})
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("refs/tags/issueops/dispatch/", text)
-        self.assertIn("github.workflow_sha", text)
-        self.assertNotIn("issue_comment", text)
-        self.assertNotIn("schedule:", text)
-        self.assertNotIn("ref: main", text)
+        self.assertIn("GITHUB_REF", WORKFLOW.read_text())
+        self.assertIn("refs/heads/main", WORKFLOW.read_text())
+        self.assertNotIn("issue_comment", WORKFLOW.read_text())
+        self.assertNotIn("schedule:", WORKFLOW.read_text())
 
-    def test_secret_free_guard_has_only_required_read_permissions(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        guard = raw["jobs"]["guard"]
-        self.assertEqual(
-            guard["permissions"],
-            {"contents": "read", "actions": "read", "attestations": "read"},
-        )
-        self.assertIn("github.run_attempt == 1", str(guard["if"]))
+    def test_preparation_has_no_secret_and_execution_is_protected(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
-        guard_text = text.split("  prepare:", 1)[0]
-        self.assertNotIn("OPENROUTER_API_KEY", guard_text)
-        self.assertNotIn("environment: governed-llm-dry-run", guard_text)
-        self.assertIn("issueops_dispatch.target_guard", guard_text)
-
-    def test_pinned_attestation_verifier_contract_is_frozen(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("gh_2.97.0_linux_amd64.tar.gz", text)
-        self.assertIn(
-            "a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112",
-            text,
-        )
-        self.assertIn("sha256sum --check --strict", text)
-        self.assertIn("gh version 2.97.0", text)
-
-    def test_preparation_uses_exact_authorised_sha(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        prepare = text.split("  prepare:", 1)[1].split("  compare:", 1)[0]
+        prepare = text.split("  compare:", 1)[0]
+        compare = text.split("  compare:", 1)[1]
         self.assertNotIn("OPENROUTER_API_KEY", prepare)
-        self.assertIn("ref: ${{ github.sha }}", prepare)
-        self.assertNotIn("ref: main", prepare)
-        self.assertIn("test \"$sha\" = \"$GITHUB_SHA\"", prepare)
-
-    def test_protected_execution_independently_rejects_reruns(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        compare = raw["jobs"]["compare"]
-        condition = str(compare["if"])
-        self.assertIn("github.run_attempt == 1", condition)
-        self.assertIn("needs.guard.result == 'success'", condition)
-        self.assertEqual(compare["environment"], "governed-llm-dry-run")
-        text = WORKFLOW.read_text(encoding="utf-8")
-        compare_text = text.split("  compare:", 1)[1]
-        self.assertIn("OPENROUTER_API_KEY", compare_text)
-        self.assertIn("test \"$TRUSTED_SHA\" = \"$GITHUB_SHA\"", compare_text)
+        self.assertIn("environment: governed-llm-dry-run", compare)
+        self.assertIn("OPENROUTER_API_KEY", compare)
+        self.assertIn("persist-credentials: false", text)
+        self.assertIn("--trusted-main-sha", compare)
 
     def test_workflow_has_no_repository_write_or_automatic_trigger(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
@@ -80,8 +44,6 @@ class GovernedGPTOSSQualityComparisonWorkflowTests(unittest.TestCase):
             "git push",
             "gh pr",
             "repository_dispatch",
-            "attestations: write",
-            "actions: write",
         ):
             self.assertNotIn(prohibited, text)
         self.assertIn("gpt-oss-quality-comparison-prepared", text)

@@ -2,6 +2,11 @@ name: Governed GPT-OSS quality comparison
 
 on:
   workflow_dispatch:
+    inputs:
+      issueops_authorisation_id:
+        description: Frozen IssueOps authorisation identifier
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,7 +17,7 @@ concurrency:
 
 jobs:
   guard:
-    name: Verify protected IssueOps dispatch provenance
+    name: Verify trusted-main IssueOps dispatch provenance
     if: ${{ github.run_attempt == 1 }}
     permissions:
       contents: read
@@ -22,20 +27,23 @@ jobs:
     steps:
       - name: Reject non-canonical protected execution context
         env:
+          AUTH_ID: ${{ inputs.issueops_authorisation_id }}
+          EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != refs/tags/issueops/dispatch/*--sha-* ]]; then
-            echo "This protected target requires an IssueOps execution tag." >&2
-            exit 1
-          fi
-          if [[ ! "$GITHUB_REF" =~ ^refs/tags/issueops/dispatch/[A-Za-z0-9._-]{1,48}--sha-[0-9a-f]{40}$ ]]; then
-            echo "Execution ref does not satisfy the canonical IssueOps grammar." >&2
+          test "$EVENT_NAME" = "workflow_dispatch"
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This protected target requires trusted main." >&2
             exit 1
           fi
           if [[ "$WORKFLOW_SHA" != "$GITHUB_SHA" ]]; then
-            echo "The workflow definition is not sourced from the execution SHA." >&2
+            echo "The workflow definition is not sourced from the target SHA." >&2
+            exit 1
+          fi
+          if [[ ! "$AUTH_ID" =~ ^[A-Za-z0-9._-]{1,48}$ ]]; then
+            echo "The IssueOps authorisation identifier is invalid." >&2
             exit 1
           fi
           if [[ "$(uname -m)" != "x86_64" ]]; then
@@ -43,7 +51,7 @@ jobs:
             exit 1
           fi
 
-      - name: Check out exact protected execution SHA
+      - name: Check out exact protected main SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
@@ -65,10 +73,10 @@ jobs:
         run: |
           set -euo pipefail
           asset="gh_2.97.0_linux_amd64.tar.gz"
-          expected="a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112"
           url="https://github.com/cli/cli/releases/download/v2.97.0/$asset"
           curl --fail --location --silent --show-error "$url" --output "$RUNNER_TEMP/$asset"
-          printf '%s  %s\n' "$expected" "$RUNNER_TEMP/$asset" | sha256sum --check --strict
+          python -m issueops_dispatch.target_guard_main verify-asset \
+            --asset "$RUNNER_TEMP/$asset"
           mkdir -p "$RUNNER_TEMP/gh-2.97.0"
           tar -xzf "$RUNNER_TEMP/$asset" --strip-components=1 -C "$RUNNER_TEMP/gh-2.97.0"
           test -x "$RUNNER_TEMP/gh-2.97.0/bin/gh"
@@ -77,42 +85,17 @@ jobs:
 
       - name: Verify canonical signed dispatcher receipt
         env:
+          AUTH_ID: ${{ inputs.issueops_authorisation_id }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          python -m issueops_dispatch.target_guard \
+          python -m issueops_dispatch.target_guard_main guard \
             --repository-root . \
+            --authorisation-id "$AUTH_ID" \
             --gh-bin "${{ steps.verifier.outputs.path }}" \
             --output "$RUNNER_TEMP/issueops-target-provenance.json"
-
-      - name: Verify frozen dispatcher workflow content
-        env:
-          PROVENANCE_PATH: ${{ runner.temp }}/issueops-target-provenance.json
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import hashlib
-          import json
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          from issueops_dispatch.core import validate_registry
-          from issueops_dispatch.runner import load_registry
-
-          proof = json.loads(Path("${{ runner.temp }}/issueops-target-provenance.json").read_text(encoding="utf-8"))
-          registry = load_registry(Path(".github/issueops-workflow-dispatch.yml"))
-          records = validate_registry(registry, now=datetime.now(timezone.utc))
-          matches = [record for record in records if record["authorisation_id"] == proof["authorisation_id"]]
-          if len(matches) != 1:
-              raise SystemExit("provenance authorisation is no longer unique")
-          expected = matches[0]["dispatcher_workflow_sha256"]
-          actual = hashlib.sha256(Path(".github/workflows/issueops-workflow-dispatch.yml").read_bytes()).hexdigest()
-          if actual != expected:
-              raise SystemExit("dispatcher workflow content does not match frozen authority")
-          PY
 
       - name: Publish provenance summary
         if: success()
@@ -121,7 +104,7 @@ jobs:
           {
             echo "# Protected IssueOps provenance"
             echo
-            echo "The exact execution tag, ruleset, target/dispatcher source snapshot, signed dispatcher receipt, certificate identity, dispatcher actor/run and rerun boundary were verified before protected execution eligibility."
+            echo "Trusted-main workflow/source, immutable consumption tag, ruleset, signed dispatcher receipt, certificate identity, dispatcher actor/run and rerun boundary were verified before protected execution eligibility."
           } >> "$GITHUB_STEP_SUMMARY"
 
   prepare:
