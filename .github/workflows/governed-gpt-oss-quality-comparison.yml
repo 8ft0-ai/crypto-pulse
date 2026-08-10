@@ -87,6 +87,33 @@ jobs:
             --gh-bin "${{ steps.verifier.outputs.path }}" \
             --output "$RUNNER_TEMP/issueops-target-provenance.json"
 
+      - name: Verify frozen dispatcher workflow content
+        env:
+          PROVENANCE_PATH: ${{ runner.temp }}/issueops-target-provenance.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          from issueops_dispatch.core import validate_registry
+          from issueops_dispatch.runner import load_registry
+
+          proof = json.loads(Path("${{ runner.temp }}/issueops-target-provenance.json").read_text(encoding="utf-8"))
+          registry = load_registry(Path(".github/issueops-workflow-dispatch.yml"))
+          records = validate_registry(registry, now=datetime.now(timezone.utc))
+          matches = [record for record in records if record["authorisation_id"] == proof["authorisation_id"]]
+          if len(matches) != 1:
+              raise SystemExit("provenance authorisation is no longer unique")
+          expected = matches[0]["dispatcher_workflow_sha256"]
+          actual = hashlib.sha256(Path(".github/workflows/issueops-workflow-dispatch.yml").read_bytes()).hexdigest()
+          if actual != expected:
+              raise SystemExit("dispatcher workflow content does not match frozen authority")
+          PY
+
       - name: Publish provenance summary
         if: success()
         shell: bash
@@ -94,7 +121,7 @@ jobs:
           {
             echo "# Protected IssueOps provenance"
             echo
-            echo "The exact execution tag, ruleset, target SHA, signed dispatcher receipt, certificate identity, dispatcher actor/run and rerun boundary were verified before protected execution eligibility."
+            echo "The exact execution tag, ruleset, target/dispatcher source snapshot, signed dispatcher receipt, certificate identity, dispatcher actor/run and rerun boundary were verified before protected execution eligibility."
           } >> "$GITHUB_STEP_SUMMARY"
 
   prepare:
