@@ -62,7 +62,7 @@ jobs:
             --run-attempt "$GITHUB_RUN_ATTEMPT"
 
   consume-and-dispatch:
-    name: Atomically consume and dispatch
+    name: Atomically consume and dispatch trusted main
     needs: resolve
     if: needs.resolve.outputs.authorised == 'true'
     runs-on: ubuntu-latest
@@ -102,14 +102,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Consume one-time authority and dispatch once
+      - name: Consume one-time authority and dispatch trusted main once
         id: dispatch
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          python -m issueops_dispatch.runner consume \
+          python -m issueops_dispatch.protected_dispatch consume \
             --event "$GITHUB_EVENT_PATH" \
             --config .github/issueops-workflow-dispatch.yml \
             --dispatcher-workflow .github/workflows/issueops-workflow-dispatch.yml \
@@ -119,7 +119,7 @@ jobs:
             --token "$GITHUB_TOKEN"
 
   sign-dispatch-receipt:
-    name: Sign exact target-run receipt
+    name: Sign exact trusted-main target-run receipt
     needs: [resolve, consume-and-dispatch]
     if: needs.consume-and-dispatch.result == 'success'
     runs-on: ubuntu-latest
@@ -156,7 +156,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Revalidate exact target run and prepare canonical receipt
+      - name: Revalidate exact trusted-main target run and prepare canonical receipt
         id: receipt
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -164,7 +164,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m issueops_dispatch.runner prepare-attestation \
+          python -m issueops_dispatch.protected_dispatch prepare-attestation \
             --event "$GITHUB_EVENT_PATH" \
             --config .github/issueops-workflow-dispatch.yml \
             --dispatcher-workflow .github/workflows/issueops-workflow-dispatch.yml \
@@ -199,6 +199,7 @@ jobs:
             echo
             echo "- Authorisation: \`$AUTH_ID\`"
             echo "- Execution tag: \`$EXECUTION_TAG\`"
+            echo "- Target ref: \`refs/heads/main\`"
             echo "- Target run: [$TARGET_RUN_ID]($TARGET_RUN_URL)"
             echo "- Canonical subject SHA-256: \`$SUBJECT_SHA256\`"
             echo "- Dispatcher run attempt: \`$GITHUB_RUN_ATTEMPT\`"
