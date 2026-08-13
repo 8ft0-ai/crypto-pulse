@@ -1,4 +1,30 @@
 {
   "schema_version": 2,
-  "authorisations": []
+  "authorisations": [
+    {
+      "authorisation_id": "phase9-gpt-oss-quality-20260814-v1",
+      "governing_issue": 352,
+      "command": "/run-phase9-gpt-oss-quality-20260814-v1",
+      "actor_login": "8ft0-ai",
+      "actor_user_id": 130460431,
+      "required_author_association": "OWNER",
+      "target_workflow_id": 328208073,
+      "target_workflow_path": ".github/workflows/governed-gpt-oss-quality-comparison.yml",
+      "target_ref_policy": "consumed_execution_tag_v1",
+      "target_workflow_sha256": "29bbb85c92154cbe67e5778451274e9e37bdf3107c14bf7e3b4cbd3652088766",
+      "fixed_inputs": {},
+      "maximum_dispatch_attempts": 1,
+      "enabled": true,
+      "not_before": null,
+      "expires_at": "2026-08-21T00:00:00Z",
+      "consumption_mechanism": "execution_tag_v1",
+      "provenance_mechanism": "dispatch_attestation_v1",
+      "attestation_predicate_type": "https://github.com/8ft0-ai/crypto-pulse/issueops/dispatch-attestation/v1",
+      "dispatcher_workflow_path": ".github/workflows/issueops-workflow-dispatch.yml",
+      "dispatcher_workflow_sha256": "b9cb0b5511dd1e992dda1573f893509b76be20e9484f76f900042fd5ef9bdf0b",
+      "execution_tag_ruleset_id": 20623136,
+      "execution_tag_ruleset_name": "IssueOps immutable execution tags",
+      "purpose": "One-time Phase 9 GPT-OSS 120B quality and stability comparison governed by issue #352"
+    }
+  ]
 }
