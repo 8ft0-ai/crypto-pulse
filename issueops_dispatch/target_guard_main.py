@@ -9,6 +9,8 @@ import os
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -43,6 +45,38 @@ def verify_dispatcher_workflow_hash(
         )
 
 
+def _is_initial_attestation_subject_404(
+    error: common.GuardError,
+    client: common.GitHubReadAPI,
+    subject_sha256: str,
+) -> bool:
+    cause = error.__cause__
+    if not isinstance(cause, urllib.error.HTTPError) or cause.code != 404:
+        return False
+    try:
+        parsed = urllib.parse.urlparse(cause.geturl())
+        query = urllib.parse.parse_qs(
+            parsed.query, keep_blank_values=True, strict_parsing=True
+        )
+    except (AttributeError, ValueError):
+        return False
+    expected_path = (
+        f"/repos/{client.repository}/attestations/sha256:{subject_sha256}"
+    )
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc == "api.github.com"
+        and parsed.path == expected_path
+        and not parsed.params
+        and not parsed.fragment
+        and query
+        == {
+            "predicate_type": [core.PREDICATE_TYPE],
+            "per_page": ["100"],
+        }
+    )
+
+
 def wait_for_attestations(
     client: common.GitHubReadAPI,
     subject_sha256: str,
@@ -54,7 +88,14 @@ def wait_for_attestations(
     if enumerations < 1:
         raise common.GuardError("attestation enumeration bound must be positive")
     for attempt in range(enumerations):
-        attestations = client.list_attestations(subject_sha256)
+        try:
+            attestations = client.list_attestations(subject_sha256)
+        except common.GuardError as exc:
+            if not _is_initial_attestation_subject_404(
+                exc, client, subject_sha256
+            ):
+                raise
+            attestations = []
         if attestations:
             return attestations
         if attempt + 1 < enumerations:
