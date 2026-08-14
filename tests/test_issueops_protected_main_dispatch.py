@@ -571,9 +571,13 @@ class EndToEndGuardPolicyTests(unittest.TestCase):
             self.repository(root)
             api = self.API(count=2)
             with mock.patch.object(legacy_guard, "verify_pinned_gh"), mock.patch.object(
-                legacy_guard,
-                "run_gh_verify",
-                side_effect=[None, verified_payload()],
+                guard,
+                "download_attestation_bundles",
+                return_value=[b'{}', b'{}'],
+            ), mock.patch.object(
+                guard,
+                "run_gh_verify_main",
+                side_effect=[(None, "fixture rejection"), (verified_payload(), None)],
             ):
                 result = self.call(root, api)
             self.assertEqual(result["dispatcher_run_id"], DISPATCHER_RUN_ID)
@@ -584,9 +588,16 @@ class EndToEndGuardPolicyTests(unittest.TestCase):
             self.repository(root)
             api = self.API(count=2)
             with mock.patch.object(legacy_guard, "verify_pinned_gh"), mock.patch.object(
-                legacy_guard,
-                "run_gh_verify",
-                side_effect=[verified_payload(), verified_payload()],
+                guard,
+                "download_attestation_bundles",
+                return_value=[b'{}', b'{}'],
+            ), mock.patch.object(
+                guard,
+                "run_gh_verify_main",
+                side_effect=[
+                    (verified_payload(), None),
+                    (verified_payload(), None),
+                ],
             ):
                 with self.assertRaisesRegex(legacy_guard.GuardError, "exactly one"):
                     self.call(root, api)
@@ -601,9 +612,16 @@ class EndToEndGuardPolicyTests(unittest.TestCase):
                 "target_run_id"
             ] = RUN_ID + 1
             with mock.patch.object(legacy_guard, "verify_pinned_gh"), mock.patch.object(
-                legacy_guard,
-                "run_gh_verify",
-                side_effect=[verified_payload(), conflicting],
+                guard,
+                "download_attestation_bundles",
+                return_value=[b'{}', b'{}'],
+            ), mock.patch.object(
+                guard,
+                "run_gh_verify_main",
+                side_effect=[
+                    (verified_payload(), None),
+                    (conflicting, None),
+                ],
             ):
                 with self.assertRaisesRegex(legacy_guard.GuardError, "conflicts"):
                     self.call(root, api)
