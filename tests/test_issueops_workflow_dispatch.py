@@ -157,11 +157,11 @@ class ResolutionTests(unittest.TestCase):
             now=now,
         )
 
-    def test_registry_empty_and_stdlib_json(self) -> None:
-        self.assertEqual(
-            json.loads(REGISTRY.read_text()),
-            {"schema_version": 2, "authorisations": []},
-        )
+    def test_registry_schema_and_stdlib_json(self) -> None:
+        registry_data = json.loads(REGISTRY.read_text())
+        self.assertEqual(registry_data["schema_version"], core.SCHEMA_VERSION)
+        self.assertIsInstance(registry_data["authorisations"], list)
+        core.validate_registry(registry_data, now=NOW)
         runtime = (ROOT / "issueops_dispatch/runner.py").read_text()
         self.assertNotIn("import yaml", runtime)
         self.assertNotIn("yaml.safe_load", runtime)
