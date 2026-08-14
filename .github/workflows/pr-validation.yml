@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  attestations: read
 
 concurrency:
   group: cryptopulse-pr-validation-${{ github.event.pull_request.number }}
@@ -45,6 +46,77 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml markdown
+
+      - name: Diagnose recovery-v2 receipt verifier
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: 5f813fcf1600be6e2ea65908d8e2c20d1f0682f2
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from issueops_dispatch import protected_dispatch, target_guard
+          from issueops_dispatch.core import canonical_json_bytes
+
+          source_sha = os.environ["SOURCE_SHA"]
+          authorisation_id = "phase9-gpt-oss-quality-recovery-20260814-v2"
+          registry = json.loads(Path(".github/issueops-workflow-dispatch.yml").read_text(encoding="utf-8"))
+          record = next(
+              item for item in registry["authorisations"]
+              if item["authorisation_id"] == authorisation_id
+          )
+          execution_ref = (
+              f"refs/tags/issueops/dispatch/{authorisation_id}--sha-{source_sha}"
+          )
+          resolution = target_guard.build_resolution(
+              record=record,
+              source_sha=source_sha,
+              execution_ref=execution_ref,
+          )
+          subject = protected_dispatch.canonical_subject_main(
+              resolution=resolution,
+              target_run={"id": 31772966775},
+          )
+          Path(os.environ["RUNNER_TEMP"], "recovery-v2-subject.json").write_bytes(
+              canonical_json_bytes(subject)
+          )
+          PY
+
+          asset="gh_2.97.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/cli/cli/releases/download/v2.97.0/$asset" \
+            --output "$RUNNER_TEMP/$asset"
+          python -m issueops_dispatch.target_guard_main verify-asset \
+            --asset "$RUNNER_TEMP/$asset"
+          mkdir -p "$RUNNER_TEMP/gh-2.97.0"
+          tar -xzf "$RUNNER_TEMP/$asset" --strip-components=1 \
+            -C "$RUNNER_TEMP/gh-2.97.0"
+
+          set +e
+          "$RUNNER_TEMP/gh-2.97.0/bin/gh" attestation verify \
+            "$RUNNER_TEMP/recovery-v2-subject.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --signer-workflow "8ft0-ai/crypto-pulse/.github/workflows/issueops-workflow-dispatch.yml" \
+            --signer-digest "$SOURCE_SHA" \
+            --source-digest "$SOURCE_SHA" \
+            --source-ref "refs/heads/main" \
+            --predicate-type "https://github.com/8ft0-ai/crypto-pulse/issueops/dispatch-attestation/v1" \
+            --deny-self-hosted-runners \
+            --format json \
+            >"$RUNNER_TEMP/recovery-v2-verify.stdout" \
+            2>"$RUNNER_TEMP/recovery-v2-verify.stderr"
+          status=$?
+          set -e
+          echo "DIAGNOSTIC_GH_VERIFY_EXIT=$status"
+          sed -E \
+            's/(gh[ops]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/***MASKED***/g' \
+            "$RUNNER_TEMP/recovery-v2-verify.stderr"
+          if [[ "$status" -eq 0 ]]; then
+            echo "Pinned verifier accepted the persisted recovery-v2 receipt."
+          fi
 
       - name: Run semantic-plan benchmark integration tests
         run: |
