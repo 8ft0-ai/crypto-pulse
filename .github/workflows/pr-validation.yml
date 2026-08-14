@@ -114,9 +114,7 @@ jobs:
           sed -E \
             's/(gh[ops]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/***MASKED***/g' \
             "$RUNNER_TEMP/recovery-v2-verify.stderr"
-          if [[ "$status" -eq 0 ]]; then
-            echo "Pinned verifier accepted the persisted recovery-v2 receipt."
-          fi
+          exit 1
 
       - name: Run semantic-plan benchmark integration tests
         run: |
