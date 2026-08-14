@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -22,6 +24,9 @@ from issueops_dispatch.runner import load_registry
 
 ATTESTATION_ENUMERATIONS = 12
 ATTESTATION_INTERVAL_SECONDS = 5
+GH_ATTESTATION_LIMIT = 1000
+VERIFIER_DIAGNOSTIC_LIMIT = 400
+_TOKEN_RE = re.compile(r"(?:gh[ops]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)")
 
 
 def verify_asset_checksum(path: Path) -> None:
@@ -223,6 +228,142 @@ def verify_gh_result_main(
     return dispatcher_run_id
 
 
+def _sanitise_subprocess_diagnostic(stderr: bytes, *, token: str) -> str:
+    text = stderr.decode("utf-8", errors="replace")
+    if token:
+        text = text.replace(token, "***")
+    text = _TOKEN_RE.sub("***", text)
+    text = " ".join(text.split())
+    if not text:
+        return "no diagnostic text"
+    return text[:VERIFIER_DIAGNOSTIC_LIMIT]
+
+
+def download_attestation_bundles(
+    *,
+    gh_binary: Path,
+    subject_path: Path,
+    subject_digest: str,
+    expected_count: int,
+    destination: Path,
+    token: str,
+) -> list[bytes]:
+    """Use the pinned CLI's GitHub bundle decoder, then return one JSON bundle per line."""
+
+    if expected_count < 1:
+        raise common.GuardError("attestation download requires positive evidence count")
+    if expected_count > GH_ATTESTATION_LIMIT:
+        raise common.GuardError(
+            "attestation evidence exceeds pinned gh download verification bound"
+        )
+    command = [
+        str(gh_binary),
+        "attestation",
+        "download",
+        str(subject_path),
+        "--repo",
+        core.REPOSITORY,
+        "--predicate-type",
+        core.PREDICATE_TYPE,
+        "--limit",
+        str(GH_ATTESTATION_LIMIT),
+    ]
+    env = dict(os.environ)
+    env["GH_TOKEN"] = token
+    result = subprocess.run(
+        command,
+        cwd=destination,
+        text=False,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        diagnostic = _sanitise_subprocess_diagnostic(result.stderr, token=token)
+        raise common.GuardError(
+            f"pinned gh attestation download failed: {diagnostic}"
+        )
+
+    metadata_path = destination / f"sha256:{subject_digest}.jsonl"
+    if not metadata_path.is_file():
+        raise common.GuardError(
+            "pinned gh attestation download did not create the expected JSONL bundle"
+        )
+    lines = metadata_path.read_bytes().splitlines()
+    if len(lines) != expected_count:
+        raise common.GuardError(
+            "pinned gh decoded bundle count does not match bounded attestation enumeration"
+        )
+    for line in lines:
+        if not line.strip():
+            raise common.GuardError("pinned gh decoded an empty attestation bundle")
+        try:
+            decoded = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise common.GuardError(
+                "pinned gh decoded malformed JSON attestation bundle"
+            ) from exc
+        if not isinstance(decoded, Mapping):
+            raise common.GuardError(
+                "pinned gh decoded attestation bundle is not a JSON object"
+            )
+    return lines
+
+
+def run_gh_verify_main(
+    *,
+    gh_binary: Path,
+    subject_path: Path,
+    bundle_path: Path,
+    source_sha: str,
+    token: str,
+) -> tuple[Any | None, str | None]:
+    command = [
+        str(gh_binary),
+        "attestation",
+        "verify",
+        str(subject_path),
+        "--bundle",
+        str(bundle_path),
+        "--repo",
+        core.REPOSITORY,
+        "--cert-oidc-issuer",
+        common.EXPECTED_OIDC_ISSUER,
+        "--signer-workflow",
+        f"{core.REPOSITORY}/{core.DISPATCHER_WORKFLOW_PATH}",
+        "--signer-digest",
+        source_sha,
+        "--source-digest",
+        source_sha,
+        "--source-ref",
+        common.EXPECTED_SOURCE_REF,
+        "--predicate-type",
+        core.PREDICATE_TYPE,
+        "--deny-self-hosted-runners",
+        "--format",
+        "json",
+    ]
+    env = dict(os.environ)
+    env["GH_TOKEN"] = token
+    result = subprocess.run(
+        command, text=False, capture_output=True, env=env, check=False
+    )
+    if result.returncode != 0:
+        return None, _sanitise_subprocess_diagnostic(result.stderr, token=token)
+    try:
+        stdout = result.stdout.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise common.GuardError(
+            "pinned gh returned non-UTF-8 JSON after successful verification"
+        ) from exc
+    try:
+        return json.loads(stdout), None
+    except json.JSONDecodeError as exc:
+        raise common.GuardError(
+            "pinned gh returned malformed JSON after successful verification"
+        ) from exc
+
+
 def execute_guard(
     *,
     repository_root: Path,
@@ -301,9 +442,15 @@ def execute_guard(
     attestations = wait_for_attestations(
         client, subject_digest, sleep_fn=sleep_fn
     )
+    for item in attestations:
+        if not isinstance(item.get("bundle_url"), str):
+            raise common.GuardError(
+                "attestation collection contains an item without bundle_url"
+            )
 
     common.verify_pinned_gh(gh_binary)
     verified: list[tuple[int, int]] = []
+    verifier_rejections: list[str] = []
     signer_verified_but_conflicting = 0
     with tempfile.TemporaryDirectory(
         prefix="issueops-target-guard-main-"
@@ -311,15 +458,18 @@ def execute_guard(
         temp_root = Path(tmp)
         subject_path = temp_root / "dispatch-subject.json"
         subject_path.write_bytes(subject_bytes)
-        for index, item in enumerate(attestations):
-            bundle_url = item.get("bundle_url")
-            if not isinstance(bundle_url, str):
-                raise common.GuardError(
-                    "attestation collection contains an item without bundle_url"
-                )
+        bundles = download_attestation_bundles(
+            gh_binary=gh_binary,
+            subject_path=subject_path,
+            subject_digest=subject_digest,
+            expected_count=len(attestations),
+            destination=temp_root,
+            token=token,
+        )
+        for index, bundle_bytes in enumerate(bundles):
             bundle_path = temp_root / f"bundle-{index}.json"
-            bundle_path.write_bytes(client.fetch_bundle(bundle_url))
-            payload = common.run_gh_verify(
+            bundle_path.write_bytes(bundle_bytes + b"\n")
+            payload, diagnostic = run_gh_verify_main(
                 gh_binary=gh_binary,
                 subject_path=subject_path,
                 bundle_path=bundle_path,
@@ -327,6 +477,7 @@ def execute_guard(
                 token=token,
             )
             if payload is None:
+                verifier_rejections.append(diagnostic or "no diagnostic text")
                 continue
             try:
                 dispatcher_run_id = verify_gh_result_main(
@@ -346,6 +497,11 @@ def execute_guard(
             "with the frozen target authority"
         )
     if len(verified) != 1:
+        if not verified and verifier_rejections:
+            raise common.GuardError(
+                "canonical dispatcher receipt evidence exists but the pinned verifier "
+                f"rejected every candidate: {verifier_rejections[0]}"
+            )
         raise common.GuardError(
             "protected target requires exactly one qualifying canonical "
             "dispatcher receipt"
