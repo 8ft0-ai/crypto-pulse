@@ -47,10 +47,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml markdown
 
-      - name: Diagnose recovery-v2 receipt verifier
+      - name: Diagnose recovery-v2 receipt bundle verifier
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: 5f813fcf1600be6e2ea65908d8e2c20d1f0682f2
+          PREDICATE_TYPE: https://github.com/8ft0-ai/crypto-pulse/issueops/dispatch-attestation/v1
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -93,24 +94,39 @@ jobs:
           mkdir -p "$RUNNER_TEMP/gh-2.97.0"
           tar -xzf "$RUNNER_TEMP/$asset" --strip-components=1 \
             -C "$RUNNER_TEMP/gh-2.97.0"
+          gh_bin="$RUNNER_TEMP/gh-2.97.0/bin/gh"
+
+          subject_digest="$(sha256sum "$RUNNER_TEMP/recovery-v2-subject.json" | awk '{print $1}')"
+          bundle_url="$(
+            "$gh_bin" api --method GET \
+              "/repos/$GITHUB_REPOSITORY/attestations/sha256:$subject_digest" \
+              -f predicate_type="$PREDICATE_TYPE" \
+              -F per_page=100 \
+              --jq '.attestations[0].bundle_url'
+          )"
+          test -n "$bundle_url"
+          curl --fail --location --silent --show-error "$bundle_url" \
+            --output "$RUNNER_TEMP/recovery-v2-bundle.json"
+          echo "DIAGNOSTIC_BUNDLE_BYTES=$(wc -c < "$RUNNER_TEMP/recovery-v2-bundle.json")"
 
           set +e
-          "$RUNNER_TEMP/gh-2.97.0/bin/gh" attestation verify \
+          "$gh_bin" attestation verify \
             "$RUNNER_TEMP/recovery-v2-subject.json" \
+            --bundle "$RUNNER_TEMP/recovery-v2-bundle.json" \
             --repo "$GITHUB_REPOSITORY" \
             --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
             --signer-workflow "8ft0-ai/crypto-pulse/.github/workflows/issueops-workflow-dispatch.yml" \
             --signer-digest "$SOURCE_SHA" \
             --source-digest "$SOURCE_SHA" \
             --source-ref "refs/heads/main" \
-            --predicate-type "https://github.com/8ft0-ai/crypto-pulse/issueops/dispatch-attestation/v1" \
+            --predicate-type "$PREDICATE_TYPE" \
             --deny-self-hosted-runners \
             --format json \
             >"$RUNNER_TEMP/recovery-v2-verify.stdout" \
             2>"$RUNNER_TEMP/recovery-v2-verify.stderr"
           status=$?
           set -e
-          echo "DIAGNOSTIC_GH_VERIFY_EXIT=$status"
+          echo "DIAGNOSTIC_GH_BUNDLE_VERIFY_EXIT=$status"
           sed -E \
             's/(gh[ops]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/***MASKED***/g' \
             "$RUNNER_TEMP/recovery-v2-verify.stderr"
