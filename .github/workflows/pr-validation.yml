@@ -47,7 +47,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml markdown
 
-      - name: Diagnose recovery-v2 receipt bundle verifier
+      - name: Diagnose recovery-v2 bundle transport encoding
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: 5f813fcf1600be6e2ea65908d8e2c20d1f0682f2
@@ -68,9 +68,7 @@ jobs:
               item for item in registry["authorisations"]
               if item["authorisation_id"] == authorisation_id
           )
-          execution_ref = (
-              f"refs/tags/issueops/dispatch/{authorisation_id}--sha-{source_sha}"
-          )
+          execution_ref = f"refs/tags/issueops/dispatch/{authorisation_id}--sha-{source_sha}"
           resolution = target_guard.build_resolution(
               record=record,
               source_sha=source_sha,
@@ -105,14 +103,20 @@ jobs:
               --jq '.attestations[0].bundle_url'
           )"
           test -n "$bundle_url"
+
           curl --fail --location --silent --show-error "$bundle_url" \
-            --output "$RUNNER_TEMP/recovery-v2-bundle.json"
-          echo "DIAGNOSTIC_BUNDLE_BYTES=$(wc -c < "$RUNNER_TEMP/recovery-v2-bundle.json")"
+            --output "$RUNNER_TEMP/raw-bundle"
+          curl --compressed --fail --location --silent --show-error "$bundle_url" \
+            --output "$RUNNER_TEMP/decoded-bundle.json"
+          echo "DIAGNOSTIC_RAW_PREFIX=$(od -An -tx1 -N4 "$RUNNER_TEMP/raw-bundle" | tr -d ' \n')"
+          echo "DIAGNOSTIC_DECODED_PREFIX=$(od -An -tx1 -N4 "$RUNNER_TEMP/decoded-bundle.json" | tr -d ' \n')"
+          echo "DIAGNOSTIC_RAW_BYTES=$(wc -c < "$RUNNER_TEMP/raw-bundle")"
+          echo "DIAGNOSTIC_DECODED_BYTES=$(wc -c < "$RUNNER_TEMP/decoded-bundle.json")"
 
           set +e
           "$gh_bin" attestation verify \
             "$RUNNER_TEMP/recovery-v2-subject.json" \
-            --bundle "$RUNNER_TEMP/recovery-v2-bundle.json" \
+            --bundle "$RUNNER_TEMP/decoded-bundle.json" \
             --repo "$GITHUB_REPOSITORY" \
             --cert-oidc-issuer "https://token.actions.githubusercontent.com" \
             --signer-workflow "8ft0-ai/crypto-pulse/.github/workflows/issueops-workflow-dispatch.yml" \
@@ -126,7 +130,7 @@ jobs:
             2>"$RUNNER_TEMP/recovery-v2-verify.stderr"
           status=$?
           set -e
-          echo "DIAGNOSTIC_GH_BUNDLE_VERIFY_EXIT=$status"
+          echo "DIAGNOSTIC_DECODED_VERIFY_EXIT=$status"
           sed -E \
             's/(gh[ops]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/***MASKED***/g' \
             "$RUNNER_TEMP/recovery-v2-verify.stderr"
