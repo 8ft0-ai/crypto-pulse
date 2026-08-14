@@ -603,12 +603,18 @@ def run_gh_verify(
     env = dict(os.environ)
     env["GH_TOKEN"] = token
     result = subprocess.run(
-        command, text=True, capture_output=True, env=env, check=False
+        command, text=False, capture_output=True, env=env, check=False
     )
     if result.returncode != 0:
         return None
     try:
-        return json.loads(result.stdout)
+        stdout = result.stdout.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise GuardError(
+            "pinned gh returned non-UTF-8 JSON after successful verification"
+        ) from exc
+    try:
+        return json.loads(stdout)
     except json.JSONDecodeError as exc:
         raise GuardError(
             "pinned gh returned malformed JSON after successful verification"
