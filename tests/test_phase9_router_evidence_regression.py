@@ -89,6 +89,28 @@ class ScalarMetadataTransport:
         )
 
 
+class MalformedSelectedMetadataTransport(ScalarMetadataTransport):
+    def post(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        body: bytes,
+        timeout_seconds: float,
+    ) -> HttpResponse:
+        response = super().post(
+            url,
+            headers=headers,
+            body=body,
+            timeout_seconds=timeout_seconds,
+        )
+        payload = json.loads(response.body.decode("utf-8"))
+        payload["openrouter_metadata"]["endpoints"]["available"].append(
+            {"provider": None, "selected": True}
+        )
+        return HttpResponse(response.status, json.dumps(payload).encode(), response.headers)
+
+
 class RouterEvidenceTests(unittest.TestCase):
     def test_scalar_attempt_matches_retained_run_shape(self) -> None:
         evidence = core._router_evidence(
@@ -240,6 +262,24 @@ class RouterEvidenceTests(unittest.TestCase):
         self.assertIsNone(evidence["actual_provider"])
         self.assertIsNone(evidence["provider_slug"])
 
+    def test_malformed_competing_selected_endpoint_is_ambiguous(self) -> None:
+        evidence = core._router_evidence(
+            {
+                "attempt": 1,
+                "endpoints": {
+                    "available": [
+                        {"provider": "DeepInfra", "selected": True},
+                        {"provider": None, "selected": True},
+                    ]
+                },
+            },
+            required_provider_slug="deepinfra",
+        )
+        self.assertTrue(evidence["exact_one_attempt"])
+        self.assertTrue(evidence["provider_ambiguous"])
+        self.assertIsNone(evidence["actual_provider"])
+        self.assertIsNone(evidence["provider_slug"])
+
     def test_failed_explicit_attempt_remains_invalid(self) -> None:
         evidence = core._router_evidence(
             {
@@ -304,6 +344,47 @@ class RouterEvidenceTests(unittest.TestCase):
                 self.assertEqual(request["model"], "openai/gpt-oss-120b")
                 self.assertEqual(request["provider"]["only"], ["deepinfra"])
                 self.assertFalse(request["provider"]["allow_fallbacks"])
+
+    def test_malformed_competing_selected_endpoint_stops_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prepared = root / "prepared"
+            prepare_gpt_oss_quality_comparison(
+                repository_root=ROOT,
+                config_path=DEFAULT_CONFIG,
+                output_dir=prepared,
+            )
+            manifest = json.loads((prepared / PREPARED_MANIFEST).read_text())
+            cases = {row["key"]: row for row in manifest["cases"]}
+            selections = [
+                list(cases[item["case_key"]]["baseline_selected_candidate_ids"])
+                for item in manifest["planned_schedule"]
+            ]
+            transport = MalformedSelectedMetadataTransport(selections)
+            output = root / "output"
+            summary = execute_gpt_oss_quality_comparison(
+                repository_root=ROOT,
+                config_path=DEFAULT_CONFIG,
+                prepared_dir=prepared,
+                output_dir=output,
+                api_key="test-secret",
+                trusted_main_sha="a" * 40,
+                catalogue_loader=catalogue,
+                transport_factory=lambda: transport,
+            )
+
+            self.assertEqual(transport.calls, 1)
+            self.assertEqual(summary["completed_paid_calls"], 1)
+            self.assertEqual(summary["status"], "partial-non-adjudicable")
+            first_result = json.loads(
+                (
+                    output
+                    / "runs/repeat-1/historical-degraded-sparse/result.json"
+                ).read_text()
+            )
+            self.assertEqual(first_result["classification"], "infrastructure-failure")
+            self.assertEqual(first_result["failure_code"], "provider_identity_mismatch")
+            self.assertFalse(first_result["governance_pass"])
 
 
 if __name__ == "__main__":
