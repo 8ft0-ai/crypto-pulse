@@ -97,6 +97,72 @@ def _provider_slug(value: str | None) -> str | None:
     return "deepinfra" if normalised == "deepinfra" else None
 
 
+def _router_evidence(
+    metadata: Mapping[str, Any], *, required_provider_slug: str
+) -> dict[str, Any]:
+    """Interpret exact-one-route evidence across supported OpenRouter metadata shapes."""
+    attempts_value = metadata.get("attempts")
+    attempts_present = isinstance(attempts_value, list)
+    attempts = attempts_value if attempts_present else []
+
+    scalar_value = metadata.get("attempt")
+    scalar_attempt = (
+        scalar_value
+        if isinstance(scalar_value, int) and not isinstance(scalar_value, bool)
+        else None
+    )
+
+    selected_providers: list[str] = []
+    endpoints = metadata.get("endpoints")
+    if isinstance(endpoints, Mapping):
+        available = endpoints.get("available")
+        if isinstance(available, list):
+            selected_providers = [
+                str(endpoint["provider"])
+                for endpoint in available
+                if isinstance(endpoint, Mapping)
+                and endpoint.get("selected") is True
+                and isinstance(endpoint.get("provider"), str)
+            ]
+    provider_ambiguous = len(selected_providers) > 1
+    actual_provider = None if provider_ambiguous else _selected_provider(metadata)
+    provider_slug = _provider_slug(actual_provider)
+
+    if attempts_present:
+        exact_one_attempt = len(attempts) == 1 and scalar_attempt in (None, 1)
+        router_attempt_count = len(attempts)
+    else:
+        exact_one_attempt = scalar_attempt == 1
+        router_attempt_count = scalar_attempt or 0
+
+    explicit_attempt_valid = True
+    if attempts_present and len(attempts) == 1:
+        attempt = attempts[0]
+        explicit_attempt_valid = bool(
+            isinstance(attempt, Mapping)
+            and attempt.get("status") == 200
+            and _provider_slug(
+                attempt.get("provider")
+                if isinstance(attempt.get("provider"), str)
+                else None
+            )
+            == required_provider_slug
+        )
+
+    return {
+        "actual_provider": actual_provider,
+        "provider_slug": provider_slug,
+        "provider_ambiguous": provider_ambiguous,
+        "attempts_present": attempts_present,
+        "attempts": attempts,
+        "scalar_attempt": scalar_attempt,
+        "router_attempt_count": router_attempt_count,
+        "exact_one_attempt": exact_one_attempt,
+        "explicit_attempt_valid": explicit_attempt_valid,
+        "provider_fallback_used": not exact_one_attempt,
+    }
+
+
 def _safe_headers(headers: Mapping[str, str]) -> dict[str, str]:
     allowed = {"content-type", "x-request-id", "cf-ray", "x-openrouter-request-id"}
     return {
@@ -594,10 +660,11 @@ def _execute_call(
     cost = float(cost_raw) if reported_cost else plan.maximum_call_cost_usd
     ledger.charge(cost)
     metadata = payload.get("openrouter_metadata") if isinstance(payload.get("openrouter_metadata"), Mapping) else {}
-    attempts = metadata.get("attempts") if isinstance(metadata.get("attempts"), list) else []
+    route = _router_evidence(metadata, required_provider_slug=plan.provider_slug)
+    attempts = route["attempts"]
     actual_model = payload.get("model") if isinstance(payload.get("model"), str) else None
-    actual_provider = _selected_provider(metadata)
-    provider_slug = _provider_slug(actual_provider)
+    actual_provider = route["actual_provider"]
+    provider_slug = route["provider_slug"]
     choices = payload.get("choices") if isinstance(payload.get("choices"), list) else []
     choice = choices[0] if len(choices) == 1 and isinstance(choices[0], Mapping) else {}
     message = choice.get("message") if isinstance(choice.get("message"), Mapping) else {}
@@ -616,8 +683,8 @@ def _execute_call(
         "observed_cost_usd": cost,
         "metering_status": "reported" if reported_cost else "reserved-maximum",
         "latency_ms": latency_ms,
-        "router_attempt_count": len(attempts),
-        "provider_fallback_used": len(attempts) != 1,
+        "router_attempt_count": route["router_attempt_count"],
+        "provider_fallback_used": route["provider_fallback_used"],
         "cross_model_fallback_used": actual_model is not None and actual_model != plan.model,
     }
     # Deliberately exclude any returned reasoning text; retain only observable counts and routing data.
@@ -652,11 +719,11 @@ def _execute_call(
         result = infra("call_cost_exceeded", "OpenRouter response exceeded the reviewed per-call ceiling")
     elif actual_model != plan.model:
         result = infra("model_identity_mismatch", "OpenRouter did not preserve the exact requested model")
-    elif provider_slug != plan.provider_slug:
+    elif route["provider_ambiguous"] or provider_slug != plan.provider_slug:
         result = infra("provider_identity_mismatch", "OpenRouter did not preserve the pinned DeepInfra route")
-    elif not metadata or len(attempts) != 1:
+    elif not metadata or not route["exact_one_attempt"]:
         result = infra("provider_fallback_or_metadata_failure", "Exact one-attempt router evidence was not retained")
-    elif not isinstance(attempts[0], Mapping) or attempts[0].get("status") != 200 or _provider_slug(str(attempts[0].get("provider"))) != plan.provider_slug:
+    elif route["attempts_present"] and not route["explicit_attempt_valid"]:
         result = infra("provider_attempt_invalid", "Router attempt evidence did not prove one successful DeepInfra attempt")
     elif payload.get("error") is not None or choice.get("error") is not None:
         result = infra("provider_response_error", "OpenRouter response retained a provider or choice error")
