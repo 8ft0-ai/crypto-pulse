@@ -141,21 +141,23 @@ def _interpret_router_evidence(
                 "provider_fallback_or_metadata_failure",
                 "Exact one-attempt router evidence was not retained",
             )
-        selected = [
-            endpoint.get("provider")
+        selected_endpoints = [
+            endpoint
             for endpoint in available
-            if (
-                isinstance(endpoint, Mapping)
-                and endpoint.get("selected") is True
-                and isinstance(endpoint.get("provider"), str)
-            )
+            if isinstance(endpoint, Mapping) and endpoint.get("selected") is True
         ]
-        if len(selected) != 1:
+        if len(selected_endpoints) != 1:
             return failure(
                 "provider_fallback_or_metadata_failure",
                 "Exact one-attempt router evidence was not retained",
             )
-        selected_provider = str(selected[0])
+        selected_provider_value = selected_endpoints[0].get("provider")
+        if not isinstance(selected_provider_value, str):
+            return failure(
+                "provider_fallback_or_metadata_failure",
+                "Exact one-attempt router evidence was not retained",
+            )
+        selected_provider = selected_provider_value
         if _provider_slug(selected_provider) != expected_provider_slug:
             return failure(
                 "provider_identity_mismatch",
