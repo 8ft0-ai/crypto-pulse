@@ -38,14 +38,25 @@ phase-template.md
 
 A new roadmap phase spec should stay forward-looking. At close-out, put completed evidence into `planning/delivery/` and keep the roadmap directory focused on planning intent.
 
-## Active roadmap specs
+## Current roadmap position
+
+There is no active implementation phase. Phase 10 is the sole owner-approved shaping candidate after the Phase 9 close-out. Its roadmap specification records the bounded deterministic direction only; implementation requires a separate delivery-control issue and separate owner authority.
 
 | Phase | Status | Planning record | Delivery record |
 | --- | --- | --- | --- |
-| Phase 4 — Live-site provenance UX | Shaping | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | Pending |
-| Phase 6 — Deterministic claim candidates and bounded model selection | Shaping; parent issue #283 | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) | Pending |
+| Phase 10 — Deterministic previous-hour comparison engine | Shaping; planning only under #398 | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | Pending |
 
-Phase 6 is the active governed-analysis direction. It compiles semantically valid claim candidates deterministically, proves a no-LLM ranking baseline, and permits a model only to select bounded repository-owned candidate IDs after the baseline is complete.
+Phase 10 extends the repository-owned evidence path before any model or narrative layer: compare a current validated snapshot with one uniquely resolved valid predecessor, emit deterministic structured change evidence, and fail closed when continuity or comparability cannot be proved.
+
+## Completed roadmap directions
+
+| Phase | Status | Planning record | Delivery record |
+| --- | --- | --- | --- |
+| Phase 4 — Live-site provenance UX | Implementation complete | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | [../delivery/phase-04-live-site-provenance-ux.md](../delivery/phase-04-live-site-provenance-ux.md) |
+| Phase 6 — Deterministic claim candidates and bounded model selection | Complete; deterministic selector retained | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) | [../delivery/phase-06-deterministic-claim-selection.md](../delivery/phase-06-deterministic-claim-selection.md) |
+| Phase 9 — GPT-OSS quality and stability comparison | Complete; `no-stable-material-uplift` | [phase-09-gpt-oss-quality-decision.md](phase-09-gpt-oss-quality-decision.md) | [../delivery/phase-09-gpt-oss-quality-comparison.md](../delivery/phase-09-gpt-oss-quality-comparison.md) |
+
+The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 did not promote a model or provider, authorise another Phase 9 run, or enable automatic generation, scheduling or publication. Its temporary paid comparison workflow remains archived from executable `main`.
 
 ## Superseded active direction
 
@@ -68,7 +79,7 @@ Ideas that are useful but not ready for an active phase are parked in:
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without expanding the active phase scope.
+Use the backlog to preserve follow-on ideas without expanding the current shaping scope.
 
 ## Retrospective roadmap specs
 
