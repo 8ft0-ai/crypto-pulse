@@ -101,16 +101,21 @@ def _router_evidence(
     metadata: Mapping[str, Any], *, required_provider_slug: str
 ) -> dict[str, Any]:
     """Interpret exact-one-route evidence across supported OpenRouter metadata shapes."""
+    attempts_supplied = "attempts" in metadata
     attempts_value = metadata.get("attempts")
     attempts_present = isinstance(attempts_value, list)
+    attempts_malformed = attempts_supplied and not attempts_present
     attempts = attempts_value if attempts_present else []
 
+    scalar_supplied = "attempt" in metadata
     scalar_value = metadata.get("attempt")
     scalar_attempt = (
         scalar_value
         if isinstance(scalar_value, int) and not isinstance(scalar_value, bool)
         else None
     )
+    scalar_malformed = scalar_supplied and scalar_attempt is None
+    metadata_malformed = attempts_malformed or scalar_malformed
 
     selected_providers: list[str] = []
     endpoints = metadata.get("endpoints")
@@ -128,7 +133,10 @@ def _router_evidence(
     actual_provider = None if provider_ambiguous else _selected_provider(metadata)
     provider_slug = _provider_slug(actual_provider)
 
-    if attempts_present:
+    if metadata_malformed:
+        exact_one_attempt = False
+        router_attempt_count = len(attempts) if attempts_present else 0
+    elif attempts_present:
         exact_one_attempt = len(attempts) == 1 and scalar_attempt in (None, 1)
         router_attempt_count = len(attempts)
     else:
@@ -156,6 +164,7 @@ def _router_evidence(
         "attempts_present": attempts_present,
         "attempts": attempts,
         "scalar_attempt": scalar_attempt,
+        "metadata_malformed": metadata_malformed,
         "router_attempt_count": router_attempt_count,
         "exact_one_attempt": exact_one_attempt,
         "explicit_attempt_valid": explicit_attempt_valid,
@@ -661,7 +670,6 @@ def _execute_call(
     ledger.charge(cost)
     metadata = payload.get("openrouter_metadata") if isinstance(payload.get("openrouter_metadata"), Mapping) else {}
     route = _router_evidence(metadata, required_provider_slug=plan.provider_slug)
-    attempts = route["attempts"]
     actual_model = payload.get("model") if isinstance(payload.get("model"), str) else None
     actual_provider = route["actual_provider"]
     provider_slug = route["provider_slug"]
