@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
-import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -188,20 +188,6 @@ def _bytes_at_commit(repository_root: Path, commit_sha: str, repository_path: st
     return _git(repository_root, "show", f"{commit_sha}:{repository_path}")
 
 
-def _load_yaml_bytes(raw: bytes) -> dict[str, Any]:
-    try:
-        import yaml
-    except ImportError as exc:  # pragma: no cover - dependency is required by the repository
-        raise RuntimeError("PyYAML is required for the governed config") from exc
-    try:
-        payload = yaml.safe_load(raw.decode("utf-8")) or {}
-    except (UnicodeDecodeError, yaml.YAMLError) as exc:
-        raise RuntimeError("governed config could not be parsed") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("governed config must be a mapping")
-    return payload
-
-
 def _parse_snapshot(raw: bytes) -> dict[str, Any] | None:
     try:
         payload = json.loads(raw.decode("utf-8"))
@@ -252,18 +238,6 @@ def _semantic_compatible(snapshot: dict[str, Any]) -> bool:
     return True
 
 
-def _materialize_snapshot_tree(
-    root: Path,
-    snapshot_bytes: dict[str, bytes],
-) -> Path:
-    snapshot_root = root / SNAPSHOT_PREFIX
-    for repository_path, raw in snapshot_bytes.items():
-        target = root / PurePosixPath(repository_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(raw)
-    return snapshot_root
-
-
 def build_comparison_record(
     repository_root: Path,
     commit_sha: str,
@@ -301,19 +275,24 @@ def build_comparison_record(
             path: _bytes_at_commit(repository_root, exact_commit, path)
             for path in snapshot_paths
         }
-        config_raw = _bytes_at_commit(repository_root, exact_commit, CONFIG_PATH)
-        config = _load_yaml_bytes(config_raw)
     except (RuntimeError, UnicodeDecodeError, OSError):
         return _finalize(record)
 
-    try:
-        with tempfile.TemporaryDirectory(prefix="crypto-pulse-comparison-") as tempdir:
-            temp_root = Path(tempdir)
-            snapshot_root = _materialize_snapshot_tree(temp_root, snapshot_bytes)
-            current_path = temp_root / PurePosixPath(current_repository_path)
-            resolution = resolve_predecessor(current_path, snapshot_root, config)
-    except OSError:
+    current_raw = snapshot_bytes[current_repository_path]
+    current_snapshot = _parse_snapshot(current_raw)
+    if current_snapshot is None:
+        record["current"]["path"] = current_repository_path
+        record["comparison_status"] = "current-identity-invalid"
         return _finalize(record)
+
+    run = current_snapshot.get("run")
+    current_identity = {
+        "path": current_repository_path,
+        "sha256": hashlib.sha256(current_raw).hexdigest(),
+        "schema_version": current_snapshot.get("schema_version"),
+        "generated_at_utc": run.get("generated_at_utc") if isinstance(run, dict) else None,
+    }
+    resolution = resolve_predecessor(current_identity, repository_root, context)
 
     record["current"] = resolution["current"]
     record["predecessor"] = resolution["predecessor"]
@@ -330,9 +309,8 @@ def build_comparison_record(
         record["comparison_status"] = "pair-semantics-incompatible"
         return _finalize(record)
 
-    current_snapshot = _parse_snapshot(snapshot_bytes[current_repository_path])
     predecessor_snapshot = _parse_snapshot(snapshot_bytes[predecessor_path])
-    if current_snapshot is None or predecessor_snapshot is None:
+    if predecessor_snapshot is None:
         record["comparison_status"] = "pair-semantics-incompatible"
         return _finalize(record)
 
