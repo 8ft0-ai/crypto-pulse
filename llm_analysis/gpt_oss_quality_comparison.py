@@ -117,20 +117,27 @@ def _router_evidence(
     scalar_malformed = scalar_supplied and scalar_attempt is None
     metadata_malformed = attempts_malformed or scalar_malformed
 
-    selected_providers: list[str] = []
+    selected_endpoints: list[Mapping[str, Any]] = []
+    selected_endpoint_malformed = False
     endpoints = metadata.get("endpoints")
     if isinstance(endpoints, Mapping):
         available = endpoints.get("available")
         if isinstance(available, list):
-            selected_providers = [
-                str(endpoint["provider"])
-                for endpoint in available
-                if isinstance(endpoint, Mapping)
-                and endpoint.get("selected") is True
-                and isinstance(endpoint.get("provider"), str)
-            ]
-    provider_ambiguous = len(selected_providers) > 1
-    actual_provider = None if provider_ambiguous else _selected_provider(metadata)
+            for endpoint in available:
+                if isinstance(endpoint, Mapping) and endpoint.get("selected") is True:
+                    selected_endpoints.append(endpoint)
+                    if not isinstance(endpoint.get("provider"), str):
+                        selected_endpoint_malformed = True
+    provider_ambiguous = selected_endpoint_malformed or len(selected_endpoints) > 1
+    actual_provider = (
+        None
+        if provider_ambiguous
+        else (
+            str(selected_endpoints[0]["provider"])
+            if len(selected_endpoints) == 1
+            else _selected_provider(metadata)
+        )
+    )
     provider_slug = _provider_slug(actual_provider)
 
     if metadata_malformed:
