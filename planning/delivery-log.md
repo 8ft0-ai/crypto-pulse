@@ -187,3 +187,48 @@ Delivery notes:
 - No further paid Phase 6 run, provider substitution, third model, prompt retuning or cost-ceiling increase is authorised.
 - The obsolete paid comparison workflow is archived during close-out while configuration, prompts, schemas, runners, scoring code, documentation, Git history and protected artifact references remain auditable.
 - Automatic report generation and publication remain disabled and separately governed.
+
+## Phase 9 — GPT-OSS quality and stability comparison
+
+Status: complete.
+
+Primary outcome: the governed GPT-OSS 120B / DeepInfra comparison terminates as `no-stable-material-uplift`; deterministic selection remains the sole active selector and the temporary paid Phase 9 workflow is archived.
+
+```text
+Parent issue: #352
+Implementation PR: #355
+Canonical decision: #389
+Paid-workflow archival: #390 / PR #391
+Roadmap decision: #392 / PR #394
+Close-out issue: #395
+Dispatcher run: 31867552577
+Protected run: 31867564494
+Trusted execution SHA: 43c69ed122c4e39cf2dda92bfcefa7e4314b3922
+Protected run attempt: 1
+Outcome: no-stable-material-uplift
+Attempted paid calls: 1
+Accepted calls: 0
+Unattempted calls: 14
+Observed cost: USD 0.000953014
+Prepared artefact: 9242467310
+Protected comparison artefact: 9242498501
+Delivery record: planning/delivery/phase-09-gpt-oss-quality-comparison.md
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- The first Stage A call reached exact model `openai/gpt-oss-120b` on pinned DeepInfra successfully with one router attempt, no fallback, no retry, no semantic repair and no route probe.
+- Canonical reconstruction/validation then failed the frozen candidate-section contract because five selected IDs mapped to `key_observations`, where the maximum is four.
+- #352 predeclared this model-content/candidate-contract failure class as terminal `no-stable-material-uplift`, not `inconclusive-infrastructure`.
+- The remaining fourteen calls were unattempted; aggregate quality, case-level, stability, stable-majority and incremental-value promotion metrics remain `partial-non-adjudicable` / `not_adjudicable` and were not threshold-tested or imputed.
+- Prepared artefact `9242467310` retains digest `sha256:69eef6f0989a61865e59210e97ec7187865243834cc1cee014013eff441a42f8`.
+- Protected comparison artefact `9242498501` retains digest `sha256:4664e6dbff016aad2e60473728545ee08f9da5094f5ca79b8cea766e4fa8b073`.
+- Earlier infrastructure failures were handled through separately governed one-time recovery lifecycles and bounded remediations without changing the frozen quality, stability, incremental-value, call or cost gates.
+- The canonical decision authorises no Phase 9 rerun or recovery-v5 and does not promote GPT-OSS 120B or DeepInfra into operational selection.
+- PR #391 archives `.github/workflows/governed-gpt-oss-quality-comparison.yml` from executable `main` while retaining configuration, implementation, tests, historical commits and protected evidence for audit.
+- PR #394 durably records the accepted decision in `planning/roadmap/phase-09-gpt-oss-quality-decision.md`.
+- Historical consumed IssueOps authority records and immutable execution tags remain audit evidence and are not rewritten by close-out.
+- Automatic report generation, scheduling and publication remain disabled.
+- `planning/delivery/delivery.yaml` and generated `planning/delivery/graph.md` are not changed because Phase 9 adds no new production pipeline stage or committed runtime artefact; representing its execution/recovery history in the compact graph would be an implementation inventory rather than a causal delivery node.
