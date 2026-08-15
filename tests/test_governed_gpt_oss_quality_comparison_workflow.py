@@ -6,50 +6,35 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-import yaml
-
 from llm_analysis import gpt_oss_quality_comparison as core
 from llm_analysis import gpt_oss_quality_comparison_runner as runner
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/governed-gpt-oss-quality-comparison.yml"
+REFERENCE = ROOT / "docs/reference/gpt-oss-quality-comparison.md"
+EVALUATION = ROOT / "evaluation/phase-09/gpt-oss-quality-comparison/README.md"
+CONFIG = ROOT / "config/gpt-oss-quality-comparison.yml"
+CORE = ROOT / "llm_analysis/gpt_oss_quality_comparison.py"
+RUNNER = ROOT / "llm_analysis/gpt_oss_quality_comparison_runner.py"
 
 
-class GovernedGPTOSSQualityComparisonWorkflowTests(unittest.TestCase):
-    def test_workflow_is_manual_read_only_and_trusted_main(self) -> None:
-        raw = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-        trigger = raw.get("on") if "on" in raw else raw.get(True)
-        self.assertEqual(set(trigger), {"workflow_dispatch"})
-        self.assertEqual(raw["permissions"], {"contents": "read"})
-        self.assertIn("GITHUB_REF", WORKFLOW.read_text())
-        self.assertIn("refs/heads/main", WORKFLOW.read_text())
-        self.assertNotIn("issue_comment", WORKFLOW.read_text())
-        self.assertNotIn("schedule:", WORKFLOW.read_text())
+class ArchivedGPTOSSQualityComparisonWorkflowTests(unittest.TestCase):
+    def test_paid_workflow_remains_archived(self) -> None:
+        self.assertFalse(WORKFLOW.exists())
 
-    def test_preparation_has_no_secret_and_execution_is_protected(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        prepare = text.split("  compare:", 1)[0]
-        compare = text.split("  compare:", 1)[1]
-        self.assertNotIn("OPENROUTER_API_KEY", prepare)
-        self.assertIn("environment: governed-llm-dry-run", compare)
-        self.assertIn("OPENROUTER_API_KEY", compare)
-        self.assertIn("persist-credentials: false", text)
-        self.assertIn("--trusted-main-sha", compare)
+    def test_auditable_implementation_remains_retained(self) -> None:
+        for path in (REFERENCE, EVALUATION, CONFIG, CORE, RUNNER):
+            self.assertTrue(path.is_file(), path)
 
-    def test_workflow_has_no_repository_write_or_automatic_trigger(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
-        for prohibited in (
-            "contents: write",
-            "pull-requests: write",
-            "git push",
-            "gh pr",
-            "repository_dispatch",
-        ):
-            self.assertNotIn(prohibited, text)
-        self.assertIn("gpt-oss-quality-comparison-prepared", text)
-        self.assertIn(
-            "gpt-oss-quality-comparison-${{ github.run_id }}", text
+    def test_historical_docs_record_terminal_boundary(self) -> None:
+        text = "\n".join(
+            path.read_text(encoding="utf-8") for path in (REFERENCE, EVALUATION)
         )
+        self.assertIn("31867564494", text)
+        self.assertIn("no-stable-material-uplift", text)
+        self.assertIn("9242498501", text)
+        self.assertIn("no rerun", text.lower())
+        self.assertIn("archived", text.lower())
 
 
 class GovernedGPTOSSQualityComparisonRemediationTests(unittest.TestCase):
