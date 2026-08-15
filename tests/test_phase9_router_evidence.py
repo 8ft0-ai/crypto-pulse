@@ -115,6 +115,28 @@ class Phase9RouterEvidenceTests(unittest.TestCase):
 
         self.assertEqual(evidence["failure_code"], "provider_fallback_or_metadata_failure")
 
+    def test_malformed_competing_selected_provider_fails_closed(self) -> None:
+        payload = retained_scalar_response()
+        payload["openrouter_metadata"]["endpoints"]["available"].append(
+            {"provider": None, "selected": True}
+        )
+
+        evidence = interpret(payload)
+
+        self.assertEqual(evidence["failure_code"], "provider_fallback_or_metadata_failure")
+        self.assertTrue(evidence["provider_fallback_used"])
+
+    def test_single_malformed_selected_provider_fails_closed(self) -> None:
+        payload = retained_scalar_response()
+        payload["openrouter_metadata"]["endpoints"]["available"] = [
+            {"provider": None, "selected": True}
+        ]
+
+        evidence = interpret(payload)
+
+        self.assertEqual(evidence["failure_code"], "provider_fallback_or_metadata_failure")
+        self.assertTrue(evidence["provider_fallback_used"])
+
     def test_unsuccessful_explicit_attempt_fails_closed(self) -> None:
         payload = retained_scalar_response()
         payload["openrouter_metadata"]["attempts"] = [
