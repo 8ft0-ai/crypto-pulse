@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from build_crypto_snapshot_comparison_record import build_comparison_record
 from resolve_crypto_snapshot_predecessor import (
     PINNED_CONFIG_BLOB_SHA,
     PINNED_CONFIG_PATH,
@@ -417,6 +418,33 @@ class ResolveCryptoSnapshotPredecessorTests(unittest.TestCase):
 
             self.assertEqual(result["resolution_status"], "candidate-set-unorderable")
 
+    def test_special_character_candidate_is_not_silently_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository_root, root = self._repository(tmp)
+            _write_snapshot(root, BASE_TIME - timedelta(hours=2))
+            immediate_time = BASE_TIME - timedelta(hours=1)
+            special_path = _expected_relative(immediate_time).with_name(
+                "1334_AEST\n_source_snapshot.json"
+            )
+            immediate = _write_snapshot(
+                root,
+                immediate_time,
+                relative_override=special_path,
+            )
+            current = _write_snapshot(root, BASE_TIME)
+            _commit(repository_root)
+
+            result = self._resolve(repository_root, current)
+
+            self.assertEqual(
+                result["resolution_status"],
+                "predecessor-identity-invalid",
+            )
+            self.assertEqual(
+                result["predecessor"]["path"],
+                _repository_path(repository_root, immediate),
+            )
+
     def test_missing_predecessor_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repository_root, root = self._repository(tmp)
@@ -464,6 +492,32 @@ class ResolveCryptoSnapshotPredecessorTests(unittest.TestCase):
                 result["predecessor"]["path"],
                 _repository_path(repository_root, immediate),
             )
+
+    def test_slice2_serialises_invalid_predecessor_with_missing_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository_root, root = self._repository(tmp)
+
+            def remove_schema(payload: dict) -> None:
+                payload.pop("schema_version", None)
+
+            _write_snapshot(
+                root,
+                BASE_TIME - timedelta(hours=1),
+                mutate=remove_schema,
+            )
+            current = _write_snapshot(root, BASE_TIME)
+            _commit(repository_root)
+            context = _repository_context(repository_root)
+
+            record = build_comparison_record(
+                repository_root,
+                context["commit_sha"],
+                _repository_path(repository_root, current),
+            )
+
+            self.assertEqual(record["comparison_status"], "predecessor-invalid")
+            self.assertIsNone(record["predecessor"]["schema_version"])
+            self.assertEqual(len(record["comparison_id"]), 64)
 
     def test_predecessor_identity_mismatch_precedes_quality_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

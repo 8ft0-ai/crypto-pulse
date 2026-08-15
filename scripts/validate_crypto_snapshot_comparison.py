@@ -197,7 +197,7 @@ def _require_validated(item: dict[str, Any], path: str) -> None:
 
 
 def _require_minimal_predecessor(item: dict[str, Any], path: str) -> None:
-    required = ("path", "sha256", "schema_version", "generated_at_utc")
+    required = ("path", "sha256", "generated_at_utc")
     if any(item.get(key) is None for key in required):
         raise ComparisonValidationError(f"{path} must contain the selected predecessor identity")
 

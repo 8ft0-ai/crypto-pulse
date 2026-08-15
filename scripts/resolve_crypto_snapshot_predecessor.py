@@ -205,7 +205,12 @@ def _raw_identity(path: str, raw: bytes, payload: dict[str, Any]) -> dict[str, A
     identity = _empty_identity()
     identity["path"] = path
     identity["sha256"] = hashlib.sha256(raw).hexdigest()
-    identity["schema_version"] = payload.get("schema_version")
+    schema_version = payload.get("schema_version")
+    identity["schema_version"] = (
+        schema_version
+        if isinstance(schema_version, str) and schema_version.strip()
+        else None
+    )
     run = payload.get("run")
     if isinstance(run, dict):
         try:
@@ -322,12 +327,17 @@ def _candidate_paths(repository_root: Path, commit_sha: str) -> list[str]:
         repository_root,
         "ls-tree",
         "-r",
+        "-z",
         "--name-only",
         commit_sha,
         "--",
         SNAPSHOT_REPOSITORY_PREFIX.as_posix(),
     )
-    paths = output.decode("utf-8").splitlines()
+    paths = [
+        item.decode("utf-8")
+        for item in output.split(b"\0")
+        if item
+    ]
     return sorted(path for path in paths if _is_snapshot_path(path))
 
 
