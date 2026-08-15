@@ -285,7 +285,11 @@ def validate_comparison_record(record: Any) -> dict[str, Any]:
         _require_validated(current, "current")
         if predecessor is None:
             raise ComparisonValidationError("predecessor-identity-invalid requires predecessor")
-        _require_validated(predecessor, "predecessor")
+        _require_minimal_predecessor(predecessor, "predecessor")
+        if predecessor["quality_status"] is not None or predecessor["non_blocking_warnings"] is not None:
+            raise ComparisonValidationError(
+                "predecessor-identity-invalid must fail before predecessor quality classification"
+            )
         if elapsed is not None:
             raise ComparisonValidationError("predecessor-identity-invalid must fail before elapsed time")
     elif status == "predecessor-out-of-window":
