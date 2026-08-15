@@ -1,70 +1,83 @@
 # GPT-OSS candidate-selection quality comparison
 
-> **Mode:** Reference
-> **Audience:** CryptoPulse developers, reviewers and governance stakeholders
-> **Outcome:** Look up the Phase 9 frozen corpus, exact GPT-OSS/DeepInfra route, staged execution, scoring and evidence boundaries.
-> **Status:** Implementation pending independent review; no provider call authorised
+> **Mode:** Reference  
+> **Audience:** CryptoPulse developers, reviewers and governance stakeholders  
+> **Outcome:** Look up the completed Phase 9 GPT-OSS/DeepInfra comparison contract and retained evidence.  
+> **Status:** Historical; canonical outcome accepted as `no-stable-material-uplift` and paid workflow archived
 
-Phase 9 provides a bounded, protected comparison between the deterministic candidate selector and one exact model route: `openai/gpt-oss-120b` through pinned `deepinfra`.
+Phase 9 compared the deterministic candidate selector with the exact route `openai/gpt-oss-120b` through pinned `deepinfra`. The canonical decision is recorded by issue #389 and acceptance comment `5301261397`.
 
-## Commands
+## Canonical execution
 
-Secret-free preparation:
-
-```bash
-python -m llm_analysis.gpt_oss_quality_comparison_runner prepare \
-  --repository-root . \
-  --config config/gpt-oss-quality-comparison.yml \
-  --output-dir /tmp/gpt-oss-quality-comparison-prepared
+```text
+Dispatcher run:            31867552577
+Protected run:             31867564494
+Trusted execution SHA:     43c69ed122c4e39cf2dda92bfcefa7e4314b3922
+Protected run attempt:     1
+Outcome:                   no-stable-material-uplift
+Status:                    partial-non-adjudicable
+Planned paid calls:        15
+Attempted paid calls:      1
+Accepted calls:            0
+Unattempted calls:         14
+Observed total cost:       USD 0.000953014
+Network retries:           0
+Semantic repairs:          0
+Route probes:              0
 ```
 
-Protected execution requires `OPENROUTER_API_KEY` and an exact trusted-main SHA:
+GitHub Actions completed the protected workflow successfully. That conclusion records execution success, not a positive quality decision.
 
-```bash
-python -m llm_analysis.gpt_oss_quality_comparison_runner run \
-  --repository-root . \
-  --config config/gpt-oss-quality-comparison.yml \
-  --prepared-dir /tmp/gpt-oss-quality-comparison-prepared \
-  --output-dir /tmp/gpt-oss-quality-comparison \
-  --trusted-main-sha <40-character-sha>
+## Decisive result
+
+The first Stage A case, `historical-degraded-sparse`, reached the exact governed model/provider route with HTTP 200, one router attempt, no provider fallback and trustworthy usage/cost evidence.
+
+The model returned seven known, unique candidate IDs. Their frozen section mapping was:
+
+```text
+market_summary:       1
+key_observations:     5
+data_quality:         1
 ```
 
-Do not run the protected command outside separately approved Phase 9 dispatch authority.
+The retained ranking contract permits at most four `key_observations`. Canonical reconstruction/validation therefore classified the response as `candidate_selection_invalid` / model failure.
 
-## Configuration
+Under issue #352, a decisive Stage A model-content or candidate-contract failure immediately stops the remaining experiment and yields `no-stable-material-uplift`. The remaining fourteen calls were correctly left unattempted. Aggregate quality, case-level, stability and incremental-value promotion metrics are therefore not adjudicable and were not threshold-tested or imputed.
 
-`config/gpt-oss-quality-comparison.yml` is strict. Loading fails if any fixed model, provider, corpus, call, retry, repair, route-probe, price, cost, required-candidate, threshold or outcome value changes.
+`no-stable-material-uplift` authorises **no rerun under Phase 9**. GPT-OSS 120B on pinned DeepInfra is not eligible for an operational selector decision from this programme. The deterministic selector remains the sole active selector.
 
-## Preparation artefact
+## Retained protected evidence
 
-`gpt-oss-quality-comparison-prepared.json` records:
+Prepared artefact:
 
-- the regenerated five-case order;
-- the deterministic baseline and base prepared-manifest hash;
-- case candidate and request identities;
-- reviewed-useful candidate IDs;
-- deterministic selected IDs;
-- required expectation name-to-ID mappings and ordered-set hashes;
-- the exact 15-call Stage A/B schedule;
-- zero provider calls.
+```text
+ID:      9242467310
+Digest:  sha256:69eef6f0989a61865e59210e97ec7187865243834cc1cee014013eff441a42f8
+```
 
-## Protected result artefacts
+Protected comparison artefact:
 
-The result directory contains the availability record, summary, complete planned/attempted record set, per-call request and HTTP evidence, interpreted routing/usage evidence, accepted selections and deterministic renders, reviewer CSV, additions/losses CSV when adjudicable, and deterministic Markdown decision input.
+```text
+ID:      9242498501
+Digest:  sha256:4664e6dbff016aad2e60473728545ee08f9da5094f5ca79b8cea766e4fa8b073
+```
 
-`http-response.json` is written before JSON, identity, metering or model-content interpretation. The interpreted record excludes returned reasoning text and retains only observable reasoning-token counts, finish reason and routing/usage metadata.
+The protected artefact retains the prepared manifest, call schedule, request and HTTP evidence, interpreted routing/usage evidence, attempted/unattempted records, reviewer CSV and deterministic decision input. Raw provider evidence remains protected workflow evidence and is not committed or published.
 
-## Workflow
+## Retained source contract
 
-`.github/workflows/governed-gpt-oss-quality-comparison.yml` is manual-only, read-only and trusted-main pinned. Preparation runs without the provider secret. Protected execution uses the existing `governed-llm-dry-run` environment and uploads evidence without repository mutation.
+The following source-controlled implementation remains for audit and regression coverage:
 
-No pull-request workflow or test makes a provider call.
+- `config/gpt-oss-quality-comparison.yml`;
+- `llm_analysis/gpt_oss_quality_comparison.py`;
+- `llm_analysis/gpt_oss_quality_comparison_runner.py`;
+- Phase 9 comparison, router-evidence and remediation tests;
+- the frozen Phase 6 corpus and deterministic ranking contract.
 
-## Boundaries
+The historical runner commands remain implementation evidence only. They grant no execution authority and must not be used to initiate another Phase 9 provider call.
 
-- no provider or model fallback;
-- no semantic repair, network retry or route probe;
-- no model-authored claims, evidence, values, rationale or prose;
-- no report generation, branch write, scheduling or publication;
-- no automatic promotion;
-- deterministic selection remains the sole active selector until a later reviewed operational decision says otherwise.
+## Archived execution boundary
+
+The temporary paid workflow `.github/workflows/governed-gpt-oss-quality-comparison.yml` is removed by the Phase 9 archival change. Historical commits, workflow runs, consumed IssueOps records and immutable execution tags remain untouched.
+
+There is no Phase 9 rerun authority, no model promotion, no selector change, no automatic generation, no scheduling and no publication authority from this result. The remaining programme work is the separately reviewed roadmap decision record and Phase 9 close-out.

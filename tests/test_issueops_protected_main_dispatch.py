@@ -628,21 +628,12 @@ class EndToEndGuardPolicyTests(unittest.TestCase):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
-    def test_target_workflow_is_trusted_main_and_receipt_gated(self) -> None:
+    def test_phase9_paid_target_workflow_remains_archived(self) -> None:
         target = (
             Path(__file__).resolve().parents[1]
             / ".github/workflows/governed-gpt-oss-quality-comparison.yml"
-        ).read_text(encoding="utf-8")
-        self.assertIn("issueops_authorisation_id:", target)
-        self.assertIn("refs/heads/main", target)
-        self.assertIn("issueops_dispatch.target_guard_main guard", target)
-        self.assertNotIn("issueops_dispatch.target_guard \\", target)
-        guard_text = target.split("  prepare:", 1)[0]
-        compare_text = target.split("  compare:", 1)[1]
-        self.assertNotIn("OPENROUTER_API_KEY", guard_text)
-        self.assertNotIn("environment: governed-llm-dry-run", guard_text)
-        self.assertIn("needs.guard.result == 'success'", compare_text)
-        self.assertIn("environment: governed-llm-dry-run", compare_text)
+        )
+        self.assertFalse(target.exists())
 
     def test_dispatcher_consumes_tag_but_dispatches_via_trusted_main_adapter(self) -> None:
         dispatcher = (
