@@ -491,6 +491,12 @@ class ComparisonRecordTests(unittest.TestCase):
         self.assertFalse(metrics[0]["current"]["present"])
         self.assertFalse(metrics[0]["predecessor"]["present"])
 
+        cur_btc["price_usd"] = 1
+        metrics, _ = build_metric_and_source_evidence(current, predecessor)
+        self.assertEqual(metrics[0]["comparison_state"], "unavailable-predecessor")
+        self.assertTrue(metrics[0]["current"]["present"])
+        self.assertFalse(metrics[0]["predecessor"]["present"])
+
         cur_btc["price_usd"] = True
         pred_btc["price_usd"] = 1
         metrics, _ = build_metric_and_source_evidence(current, predecessor)
@@ -538,6 +544,10 @@ class ComparisonRecordTests(unittest.TestCase):
         current["sources"]["bybit"]["status"] = "skipped"
         predecessor["sources"]["binance"]["status"] = "warning"
         current["sources"]["binance"]["status"] = "error"
+        predecessor["sources"]["coingecko"]["status"] = "ok"
+        current["sources"].pop("coingecko")
+        predecessor["sources"]["defillama"]["status"] = "ok"
+        current["sources"]["defillama"]["status"] = "ok"
 
         _, sources = build_metric_and_source_evidence(current, predecessor)
         by_source = {item["source"]: item for item in sources}
@@ -547,6 +557,13 @@ class ComparisonRecordTests(unittest.TestCase):
         self.assertTrue(by_source["bybit"]["status_changed"])
         self.assertEqual(by_source["binance"]["availability_change"], "unchanged")
         self.assertTrue(by_source["binance"]["status_changed"])
+        self.assertEqual(by_source["coingecko"]["current_status"], "missing")
+        self.assertEqual(by_source["coingecko"]["availability_change"], "lost")
+        self.assertTrue(by_source["coingecko"]["status_changed"])
+        self.assertEqual(by_source["defillama"]["predecessor_status"], "ok")
+        self.assertEqual(by_source["defillama"]["current_status"], "ok")
+        self.assertEqual(by_source["defillama"]["availability_change"], "unchanged")
+        self.assertFalse(by_source["defillama"]["status_changed"])
 
     def test_validator_rejects_ready_with_arrays_and_bad_available_shapes(self) -> None:
         current, _ = self.pair()
@@ -572,14 +589,28 @@ class ComparisonRecordTests(unittest.TestCase):
             with self.assertRaises(ComparisonValidationError):
                 validate_comparison_record(bad)
 
-        reordered = copy.deepcopy(record)
-        reordered["metric_comparisons"][0], reordered["metric_comparisons"][1] = (
-            reordered["metric_comparisons"][1],
-            reordered["metric_comparisons"][0],
-        )
-        reordered["comparison_id"] = comparison_id_for_record(reordered)
-        with self.assertRaises(ComparisonValidationError):
-            validate_comparison_record(reordered)
+        for field in ("metric_comparisons", "source_availability_changes"):
+            reordered = copy.deepcopy(record)
+            reordered[field][0], reordered[field][1] = (
+                reordered[field][1],
+                reordered[field][0],
+            )
+            reordered["comparison_id"] = comparison_id_for_record(reordered)
+            with self.assertRaises(ComparisonValidationError):
+                validate_comparison_record(reordered)
+
+            duplicated = copy.deepcopy(record)
+            duplicated[field][1] = copy.deepcopy(duplicated[field][0])
+            duplicated["comparison_id"] = comparison_id_for_record(duplicated)
+            with self.assertRaises(ComparisonValidationError):
+                validate_comparison_record(duplicated)
+
+            unknown = copy.deepcopy(record)
+            identity_key = "field" if field == "metric_comparisons" else "source"
+            unknown[field][0][identity_key] = "future-identity"
+            unknown["comparison_id"] = comparison_id_for_record(unknown)
+            with self.assertRaises(ComparisonValidationError):
+                validate_comparison_record(unknown)
 
     def test_tamper_and_recomputed_inconsistent_adapter_evidence_are_rejected(self) -> None:
         current, _ = self.pair()
@@ -593,6 +624,25 @@ class ComparisonRecordTests(unittest.TestCase):
         )
         with self.assertRaises(ComparisonValidationError):
             validate_comparison_record(tampered)
+
+        source_tampered = copy.deepcopy(record)
+        source_item = source_tampered["source_availability_changes"][0]
+        source_item["current_status"] = (
+            "warning" if source_item["current_status"] == "ok" else "ok"
+        )
+        source_item["predecessor_available"] = source_item["predecessor_status"] == "ok"
+        source_item["current_available"] = source_item["current_status"] == "ok"
+        source_item["status_changed"] = (
+            source_item["predecessor_status"] != source_item["current_status"]
+        )
+        if not source_item["predecessor_available"] and source_item["current_available"]:
+            source_item["availability_change"] = "gained"
+        elif source_item["predecessor_available"] and not source_item["current_available"]:
+            source_item["availability_change"] = "lost"
+        else:
+            source_item["availability_change"] = "unchanged"
+        with self.assertRaises(ComparisonValidationError):
+            validate_comparison_record(source_tampered)
 
         inconsistent = copy.deepcopy(record)
         inconsistent["metric_comparisons"][0]["relation"] = (
