@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Phase 10 Slice 2 comparison-record envelope and semantic gate."""
+"""Build the Phase 10 comparison record, semantic gate, and deterministic adapters."""
 
 from __future__ import annotations
 
@@ -12,6 +12,10 @@ import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from compare_crypto_snapshot_fields import (
+    ComparisonAdapterError,
+    build_metric_and_source_evidence,
+)
 from resolve_crypto_snapshot_predecessor import resolve_predecessor
 from validate_crypto_snapshot_comparison import (
     COMPARISON_SCHEMA_VERSION,
@@ -239,7 +243,7 @@ def build_comparison_record(
     commit_sha: str,
     current_repository_path: str,
 ) -> dict[str, Any]:
-    """Build one deterministic, read-only Slice 2 comparison record."""
+    """Build one deterministic, read-only Phase 10 comparison record."""
 
     repository_root = Path(repository_root).resolve()
     record = _base_record()
@@ -310,15 +314,30 @@ def build_comparison_record(
         record["comparison_status"] = "pair-semantics-incompatible"
         return _finalize(record)
 
-    if _semantic_compatible(current_snapshot) and _semantic_compatible(predecessor_snapshot):
-        record["comparison_status"] = "comparison-ready"
-    else:
+    if not (
+        _semantic_compatible(current_snapshot)
+        and _semantic_compatible(predecessor_snapshot)
+    ):
         record["comparison_status"] = "pair-semantics-incompatible"
+        return _finalize(record)
+
+    try:
+        metric_comparisons, source_changes = build_metric_and_source_evidence(
+            current_snapshot,
+            predecessor_snapshot,
+        )
+    except ComparisonAdapterError:
+        record["comparison_status"] = "pair-semantics-incompatible"
+        return _finalize(record)
+
+    record["metric_comparisons"] = metric_comparisons
+    record["source_availability_changes"] = source_changes
+    record["comparison_status"] = "comparison-available"
     return _finalize(record)
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a Phase 10 Slice 2 comparison record.")
+    parser = argparse.ArgumentParser(description="Build a Phase 10 comparison record.")
     parser.add_argument("repository_root", help="Local Git repository root")
     parser.add_argument("commit_sha", help="Exact 40-character commit SHA")
     parser.add_argument("current_repository_path", help="Repository-relative current snapshot path")
