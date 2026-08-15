@@ -40,13 +40,9 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-There is no active implementation phase. Phase 10 is the sole owner-approved shaping candidate after the Phase 9 close-out. Its roadmap specification records the bounded deterministic direction only; implementation requires a separate delivery-control issue and separate owner authority.
+There is no active implementation or shaping phase. Phase 10 is complete, and no successor phase is selected or authorised by its close-out.
 
-| Phase | Status | Planning record | Delivery record |
-| --- | --- | --- | --- |
-| Phase 10 — Deterministic previous-hour comparison engine | Shaping; planning only under #398 | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | Pending |
-
-Phase 10 extends the repository-owned evidence path before any model or narrative layer: compare a current validated snapshot with one uniquely resolved valid predecessor, emit deterministic structured change evidence, and fail closed when continuity or comparability cannot be proved.
+The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`, and Phase 10 adds deterministic previous-hour comparison evidence without enabling a model/provider path, automatic report generation, scheduling or publication.
 
 ## Completed roadmap directions
 
@@ -55,8 +51,9 @@ Phase 10 extends the repository-owned evidence path before any model or narrativ
 | Phase 4 — Live-site provenance UX | Implementation complete | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) | [../delivery/phase-04-live-site-provenance-ux.md](../delivery/phase-04-live-site-provenance-ux.md) |
 | Phase 6 — Deterministic claim candidates and bounded model selection | Complete; deterministic selector retained | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) | [../delivery/phase-06-deterministic-claim-selection.md](../delivery/phase-06-deterministic-claim-selection.md) |
 | Phase 9 — GPT-OSS quality and stability comparison | Complete; `no-stable-material-uplift` | [phase-09-gpt-oss-quality-decision.md](phase-09-gpt-oss-quality-decision.md) | [../delivery/phase-09-gpt-oss-quality-comparison.md](../delivery/phase-09-gpt-oss-quality-comparison.md) |
+| Phase 10 — Deterministic previous-hour comparison engine | Complete; exact-hour deterministic comparison evidence | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | [../delivery/phase-10-previous-hour-comparison.md](../delivery/phase-10-previous-hour-comparison.md) |
 
-The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 did not promote a model or provider, authorise another Phase 9 run, or enable automatic generation, scheduling or publication. Its temporary paid comparison workflow remains archived from executable `main`.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. It retains immutable repository and exact-byte provenance, explicit fail-closed states, deterministic metric/source evidence and stable comparison identity. Any future consumer of this evidence remains separately governed.
 
 ## Superseded active direction
 
@@ -79,7 +76,7 @@ Ideas that are useful but not ready for an active phase are parked in:
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without expanding the current shaping scope.
+Use the backlog to preserve follow-on ideas without expanding the currently authorised scope.
 
 ## Retrospective roadmap specs
 
