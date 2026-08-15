@@ -506,6 +506,10 @@ class ComparisonRecordTests(unittest.TestCase):
         metrics, _ = build_metric_and_source_evidence(current, predecessor)
         self.assertEqual(metrics[0]["comparison_state"], "invalid-current")
 
+        cur_btc["price_usd"] = "1e-9999"
+        metrics, _ = build_metric_and_source_evidence(current, predecessor)
+        self.assertEqual(metrics[0]["comparison_state"], "invalid-current")
+
     def test_market_cap_rank_relation_is_generic_numeric_relation(self) -> None:
         predecessor = _payload_at(self.current_time - timedelta(hours=1))
         current = _payload_at(self.current_time)

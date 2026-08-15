@@ -75,7 +75,7 @@ def metric_specs() -> tuple[tuple[str, str | None, str, str], ...]:
 METRIC_SPECS = metric_specs()
 
 
-def _decimal_number(value: Any) -> Decimal | None:
+def _decimal_number(value: Any) -> tuple[float, Decimal] | None:
     if isinstance(value, bool) or value is None:
         return None
     if not isinstance(value, (int, float, str)):
@@ -93,16 +93,17 @@ def _decimal_number(value: Any) -> Decimal | None:
         number = Decimal(text)
     except (InvalidOperation, ValueError):
         return None
-    return number if number.is_finite() else None
+    return (accepted, number) if number.is_finite() else None
 
 
 def metric_number(value: Any, rule: str) -> Decimal | None:
-    number = _decimal_number(value)
-    if number is None:
+    parsed = _decimal_number(value)
+    if parsed is None:
         return None
-    if rule == "positive" and not number > 0:
+    accepted, number = parsed
+    if rule == "positive" and not accepted > 0:
         return None
-    if rule == "nonnegative" and not number >= 0:
+    if rule == "nonnegative" and not accepted >= 0:
         return None
     if rule not in {"positive", "nonnegative", "finite"}:
         raise ComparisonAdapterError(f"unknown numeric rule: {rule}")
