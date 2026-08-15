@@ -104,6 +104,7 @@ class RouterEvidenceTests(unittest.TestCase):
             required_provider_slug="deepinfra",
         )
         self.assertFalse(evidence["attempts_present"])
+        self.assertFalse(evidence["metadata_malformed"])
         self.assertEqual(evidence["router_attempt_count"], 1)
         self.assertTrue(evidence["exact_one_attempt"])
         self.assertEqual(evidence["actual_provider"], "DeepInfra")
@@ -127,6 +128,7 @@ class RouterEvidenceTests(unittest.TestCase):
             required_provider_slug="deepinfra",
         )
         self.assertTrue(evidence["attempts_present"])
+        self.assertFalse(evidence["metadata_malformed"])
         self.assertTrue(evidence["exact_one_attempt"])
         self.assertTrue(evidence["explicit_attempt_valid"])
         self.assertFalse(evidence["provider_fallback_used"])
@@ -179,6 +181,44 @@ class RouterEvidenceTests(unittest.TestCase):
             required_provider_slug="deepinfra",
         )
         self.assertTrue(evidence["attempts_present"])
+        self.assertFalse(evidence["exact_one_attempt"])
+        self.assertTrue(evidence["provider_fallback_used"])
+
+    def test_malformed_attempts_field_fails_closed(self) -> None:
+        evidence = core._router_evidence(
+            {
+                "attempt": 1,
+                "endpoints": {
+                    "available": [
+                        {"provider": "DeepInfra", "selected": True}
+                    ]
+                },
+                "attempts": {"provider": "DeepInfra", "status": 200},
+            },
+            required_provider_slug="deepinfra",
+        )
+        self.assertFalse(evidence["attempts_present"])
+        self.assertTrue(evidence["metadata_malformed"])
+        self.assertFalse(evidence["exact_one_attempt"])
+        self.assertTrue(evidence["provider_fallback_used"])
+
+    def test_malformed_scalar_attempt_fails_closed_even_with_valid_array(self) -> None:
+        evidence = core._router_evidence(
+            {
+                "attempt": "1",
+                "endpoints": {
+                    "available": [
+                        {"provider": "DeepInfra", "selected": True}
+                    ]
+                },
+                "attempts": [
+                    {"provider": "DeepInfra", "status": 200}
+                ],
+            },
+            required_provider_slug="deepinfra",
+        )
+        self.assertTrue(evidence["attempts_present"])
+        self.assertTrue(evidence["metadata_malformed"])
         self.assertFalse(evidence["exact_one_attempt"])
         self.assertTrue(evidence["provider_fallback_used"])
 
