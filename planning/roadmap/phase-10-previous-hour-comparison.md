@@ -1,10 +1,16 @@
 # Phase 10 — Deterministic previous-hour comparison engine
 
-Status: shaping.
+Status: complete.
 
 Roadmap rebaseline issue: #398
 
-This is a forward-looking roadmap specification. It records the owner-approved post-Phase-9 direction only. It does not authorise implementation, workflow changes, provider/model use, report integration, publication changes or rolling snapshot automation changes.
+Parent delivery-control issue: #400
+
+Close-out issue: #412
+
+Delivery record: `planning/delivery/phase-10-previous-hour-comparison.md`
+
+This roadmap specification records the owner-approved post-Phase-9 deterministic direction that was delivered under #400. The completed delivery evidence is retained in the Phase 10 delivery record. This record does not authorise follow-on workflow changes, provider/model use, report integration, publication changes or rolling snapshot automation changes.
 
 ## Problem statement
 
@@ -155,21 +161,21 @@ Fixtures must not require a live provider/model call. The proof should make exac
 
 ## Acceptance gates
 
-- [ ] A separate delivery-control/design issue freezes the canonical predecessor-resolution and elapsed-time policy before implementation.
-- [ ] The implementation accepts exactly one current snapshot and one uniquely resolved predecessor as its comparison pair.
-- [ ] Both inputs are validated through the existing repository-owned snapshot-validity boundary.
-- [ ] Comparison evidence retains exact provenance to both inputs and their canonical timestamps/identities.
-- [ ] A versioned structured comparison contract exists and is validated fail closed.
-- [ ] Only semantically compatible fields are compared.
-- [ ] Missing, invalid and incompatible metrics remain explicitly unavailable and are never coerced to zero.
-- [ ] Source availability gain/loss is represented separately from market movement.
-- [ ] Comparison identity and ordering are deterministic across repeated execution of the same inputs.
-- [ ] The required proof corpus covers success, ambiguity, absence, invalidity and incompatibility cases.
-- [ ] Proof requires zero provider/model calls and no credentials.
-- [ ] Existing deterministic selector behaviour is unchanged.
-- [ ] Existing source snapshot contents and rolling snapshot automation are unchanged.
-- [ ] No automatic report generation, scheduling, publication or auto-merge behaviour is added.
-- [ ] No generated `_site/` output is committed.
+- [x] A separate delivery-control/design issue freezes the canonical predecessor-resolution and elapsed-time policy before implementation.
+- [x] The implementation accepts exactly one current snapshot and one uniquely resolved predecessor as its comparison pair.
+- [x] Both inputs are validated through the existing repository-owned snapshot-validity boundary.
+- [x] Comparison evidence retains exact provenance to both inputs and their canonical timestamps/identities.
+- [x] A versioned structured comparison contract exists and is validated fail closed.
+- [x] Only semantically compatible fields are compared.
+- [x] Missing, invalid and incompatible metrics remain explicitly unavailable and are never coerced to zero.
+- [x] Source availability gain/loss is represented separately from market movement.
+- [x] Comparison identity and ordering are deterministic across repeated execution of the same inputs.
+- [x] The required proof corpus covers success, ambiguity, absence, invalidity and incompatibility cases.
+- [x] Proof requires zero provider/model calls and no credentials.
+- [x] Existing deterministic selector behaviour is unchanged.
+- [x] Existing source snapshot contents and rolling snapshot automation are unchanged.
+- [x] No automatic report generation, scheduling, publication or auto-merge behaviour is added.
+- [x] No generated `_site/` output is committed.
 
 ## Non-goals
 
@@ -197,7 +203,7 @@ A later phase may consume validated comparison evidence only after this determin
 
 ## Proposed implementation slices
 
-These are planning candidates only. Do not create or execute them without separate owner authority after this roadmap candidate is independently reviewed and merged.
+These were the bounded planning slices for Phase 10 and are retained here as the historical delivery shape. Their execution required separate owner authority under #400.
 
 ```text
 1. Phase 10 delivery-control/design issue
@@ -257,25 +263,25 @@ Mitigation: keep the target path credential-free, structured and deterministic; 
 
 Phase 10 is complete only when:
 
-- [ ] the separately authorised parent delivery-control issue and bounded child issues exist;
-- [ ] the predecessor/time-gap policy was frozen before implementation;
-- [ ] implementation PRs are merged after exact-head validation and review;
-- [ ] offline proof records concrete input/output and repeatability evidence;
-- [ ] no provider/model call or credential was required;
-- [ ] source snapshot automation and deterministic selector state remained unchanged;
-- [ ] the Phase 10 delivery record is added under `planning/delivery/`;
-- [ ] `planning/delivery-log.md` is updated;
-- [ ] `planning/delivery/delivery.yaml` is updated, or explicitly marked not applicable under the existing compact graph rules;
-- [ ] `planning/delivery/graph.md` is regenerated if `delivery.yaml` changes;
-- [ ] roadmap/backlog state is reconciled after close-out;
-- [ ] generated `_site/` output is not committed.
+- [x] the separately authorised parent delivery-control issue and bounded child issues exist;
+- [x] the predecessor/time-gap policy was frozen before implementation;
+- [x] implementation PRs are merged after exact-head validation and review;
+- [x] offline proof records concrete input/output and repeatability evidence;
+- [x] no provider/model call or credential was required;
+- [x] source snapshot automation and deterministic selector state remained unchanged;
+- [x] the Phase 10 delivery record is added under `planning/delivery/`;
+- [x] `planning/delivery-log.md` is updated;
+- [x] `planning/delivery/delivery.yaml` is updated, or explicitly marked not applicable under the existing compact graph rules;
+- [x] `planning/delivery/graph.md` is regenerated if `delivery.yaml` changes;
+- [x] roadmap/backlog state is reconciled after close-out;
+- [x] generated `_site/` output is not committed.
 
 ## Follow-on delivery record
 
-At close-out, create:
+Completed close-out record:
 
 ```text
 planning/delivery/phase-10-previous-hour-comparison.md
 ```
 
-The completed delivery record should state what comparison contract actually shipped, the exact predecessor policy, proof inputs/results, validation evidence, preserved boundaries and any separately governed follow-on candidate.
+The completed delivery record states what comparison contract shipped, the exact predecessor policy, proof inputs/results, validation evidence, preserved boundaries and the requirement that any future consumer be separately governed.

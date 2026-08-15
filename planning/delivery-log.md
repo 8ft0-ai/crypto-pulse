@@ -232,3 +232,36 @@ Delivery notes:
 - Historical consumed IssueOps authority records and immutable execution tags remain audit evidence and are not rewritten by close-out.
 - Automatic report generation, scheduling and publication remain disabled.
 - `planning/delivery/delivery.yaml` and generated `planning/delivery/graph.md` are not changed because Phase 9 adds no new production pipeline stage or committed runtime artefact; representing its execution/recovery history in the compact graph would be an implementation inventory rather than a causal delivery node.
+
+## Phase 10 — Deterministic previous-hour comparison engine
+
+Status: complete.
+
+Primary outcome: repository code now produces deterministic, fail-closed previous-hour comparison evidence from one current snapshot and its uniquely resolved immediate predecessor under the frozen exact-hour contract.
+
+```text
+Parent issue: #400
+Close-out issue: #412
+Planning issues: #401, #404, #406, #409
+Implementation/proof PRs: #403, #405, #407, #410
+Corrective reconciliation: #402
+Close-out semantic correction: #411 / PR #413
+Proof merge: 873df207b81afb8c9a0fa2a2410b4683136b1e02
+Proof exact-head validation: 31911287479
+Final corrective merge: 47c92d2cb8849bf673763bf31f4caf2406ef49eb
+Final corrective exact-head validation: 31913953865
+Proof corpus: phase10-comparison-proof-corpus/v1 — 14 ordered cases
+Delivery record: planning/delivery/phase-10-previous-hour-comparison.md
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- `phase10-predecessor-exact-hour/v1` selects the greatest strictly prior `run.generated_at_utc` candidate from one immutable repository tree, never skips the immediate predecessor, and accepts exactly `3,600` elapsed seconds with no tolerance or fallback.
+- Snapshot identity is bound to repository path, exact bytes, schema and authoritative UTC time; validator/config blob identities are pinned, with `valid-ok` and `valid-degraded` evidence preserved.
+- `crypto-snapshot-comparison/v1` emits deterministic fixed-order metric/source evidence and a canonical full-record `comparison_id`; missing or invalid metrics are never coerced to zero and source availability remains distinct from market movement.
+- PR #410 proves the complete path offline with exact inputs/golden outputs, repeatable commit/tree construction and stable comparison identities across the required success and fail-closed classes.
+- Close-out review found one enforcement gap for additional asset/stablecoin identities; #411/PR #413 corrected it so supported identities are exactly BTC/ETH/SOL and USDT/USDC and unknown additional identities fail `pair-semantics-incompatible`, without widening the frozen contract.
+- No provider/model call, credential, workflow, snapshot, selector, report/site, publication or generated `_site/` change was required.
+- `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 10 is an offline evidence capability not yet integrated as a causal dependency in the active delivery pipeline.

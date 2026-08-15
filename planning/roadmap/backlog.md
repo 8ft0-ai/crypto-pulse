@@ -1,8 +1,8 @@
 # CryptoPulse roadmap backlog
 
-This backlog parks ideas that are useful but outside the currently approved shaping direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
+This backlog parks ideas that are useful but outside the currently approved direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-The current shaping direction is Phase 10 — deterministic previous-hour comparison. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use.
+There is no current shaping direction. Phase 10 — deterministic previous-hour comparison — is complete. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use.
 
 ## Candidate future phases
 
@@ -12,11 +12,11 @@ Capture credible market event inputs outside any model boundary before asking fo
 
 Why parked: News ingestion needs its own source-quality policy, licensing review, freshness rules and validation contract. A model must not choose or fetch authoritative market facts.
 
-### Previous-hour comparison engine — promoted to Phase 10 shaping
+### Previous-hour comparison engine — delivered as Phase 10
 
-Compare consecutive validated snapshots deterministically to identify changes in asset direction, volume, dominance, liquidations and source availability.
+Compare consecutive validated snapshots deterministically to identify changes in supported asset, DeFi, stablecoin and source-availability evidence.
 
-Status: promoted from backlog into the owner-approved Phase 10 shaping specification. This is not implementation authority. See `phase-10-previous-hour-comparison.md`.
+Status: complete. Delivered under Phase 10 with the frozen exact-hour, immediate-prior, no-skip/no-fallback contract. See `phase-10-previous-hour-comparison.md` and `../delivery/phase-10-previous-hour-comparison.md`.
 
 ### Deterministic charts and visual market cards
 
