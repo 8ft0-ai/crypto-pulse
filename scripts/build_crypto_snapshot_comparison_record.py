@@ -229,9 +229,9 @@ def _semantic_compatible(snapshot: dict[str, Any]) -> bool:
     stablecoin_symbols, stablecoins_unique = _normalised_symbols(defi.get("stablecoins"))
     if not assets_unique or not stablecoins_unique:
         return False
-    if not set(SUPPORTED_ASSET_ORDER).issubset(asset_symbols):
+    if set(asset_symbols) != set(SUPPORTED_ASSET_ORDER):
         return False
-    if not set(SUPPORTED_STABLECOIN_ORDER).issubset(stablecoin_symbols):
+    if set(stablecoin_symbols) != set(SUPPORTED_STABLECOIN_ORDER):
         return False
     if any(not isinstance(key, str) or key not in SUPPORTED_SOURCE_ORDER for key in sources):
         return False
