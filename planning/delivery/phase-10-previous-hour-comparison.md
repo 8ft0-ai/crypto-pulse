@@ -36,7 +36,7 @@ Slice 3 exact-head validation: 31883721665
 
 Immutable-binding corrective reconciliation: PR #402
 Corrective merge: e8673aeb89fa21dda4a809aea378d0e7b24564ef
-Corrective exact-head validation: 31882840576
+Corrective exact-head validation: 31884420244
 
 Slice 4 planning: #409
 Offline proof PR: #410
