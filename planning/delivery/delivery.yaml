@@ -281,6 +281,40 @@ nodes:
     title: Observation-hour identity preserves actual time
     summary: Phase 12 identifies the UTC hour containing actual generation time without changing run.generated_at_utc, historical evidence, or frozen Phase 10 exact-time semantics.
 
+  - id: phase-13
+    type: phase
+    title: Phase 13 — Deterministic observation-hour comparison and temporal evidence
+    status: complete
+    summary: Phase-12 slot identity is consumed through separately versioned exact adjacent-hour comparison and deterministic repository-bound temporal-series evidence.
+    record: planning/delivery/phase-13-observation-hour-temporal-evidence.md
+
+  - id: issue-446
+    type: issue
+    title: Phase 13 delivery control — observation-hour temporal evidence
+    number: 446
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/446
+    status: closed
+
+  - id: pr-452
+    type: pull_request
+    title: Add Phase 13 observation-hour temporal proof corpus
+    number: 452
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/452
+    status: merged
+    merge_commit: 43cbf6a62afbc83d97f6f677795b0fe61c50738a
+
+  - id: artifact-observation-hour-series
+    type: artifact
+    title: Canonical observation-hour temporal series
+    path: scripts/crypto_observation_hour_series.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-phase13-public-integration
+    type: boundary
+    title: Public temporal integration remains separately governed
+    summary: Phase 13 proves offline observation-hour comparison and series evidence but does not authorise renderer, report, site or publication integration.
+
 edges:
   - from: pre-phase-baseline
     to: phase-1
@@ -516,3 +550,28 @@ edges:
     to: boundary-no-committed-site
     type: preserved
     label: preserved
+
+  - from: phase-12
+    to: phase-13
+    type: enabled
+    label: enabled slot-ready consumer
+
+  - from: phase-13
+    to: issue-446
+    type: depends_on
+    label: governed by
+
+  - from: phase-13
+    to: pr-452
+    type: proved_by
+    label: proved offline corpus
+
+  - from: phase-13
+    to: artifact-observation-hour-series
+    type: produced
+    label: produced canonical series
+
+  - from: phase-13
+    to: boundary-phase13-public-integration
+    type: preserved
+    label: kept separate

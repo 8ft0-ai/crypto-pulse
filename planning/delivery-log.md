@@ -334,3 +334,41 @@ Delivery notes:
 - Phase 12 does not reinterpret Phase 10's exact `3,600`-second actual-time predecessor rule or Phase 11 temporal semantics and defines no duplicate-hour winner, fallback, interpolation, backfill or live temporal consumer.
 - The compact delivery graph is updated because Phase 12 changes the active source-evidence spine and establishes an enduring evidence boundary that a later separately governed consumer may depend on.
 - Observation-hour comparison/temporal consumption and public/site integration remain parked. No successor phase is selected by this close-out.
+
+## Phase 13 — Deterministic observation-hour comparison and temporal evidence
+
+Status: complete.
+
+Primary outcome: repository code now consumes Phase-12 observation-hour identity through separately versioned exact adjacent-slot comparison and canonical temporal-series contracts, with repository-bound validation and a closed offline proof corpus.
+
+```text
+Shaping/design issue: #443
+Roadmap promotion: #444 / PR #445
+Parent issue: #446
+Implementation/proof issues: #447, #449, #451
+Close-out issue: #453
+Implementation/proof PRs: #448, #450, #452
+Slice 1 merge: 4e67918ba9e9be05689d3976e08d9230844263df
+Slice 1 exact-head validation: 31928211032
+Slice 2 merge: 07385273c48ad4d4ead26b75797d704119bbcaf5
+Slice 2 exact-head validation: 31935983698
+Slice 3 merge: 43cbf6a62afbc83d97f6f677795b0fe61c50738a
+Slice 3 exact-head validation: 31937233333
+Contracts: phase13-observation-hour-adjacency/v1, crypto-observation-hour-comparison/v1, crypto-observation-hour-series/v1
+Proof corpus: tests/fixtures/phase13_observation_hour_temporal_proof_v1.json
+Delivery record: planning/delivery/phase-13-observation-hour-temporal-evidence.md
+Delivery graph update: yes — enduring observation-hour temporal evidence dependency
+_site committed: no
+```
+
+Delivery notes:
+
+- Exact current hour `H` and predecessor `H-1h` are selected by observation-hour slot identity from immutable repository evidence; legacy snapshots do not participate, malformed participating evidence fails globally, ambiguity precedes side validity and no older fallback exists.
+- Successful comparison preserves actual elapsed time as non-gating evidence, including below/equal/above-3,600-second cases, while fixed 26-metric/8-source evidence and side-specific quality/warnings remain deterministic and repository-bound.
+- `crypto-observation-hour-series/v1` replays only Phase 13 comparison evidence across exact bounded UTC-hour windows, exposes only the frozen 12-metric/8-source vocabulary, preserves categorical source status and breaks continuity unless retained identities match field-for-field.
+- Missing, ambiguity, identity, validation, semantic and metric failures remain explicit gaps; there is no raw-snapshot success bypass, interpolation, aggregation, smoothing, normalisation, carry-forward, backfill or inferred-value path.
+- The Slice 3 corpus independently materialises immutable synthetic Git repositories, covers the accepted closed/degraded/continuity/tamper matrix, and requires independent materialisations to reproduce byte-identical canonical comparison/series output and stable IDs.
+- Representative proof freezes comparison at 9,459 canonical bytes / SHA-256 `046f1f65e5a90d5138068791e5a0b1d6da2b1ec58e45e5aef7f222dac471f3e7` and series at 21,626 bytes / SHA-256 `70495c03030003d6082774a22fc11ccc895aaf403c97f6e0033af2d0683839be`.
+- Frozen Phase 10/11/12 semantics, historical snapshots, acquisition/workflows/publication, selector/report/site/renderer, provider/model/credential behaviour and generated `_site/` remain unchanged.
+- The compact delivery graph records Phase 13 as an enduring evidence dependency while explicitly preserving the boundary that rendering/public-site integration requires separate future governance.
+- No successor phase is selected by this close-out.
