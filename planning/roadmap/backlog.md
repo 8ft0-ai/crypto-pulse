@@ -2,7 +2,7 @@
 
 This backlog parks ideas that are useful but outside the currently approved direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-There is no current shaping direction. Phase 10 — deterministic previous-hour comparison — is complete. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use.
+Phase 11 — deterministic temporal visualisation — is the current shaping direction under #416. Phase 10 is complete, the Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use. Phase 11 remains offline and does not authorise site/publication integration.
 
 ## Candidate future phases
 
@@ -18,11 +18,11 @@ Compare consecutive validated snapshots deterministically to identify changes in
 
 Status: complete. Delivered under Phase 10 with the frozen exact-hour, immediate-prior, no-skip/no-fallback contract. See `phase-10-previous-hour-comparison.md` and `../delivery/phase-10-previous-hour-comparison.md`.
 
-### Deterministic charts and visual market cards
+### Deterministic charts and visual market cards — promoted to Phase 11 shaping
 
-Generate charts from archived snapshot data, such as BTC/ETH price movement, market-cap movement, top asset 1h moves, dominance and liquidations where available.
+Generate deterministic temporal visual evidence from the frozen Phase 10 comparison boundary.
 
-Why parked: Charts should be deterministic site/rendering work rather than model-generated. This likely needs data-series storage, comparison evidence and accessible visual design before promotion.
+Status: the bounded offline portion is promoted into Phase 11 under #416 and `phase-11-deterministic-temporal-visualisation.md`. Phase 11 is limited to canonical `crypto-temporal-series/v1` evidence, deterministic accessible HTML/SVG proof rendering and repeatability validation. Public-site integration, publication paths and broader visual market-card product work remain parked and require separate governance after Phase 11 proof.
 
 ### Technical-level calculation policy
 
@@ -81,7 +81,7 @@ These original prompt features should stay parked until deterministic evidence e
 - ongoing event summaries from news feeds;
 - whale, treasury or exchange-wallet movements;
 - ETF flow updates;
-- chart generation;
+- public/site chart integration beyond the bounded offline Phase 11 proof;
 - support and resistance levels;
 - trader watchlists;
 - causal claims about why price moved;
