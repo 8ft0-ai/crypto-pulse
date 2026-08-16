@@ -1,8 +1,8 @@
 # CryptoPulse roadmap backlog
 
-This backlog parks ideas that are useful but outside completed Phase 13 and any currently selected phase. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
+This backlog parks ideas that are useful but outside completed Phase 13 and the selected Phase 14 deterministic-publication direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. No successor phase is selected. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use.
+Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. Phase 14 — deterministic site publication — is now selected under #455/#456 only to restore recent deterministic report freshness through the accepted `deterministic-site-publication/v3` boundary. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is approved for operational use.
 
 ## Candidate future phases
 
@@ -24,7 +24,15 @@ Use validated `phase12-observation-hour/v1` identity to define an operational ca
 
 Status: complete. Delivered under Phase 13 as **deterministic observation-hour comparison and temporal evidence**. The accepted implementation provides exact adjacent observation-hour selection, explicit missing/duplicate/invalid evidence, immutable provenance, deterministic repository-bound comparison/series records, bounded 12-metric/8-source temporal vocabulary and closed offline proof while preserving frozen Phase 10/11 v1 semantics.
 
-See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. Public/site integration remains outside Phase 13 and separately parked below.
+See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. Public/site integration of that temporal evidence remains outside Phase 13 and separately parked below.
+
+### Deterministic report publication freshness — promoted as Phase 14
+
+Restore recent public deterministic Markdown reports from already validated source evidence without making a rolling branch a publication authority or adding a model/provider path.
+
+Status: promoted under #455/#456 as **Phase 14 — deterministic site publication** with contract `deterministic-site-publication/v3`. The selected direction keeps `main` as the sole publication authority, uses immutable trusted-generation attestation plus exact-head credential-free validation, requires strict stale-base refusal, retains the existing Pages/live-verification path, and remains inert until separately authorised provisioning/pilot/recurring gates. See `phase-14-deterministic-site-publication.md`.
+
+This promotion does not select Phase 11/13 temporal rendering for public use and does not authorise App provisioning or production activation.
 
 ### Deterministic charts and visual market cards — offline foundation delivered in Phase 11
 
@@ -34,7 +42,7 @@ Status: the bounded offline rendering foundation is complete under Phase 11. `cr
 
 Operational evidence prerequisites are also complete: Phase 12 provides future slot-ready observation-hour identity and Phase 13 provides the separately versioned observation-hour comparison/temporal consumer.
 
-Still parked: public-site integration, publication paths and broader visual market-card product work. These remain separately governed after Phase 13; no public use of the Phase 11 renderer or Phase 13 series is selected by either close-out.
+Still parked: public-site integration of temporal evidence and broader visual market-card product work. Phase 14 selects only deterministic Markdown report publication freshness; it does not select public use of the Phase 11 renderer or Phase 13 series.
 
 ### Technical-level calculation policy
 
@@ -58,7 +66,7 @@ Why parked: No model-authored operational narrative is currently enabled. Revisi
 
 Trigger governed LLM analysis automatically after a source snapshot PR merges, rather than requiring `workflow_dispatch`.
 
-Why parked: No model is currently selected or enabled, and automatic generation, scheduling and publication remain disabled. Any future automation requires a new separately governed model programme and completed validation evidence first.
+Why parked: No model is currently selected or enabled. Phase 14 concerns deterministic report publication only and does not authorise model generation, model scheduling or model credentials. Any future LLM automation requires a new separately governed model programme and completed validation evidence first.
 
 ### Expanded approved prose slots in reports
 
@@ -86,7 +94,7 @@ Why parked: There is no active generated-narrative delivery path to optimise. Re
 
 ## Parking lot from the original analyst prompt
 
-These original prompt features remain parked after completion of the Phase 10–13 evidence foundations. Each requires separate product, evidence and governance decisions before implementation:
+These original prompt features remain parked after completion of the Phase 10–13 evidence foundations and selection of the narrow Phase 14 deterministic-publication path. Each requires separate product, evidence and governance decisions before implementation:
 
 - live or most-recent data collection by a model;
 - model-selected credible sources;
