@@ -265,3 +265,37 @@ Delivery notes:
 - Close-out review found one enforcement gap for additional asset/stablecoin identities; #411/PR #413 corrected it so supported identities are exactly BTC/ETH/SOL and USDT/USDC and unknown additional identities fail `pair-semantics-incompatible`, without widening the frozen contract.
 - No provider/model call, credential, workflow, snapshot, selector, report/site, publication or generated `_site/` change was required.
 - `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 10 is an offline evidence capability not yet integrated as a causal dependency in the active delivery pipeline.
+
+## Phase 11 — Deterministic temporal visualisation
+
+Status: complete.
+
+Primary outcome: repository code now materialises deterministic repository-bound temporal series from replayed Phase 10 comparison evidence, validates them fail closed, renders deterministic accessible HTML/SVG/table output, and proves repeatability entirely offline.
+
+```text
+Parent issue: #418
+Shaping/design issue: #416
+Implementation/proof issues: #419, #421, #423
+Close-out issue: #426
+Implementation/proof PRs: #420, #422, #425
+Slice 1 merge: fbdf09cef53a5d3bd826118472fac25063d688d6
+Slice 2 merge: fc16e65dea5c8294748040fbda2650c2b7a91cbb
+Slice 3 merge: 972ec1240d6f227798dca894a711028824c77645
+Renderer exact-head validation: 31920585985
+Proof exact-head validation: 31922157164
+Proof corpus: phase11-temporal-series-proof-corpus/v1
+Series contract: crypto-temporal-series/v1
+Delivery record: planning/delivery/phase-11-deterministic-temporal-visualisation.md
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- `crypto-temporal-series/v1` preserves exact inclusive UTC-hour slots, a maximum 168-slot window, immutable repository candidate enumeration and the existing Phase 10 comparison replay as the only successful value-producing evidence path; raw snapshot metrics never bypass Phase 10.
+- Missing, ambiguity, Phase 10 and metric failure classes remain explicit and fail closed; current/predecessor snapshot identity, side-specific `valid-degraded` quality and warnings remain independently attributable.
+- The deterministic renderer consumes only repository-validated canonical series, emits semantic HTML with inline SVG and a complete table, breaks numeric lines across gaps or identity discontinuities, and keeps source status categorical rather than mapping it onto a numeric market axis.
+- The closed proof corpus independently materialises synthetic immutable Git repositories, proves complete table/continuity/tamper semantics and requires two independently materialised executions to be byte-identical and match frozen canonical-series/renderer SHA-256 identities and byte lengths.
+- No provider/model call, credential, source snapshot/acquisition, selector, report/site, workflow/publication or generated `_site/` change was required.
+- `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 11 is an offline deterministic evidence/rendering capability and has not become a causal dependency of the active ingestion/report/site/publication pipeline.
+- Public/site integration of the proven temporal renderer and broader visual market-card product work remain parked for separate future governance. No successor phase is selected by Phase 11 close-out.

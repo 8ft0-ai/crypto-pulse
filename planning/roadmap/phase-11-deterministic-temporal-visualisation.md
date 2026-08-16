@@ -1,14 +1,24 @@
 # Phase 11 — Deterministic temporal visualisation
 
-Status: shaping; design accepted, implementation separately gated.
+Status: complete.
 
 Shaping/design issue: #416
 
 Frozen design proposal: comment `5304820349`
 
+Delivery-control issue: #418
+
+Approved implementation plan: #418 comment `5305066681`
+
+Close-out issue: #426
+
+Delivery record: `../delivery/phase-11-deterministic-temporal-visualisation.md`
+
 Trusted design base: `03ec37a3fa2aa08fabf021364dc46692dde85149`
 
-This is a forward-looking roadmap specification. It promotes the independently reviewed `phase11-temporal-visualisation/v1` design into the roadmap only. It does not authorise implementation, child implementation issues, branches, pull requests, renderer/CSS changes, workflow changes, report/site integration, publication changes, provider/model use, source acquisition or generated `_site/` changes.
+Trusted implementation/proof base before close-out: `972ec1240d6f227798dca894a711028824c77645`
+
+This roadmap specification is retained as the frozen planning contract for `phase11-temporal-visualisation/v1`. Phase 11 delivered that contract through the reviewed four-slice plan under #418. Completion does not authorise public-site integration, publication changes, provider/model use, source acquisition, generated `_site/` changes or any successor phase.
 
 ## Problem statement
 
@@ -298,26 +308,26 @@ Malformed series input produces no renderer output.
 
 ## Acceptance gates
 
-- [ ] A separately authorised Phase 11 delivery-control/implementation-planning issue adopts the frozen #416 design without relaxation.
-- [ ] A canonical `crypto-temporal-series/v1` builder emits exactly one deterministic record per requested metric/source series and hourly window.
-- [ ] The builder never uses raw snapshot metrics as a success bypass around Phase 10.
-- [ ] Window, slot, missing, ambiguity and gap precedence semantics exactly match the frozen contract.
-- [ ] Numeric and source-status vocabularies are closed and validated fail closed.
-- [ ] Current and predecessor Phase 10 identity, quality and warning evidence remain separately attributable.
-- [ ] Series validation replays immutable Phase 10 evidence rather than trusting asserted IDs/values/statuses.
-- [ ] Numeric continuity is bound to exact predecessor/current identity and never inferred from timestamps alone.
-- [ ] No interpolation, aggregation, smoothing, normalisation, backfill or inferred values exist.
-- [ ] The offline renderer produces deterministic semantic HTML, inline SVG and a complete tabular equivalent.
-- [ ] Source status remains categorical and separate from market movement.
-- [ ] Accessibility does not depend on colour or visual interpretation alone.
-- [ ] The closed proof corpus demonstrates all required success/failure/degraded/ambiguity/continuity/tamper cases.
-- [ ] Two independent runs produce byte-identical canonical series and renderer output.
-- [ ] Proof requires zero network, provider, model or credential calls.
-- [ ] Phase 10 semantics, deterministic selector, source snapshots/acquisition, reports/site, workflows, publication, auto-merge and generated `_site/` remain unchanged.
+- [x] A separately authorised Phase 11 delivery-control/implementation-planning issue adopts the frozen #416 design without relaxation.
+- [x] A canonical `crypto-temporal-series/v1` builder emits exactly one deterministic record per requested metric/source series and hourly window.
+- [x] The builder never uses raw snapshot metrics as a success bypass around Phase 10.
+- [x] Window, slot, missing, ambiguity and gap precedence semantics exactly match the frozen contract.
+- [x] Numeric and source-status vocabularies are closed and validated fail closed.
+- [x] Current and predecessor Phase 10 identity, quality and warning evidence remain separately attributable.
+- [x] Series validation replays immutable Phase 10 evidence rather than trusting asserted IDs/values/statuses.
+- [x] Numeric continuity is bound to exact predecessor/current identity and never inferred from timestamps alone.
+- [x] No interpolation, aggregation, smoothing, normalisation, backfill or inferred values exist.
+- [x] The offline renderer produces deterministic semantic HTML, inline SVG and a complete tabular equivalent.
+- [x] Source status remains categorical and separate from market movement.
+- [x] Accessibility does not depend on colour or visual interpretation alone.
+- [x] The closed proof corpus demonstrates all required success/failure/degraded/ambiguity/continuity/tamper cases.
+- [x] Two independent runs produce byte-identical canonical series and renderer output.
+- [x] Proof requires zero network, provider, model or credential calls.
+- [x] Phase 10 semantics, deterministic selector, source snapshots/acquisition, reports/site, workflows, publication, auto-merge and generated `_site/` remain unchanged.
 
-## Proposed implementation slices
+## Delivered implementation slices
 
-Implementation is not authorised by this roadmap promotion. After this roadmap candidate is independently reviewed, merged with separate authority, and a Phase 11 delivery-control issue is separately authorised, the intended bounded delivery shape is:
+The reviewed delivery used the intended bounded shape:
 
 ```text
 1. Canonical series builder + validator
@@ -340,6 +350,13 @@ Implementation is not authorised by this roadmap promotion. After this roadmap c
    - delivery-graph disposition under existing compact graph rules
    - roadmap/backlog reconciliation
 ```
+
+Delivery evidence:
+
+- Slice 1: #419 / PR #420;
+- Slice 2: #421 / PR #422, validation `31920585985`;
+- Slice 3: #423 / PR #425, validation `31922157164`, substantive approval comment `5305361850`;
+- Slice 4 close-out: #426.
 
 No public-site integration slice belongs to Phase 11.
 
@@ -375,22 +392,30 @@ Mitigation: explicitly exclude providers/models, credentials, acquisition, selec
 
 ## Definition of done
 
-Phase 11 is complete only when:
+Phase 11 is complete because:
 
-- [ ] the roadmap spec and separately authorised parent delivery-control issue exist;
-- [ ] bounded implementation/proof issues exist only after their own governance gates;
-- [ ] implementation PRs are merged after exact-head validation and independent review;
-- [ ] the canonical series and renderer contracts are validated fail closed;
-- [ ] offline proof records all required gap/degraded/ambiguity/continuity/tamper evidence;
-- [ ] deterministic repeatability is proved from immutable repository evidence;
-- [ ] no network/provider/model call or credential is required;
-- [ ] Phase 10, selector, snapshot/acquisition, report/site/workflow/publication boundaries remain unchanged;
-- [ ] the Phase 11 delivery record is added under `planning/delivery/`;
-- [ ] `planning/delivery-log.md` is updated;
-- [ ] `planning/delivery/delivery.yaml` is updated, or explicitly marked not applicable under the existing compact graph rules;
-- [ ] `planning/delivery/graph.md` is regenerated if `delivery.yaml` changes;
-- [ ] roadmap/backlog state is reconciled after close-out;
-- [ ] generated `_site/` output is not committed.
+- [x] the roadmap spec and separately authorised parent delivery-control issue exist;
+- [x] bounded implementation/proof issues were created only after their own governance gates;
+- [x] implementation/proof PRs were merged after exact-head validation and substantive review;
+- [x] the canonical series and renderer contracts are validated fail closed;
+- [x] offline proof records all required gap/degraded/ambiguity/continuity/tamper evidence;
+- [x] deterministic repeatability is proved from immutable repository evidence;
+- [x] no network/provider/model call or credential is required;
+- [x] Phase 10, selector, snapshot/acquisition, report/site/workflow/publication boundaries remain unchanged;
+- [x] the Phase 11 delivery record is added under `planning/delivery/`;
+- [x] `planning/delivery-log.md` is updated;
+- [x] `planning/delivery/delivery.yaml` is explicitly not applicable under the existing compact graph rules because Phase 11 remains outside the active causal delivery pipeline;
+- [x] `planning/delivery/graph.md` remains unchanged because `delivery.yaml` is unchanged;
+- [x] roadmap/backlog state is reconciled after close-out;
+- [x] generated `_site/` output is not committed.
+
+## Close-out evidence
+
+Phase 11 closes on trusted implementation/proof `main` `972ec1240d6f227798dca894a711028824c77645` before the documentation-only close-out candidate. Slice 3 exact-head full repository validation `31922157164` succeeded. The closed proof corpus binds independent canonical-series and renderer bytes to frozen SHA-256 identities and preserves all reviewed Phase 10/11 fail-closed boundaries.
+
+`planning/delivery/delivery.yaml` and generated `planning/delivery/graph.md` remain unchanged with disposition **N/A under the existing compact causal graph rules** because Phase 11 is an offline evidence/rendering capability rather than an active ingestion/report/site/publication dependency.
+
+No successor phase is selected or authorised by this close-out.
 
 ## Follow-on boundary
 
