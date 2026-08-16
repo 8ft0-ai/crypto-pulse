@@ -23,6 +23,7 @@ from crypto_observation_hour_series import (
     SERIES_SCHEMA_VERSION,
     SOURCE_IDENTITIES,
     ObservationHourSeriesError,
+    _continuity,
     build_observation_hour_series,
     canonical_json_bytes,
     series_id_for_record,
@@ -120,6 +121,23 @@ class ObservationHourSeriesTests(unittest.TestCase):
         self.assertEqual(len(COMPARISON_GAP_MAP), 12)
         self.assertEqual(len(METRIC_GAP_MAP), 4)
 
+    def test_all_series_keys_build_and_validate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, commit = _repo(tmp)
+            slot = _slot(BASE)
+            for series_key in METRIC_IDENTITIES:
+                with self.subTest(series_kind="metric", series_key=series_key):
+                    record = build_observation_hour_series(
+                        repo, commit, "metric", series_key, slot, slot
+                    )
+                    validate_observation_hour_series(repo, record)
+            for series_key in SOURCE_IDENTITIES:
+                with self.subTest(series_kind="source-status", series_key=series_key):
+                    record = build_observation_hour_series(
+                        repo, commit, "source-status", series_key, slot, slot
+                    )
+                    validate_observation_hour_series(repo, record)
+
     def test_window_bounds_and_unknown_vocabulary_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo, commit = _repo(tmp)
@@ -162,6 +180,72 @@ class ObservationHourSeriesTests(unittest.TestCase):
             self.assertIsInstance(entry["value"]["datum"], str)
             validate_observation_hour_series(repo, record)
 
+    def test_all_comparison_failures_map_to_closed_gaps(self) -> None:
+        context = {"commit_sha": "b" * 40}
+        for status, reason in COMPARISON_GAP_MAP.items():
+            comparison = {
+                "comparison_status": status,
+                "repository_context": context,
+                "current": None,
+                "predecessor": None,
+            }
+            with self.subTest(status=status):
+                with mock.patch(
+                    "crypto_observation_hour_series.build_observation_hour_comparison",
+                    return_value=comparison,
+                ):
+                    record = build_observation_hour_series(
+                        Path("."),
+                        "b" * 40,
+                        "metric",
+                        "BTC.price_usd",
+                        "2026-01-01T00:00:00Z",
+                        "2026-01-01T00:00:00Z",
+                    )
+                self.assertIsNone(record["entries"][0]["value"])
+                self.assertEqual(record["entries"][0]["gap"]["reason"], reason)
+
+    def test_all_metric_failures_map_to_closed_gaps_without_raw_value_bypass(self) -> None:
+        identity = METRIC_IDENTITIES["BTC.price_usd"]
+        context = {"commit_sha": "b" * 40}
+        for state, reason in METRIC_GAP_MAP.items():
+            comparison = {
+                "comparison_status": "comparison-available",
+                "comparison_id": "a" * 64,
+                "repository_context": context,
+                "current": {"path": "current"},
+                "predecessor": {"path": "pred"},
+                "metric_comparisons": [{
+                    "family": identity[0],
+                    "symbol": identity[1],
+                    "field": identity[2],
+                    "predecessor": {"present": True, "value": 1},
+                    "current": {"present": True, "value": 999},
+                    "comparison_state": state,
+                    "relation": None,
+                }],
+                "source_availability_changes": [],
+            }
+            with self.subTest(state=state):
+                with mock.patch(
+                    "crypto_observation_hour_series.build_observation_hour_comparison",
+                    return_value=comparison,
+                ):
+                    record = build_observation_hour_series(
+                        Path("."),
+                        "b" * 40,
+                        "metric",
+                        "BTC.price_usd",
+                        "2026-01-01T00:00:00Z",
+                        "2026-01-01T00:00:00Z",
+                    )
+                self.assertIsNone(record["entries"][0]["value"])
+                self.assertEqual(record["entries"][0]["gap"]["reason"], reason)
+                self.assertEqual(
+                    record["entries"][0]["gap"]["metric_evidence"]["current"]["value"],
+                    999,
+                )
+
     def test_missing_and_duplicate_slots_propagate_from_slice1(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo, commit = _repo(tmp, [BASE - timedelta(minutes=50)])
@@ -178,53 +262,81 @@ class ObservationHourSeriesTests(unittest.TestCase):
             self.assertEqual(record["entries"][0]["gap"]["reason"], "phase13-current-ambiguous")
             self.assertEqual(len(record["entries"][0]["gap"]["comparison"]["current_candidates"]), 2)
 
-    def test_degraded_side_evidence_is_retained(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            _git(repo, "init", "-q")
-            _git(repo, "config", "user.email", "phase13@example.invalid")
-            _git(repo, "config", "user.name", "Phase 13 tests")
-            for ref in PINNED_REFS.values():
-                target = repo / ref["path"]
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / ref["path"], target)
-            _write_snapshot(repo, BASE - timedelta(minutes=50), fixture="valid_degraded_optional_source_warning.json")
-            _write_snapshot(repo, BASE)
-            _git(repo, "add", ".")
-            _git(repo, "commit", "-q", "-m", "fixture")
-            commit = _git(repo, "rev-parse", "HEAD").decode().strip()
-            record = build_observation_hour_series(repo, commit, "metric", "BTC.price_usd", _slot(BASE), _slot(BASE))
-            comparison = record["entries"][0]["value"]["comparison"]
-            self.assertEqual(comparison["predecessor"]["quality_status"], "valid-degraded")
-            self.assertTrue(comparison["predecessor"]["non_blocking_warnings"])
+    def test_degraded_side_evidence_is_retained_for_current_and_predecessor(self) -> None:
+        for degraded_side in ("current", "predecessor"):
+            with self.subTest(degraded_side=degraded_side):
+                with tempfile.TemporaryDirectory() as tmp:
+                    repo = Path(tmp)
+                    _git(repo, "init", "-q")
+                    _git(repo, "config", "user.email", "phase13@example.invalid")
+                    _git(repo, "config", "user.name", "Phase 13 tests")
+                    for ref in PINNED_REFS.values():
+                        target = repo / ref["path"]
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(ROOT / ref["path"], target)
+                    predecessor_fixture = (
+                        "valid_degraded_optional_source_warning.json"
+                        if degraded_side == "predecessor"
+                        else "valid_ok_snapshot.json"
+                    )
+                    current_fixture = (
+                        "valid_degraded_optional_source_warning.json"
+                        if degraded_side == "current"
+                        else "valid_ok_snapshot.json"
+                    )
+                    _write_snapshot(
+                        repo,
+                        BASE - timedelta(minutes=50),
+                        fixture=predecessor_fixture,
+                    )
+                    _write_snapshot(repo, BASE, fixture=current_fixture)
+                    _git(repo, "add", ".")
+                    _git(repo, "commit", "-q", "-m", "fixture")
+                    commit = _git(repo, "rev-parse", "HEAD").decode().strip()
+                    record = build_observation_hour_series(
+                        repo,
+                        commit,
+                        "metric",
+                        "BTC.price_usd",
+                        _slot(BASE),
+                        _slot(BASE),
+                    )
+                    comparison = record["entries"][0]["value"]["comparison"]
+                    self.assertEqual(
+                        comparison[degraded_side]["quality_status"],
+                        "valid-degraded",
+                    )
+                    self.assertTrue(
+                        comparison[degraded_side]["non_blocking_warnings"]
+                    )
 
-    def test_metric_failure_never_uses_raw_current_value(self) -> None:
-        identity = METRIC_IDENTITIES["BTC.price_usd"]
-        comparison = {
-            "comparison_status": "comparison-available",
-            "comparison_id": "a" * 64,
-            "repository_context": {"commit_sha": "b" * 40},
-            "current": {"path": "current"},
-            "predecessor": {"path": "pred"},
-            "metric_comparisons": [{
-                "family": identity[0],
-                "symbol": identity[1],
-                "field": identity[2],
-                "predecessor": {"present": True, "value": 1},
-                "current": {"present": True, "value": 999},
-                "comparison_state": "invalid-current",
-                "relation": None,
-            }],
-            "source_availability_changes": [],
+    def test_continuity_requires_field_for_field_identity(self) -> None:
+        identity = {
+            "path": "data/crypto/hourly/current.json",
+            "sha256": "a" * 64,
+            "schema_version": "0.2",
+            "generated_at_utc": "2026-01-01T00:20:00Z",
+            "observation_hour_utc": "2026-01-01T00:00:00Z",
+            "quality_status": "valid-ok",
+            "non_blocking_warnings": [],
         }
-        with mock.patch("crypto_observation_hour_series.build_observation_hour_comparison", return_value=comparison):
-            record = build_observation_hour_series(
-                Path("."), "b" * 40, "metric", "BTC.price_usd",
-                "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"
-            )
-        self.assertIsNone(record["entries"][0]["value"])
-        self.assertEqual(record["entries"][0]["gap"]["reason"], "metric-invalid-current")
-        self.assertEqual(record["entries"][0]["gap"]["metric_evidence"]["current"]["value"], 999)
+        continuous = _continuity(
+            1,
+            {"current": copy.deepcopy(identity)},
+            {"predecessor": copy.deepcopy(identity)},
+        )
+        self.assertEqual(continuous["status"], "continuous")
+        changed = copy.deepcopy(identity)
+        changed["quality_status"] = "valid-degraded"
+        changed["non_blocking_warnings"] = ["source warning"]
+        discontinuous = _continuity(
+            1,
+            {"current": copy.deepcopy(identity)},
+            {"predecessor": changed},
+        )
+        self.assertEqual(discontinuous["status"], "discontinuous")
+        self.assertEqual(discontinuous["previous_current"], identity)
+        self.assertEqual(discontinuous["current_predecessor"], changed)
 
     def test_discontinuity_and_tamper_are_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
