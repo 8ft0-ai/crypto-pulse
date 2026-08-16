@@ -40,17 +40,13 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-There is no active Phase 11 implementation authority. Phase 10 is complete. Phase 11 — deterministic temporal visualisation — is the sole owner-approved shaping direction after the design gate in #416 accepted `phase11-temporal-visualisation/v1` in comment `5304820349`.
+There is no active successor phase selected. Phase 11 — deterministic temporal visualisation — is complete under #418/#428 and the frozen `phase11-temporal-visualisation/v1` design. Its offline `crypto-temporal-series/v1` evidence, deterministic accessible renderer and closed repeatability proof are recorded in `planning/delivery/phase-11-deterministic-temporal-visualisation.md`.
 
-The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`, and Phase 10 remains the frozen deterministic previous-hour comparison boundary. Phase 11 may only consume that evidence offline under the reviewed contract; it does not enable a model/provider path, automatic report generation, scheduling, publication, site integration or auto-merge.
+The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`, Phase 10 remains the frozen deterministic previous-hour comparison boundary, and Phase 11 remains an offline consumer of that evidence only. No model/provider path, automatic report generation, scheduling, publication, site integration or auto-merge is enabled by Phase 11 close-out.
 
 ## Active roadmap direction
 
-| Phase | Status | Planning record | Delivery record |
-| --- | --- | --- | --- |
-| Phase 11 — Deterministic temporal visualisation | Shaping; design accepted under #416; implementation separately gated | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) | Pending |
-
-Phase 11 is bounded to a canonical `crypto-temporal-series/v1` record built from replayed Phase 10 comparison evidence, plus deterministic offline accessible HTML/SVG rendering and a closed repeatability proof corpus. It must preserve exact-hour gaps, ambiguity, side-specific degraded evidence and predecessor/current identity continuity without interpolation, aggregation, smoothing, normalisation, inferred values or raw-snapshot success bypasses.
+No phase is currently selected for active delivery. A future direction must be promoted from the backlog or newly shaped under separate owner authority.
 
 ## Completed roadmap directions
 
@@ -60,8 +56,9 @@ Phase 11 is bounded to a canonical `crypto-temporal-series/v1` record built from
 | Phase 6 — Deterministic claim candidates and bounded model selection | Complete; deterministic selector retained | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) | [../delivery/phase-06-deterministic-claim-selection.md](../delivery/phase-06-deterministic-claim-selection.md) |
 | Phase 9 — GPT-OSS quality and stability comparison | Complete; `no-stable-material-uplift` | [phase-09-gpt-oss-quality-decision.md](phase-09-gpt-oss-quality-decision.md) | [../delivery/phase-09-gpt-oss-quality-comparison.md](../delivery/phase-09-gpt-oss-quality-comparison.md) |
 | Phase 10 — Deterministic previous-hour comparison engine | Complete; exact-hour deterministic comparison evidence | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | [../delivery/phase-10-previous-hour-comparison.md](../delivery/phase-10-previous-hour-comparison.md) |
+| Phase 11 — Deterministic temporal visualisation | Complete; deterministic offline temporal evidence and rendering | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) | [../delivery/phase-11-deterministic-temporal-visualisation.md](../delivery/phase-11-deterministic-temporal-visualisation.md) |
 
-Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. It retains immutable repository and exact-byte provenance, explicit fail-closed states, deterministic metric/source evidence and stable comparison identity. Phase 11 is the separately governed offline consumer selected after that capability was closed.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. It retains immutable repository and exact-byte provenance, explicit fail-closed states, deterministic metric/source evidence and stable comparison identity. Phase 11 consumes that boundary offline through immutable Phase 10 replay, explicit hourly gaps and deterministic accessible rendering; public/site integration remains separately parked.
 
 ## Superseded active direction
 
@@ -84,7 +81,7 @@ Ideas that are useful but not ready for an active phase are parked in:
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without expanding the current Phase 11 shaping scope.
+Use the backlog to preserve follow-on ideas without selecting or expanding a successor phase implicitly.
 
 ## Retrospective roadmap specs
 

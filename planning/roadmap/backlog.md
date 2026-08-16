@@ -2,7 +2,7 @@
 
 This backlog parks ideas that are useful but outside the currently approved direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-Phase 11 — deterministic temporal visualisation — is the current shaping direction under #416. Phase 10 is complete, the Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use. Phase 11 remains offline and does not authorise site/publication integration.
+Phase 11 — deterministic temporal visualisation — is complete under #418/#428. Phase 10 remains the frozen previous-hour comparison boundary, the Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use. No successor phase is selected by Phase 11 close-out.
 
 ## Candidate future phases
 
@@ -18,11 +18,11 @@ Compare consecutive validated snapshots deterministically to identify changes in
 
 Status: complete. Delivered under Phase 10 with the frozen exact-hour, immediate-prior, no-skip/no-fallback contract. See `phase-10-previous-hour-comparison.md` and `../delivery/phase-10-previous-hour-comparison.md`.
 
-### Deterministic charts and visual market cards — promoted to Phase 11 shaping
+### Deterministic charts and visual market cards — offline foundation delivered as Phase 11
 
 Generate deterministic temporal visual evidence from the frozen Phase 10 comparison boundary.
 
-Status: the bounded offline portion is promoted into Phase 11 under #416 and `phase-11-deterministic-temporal-visualisation.md`. Phase 11 is limited to canonical `crypto-temporal-series/v1` evidence, deterministic accessible HTML/SVG proof rendering and repeatability validation. Public-site integration, publication paths and broader visual market-card product work remain parked and require separate governance after Phase 11 proof.
+Status: the bounded offline foundation is complete under Phase 11 and `phase-11-deterministic-temporal-visualisation.md`. Phase 11 delivered canonical `crypto-temporal-series/v1` evidence, deterministic accessible HTML/SVG proof rendering and closed repeatability validation. Public-site integration, publication paths and broader visual market-card product work remain parked and require separate governance after Phase 11 proof.
 
 ### Technical-level calculation policy
 
@@ -34,7 +34,7 @@ Why parked: Technical levels are close to trading signals. Any future implementa
 
 Define a controlled vocabulary for conditions such as `risk-on`, `risk-off`, `mixed`, `leverage elevated` or `breadth weakening`, backed by explicit evidence thresholds.
 
-Why parked: Classification should be deterministic first and narrative second. The repository should first establish stable temporal comparison evidence and separately approve any threshold taxonomy.
+Why parked: Phase 11 now provides stable deterministic temporal comparison evidence, but any sentiment/risk taxonomy would still introduce new interpretation semantics. It requires its own threshold policy, validation contract and separate owner approval.
 
 ### LLM safety and moderation pass
 
@@ -74,14 +74,14 @@ Why parked: There is no active generated-narrative delivery path to optimise. Re
 
 ## Parking lot from the original analyst prompt
 
-These original prompt features should stay parked until deterministic evidence exists and any additional governance requirements are separately approved:
+These original prompt features remain parked despite the completed deterministic Phase 10/11 evidence foundations. Each still requires separate product, evidence and governance decisions before implementation:
 
 - live or most-recent data collection by a model;
 - model-selected credible sources;
 - ongoing event summaries from news feeds;
 - whale, treasury or exchange-wallet movements;
 - ETF flow updates;
-- public/site chart integration beyond the bounded offline Phase 11 proof;
+- public/site chart integration beyond the completed offline Phase 11 proof;
 - support and resistance levels;
 - trader watchlists;
 - causal claims about why price moved;

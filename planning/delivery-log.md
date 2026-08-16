@@ -265,3 +265,39 @@ Delivery notes:
 - Close-out review found one enforcement gap for additional asset/stablecoin identities; #411/PR #413 corrected it so supported identities are exactly BTC/ETH/SOL and USDT/USDC and unknown additional identities fail `pair-semantics-incompatible`, without widening the frozen contract.
 - No provider/model call, credential, workflow, snapshot, selector, report/site, publication or generated `_site/` change was required.
 - `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 10 is an offline evidence capability not yet integrated as a causal dependency in the active delivery pipeline.
+
+## Phase 11 — Deterministic temporal visualisation
+
+Status: complete.
+
+Primary outcome: repository code now converts replayed Phase 10 comparison evidence into canonical deterministic hourly temporal series and deterministic accessible offline HTML/SVG/table output without raw-snapshot success bypass, inferred values or provider/model/network calls.
+
+```text
+Parent issue: #418
+Close-out issue: #428
+Implementation/proof issues: #419, #421, #423
+Implementation/proof PRs: #420, #422, #425
+Slice 1 merge: fbdf09cef53a5d3bd826118472fac25063d688d6
+Slice 1 exact-head validation: 31919416387
+Slice 2 merge: fc16e65dea5c8294748040fbda2650c2b7a91cbb
+Slice 2 exact-head validation: 31920585985
+Slice 3 proof merge: 972ec1240d6f227798dca894a711028824c77645
+Slice 3 exact-head validation: 31922157164
+Proof corpus: phase11-temporal-series-proof-corpus/v1
+Delivery record: planning/delivery/phase-11-deterministic-temporal-visualisation.md
+Delivery graph update: N/A under compact causal graph rules
+_site committed: no
+```
+
+Delivery notes:
+
+- `crypto-temporal-series/v1` binds one immutable repository commit/tree plus pinned Phase 10 validator/config identities, exact inclusive UTC-hour windows and one explicit value-or-gap entry per requested slot.
+- A unique current candidate is evaluated only through the existing Phase 10 comparison path; raw snapshot metrics never substitute for unavailable comparison evidence.
+- Missing, ambiguous, invalid, incompatible and metric-unavailable states remain explicit under the frozen gap vocabulary and precedence, while current/predecessor `valid-degraded` quality and warnings remain independently attributable.
+- Numeric line continuity requires exact later-predecessor/earlier-current identity equality. Gaps and identity discontinuities break segments, and no interpolation, aggregation, smoothing, normalisation, backfill or inferred value is introduced.
+- Source status remains categorical and is rendered with text/shape semantics rather than a numeric market axis.
+- PR #425 proves success, degraded, missing, ambiguity, failure mapping, continuity, tamper rejection, accessible table equivalence and independent exact-byte repeatability across synthetic immutable repositories.
+- Frozen proof outputs are bound by exact byte length plus SHA-256, including numeric canonical `8c7402db6690d888d9c5811e5d581fafd18b782d6ff8acf269d3b3511403b0d5` and renderer `a86ff5f22517ca5bc9a873a73cc5ee2d2b50c3e39ceca3ca5bc37cfdd69297db` identities.
+- Phase 10 semantics, deterministic selector behaviour, snapshots/acquisition, providers/models/credentials, reports/site, workflows/publication and generated `_site/` remain unchanged.
+- `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 11 is an offline evidence/rendering capability and is not a causal dependency of the active ingestion/report/site/publication pipeline.
+- Public/site chart integration remains parked for separate governance; no successor phase is selected by this close-out.
