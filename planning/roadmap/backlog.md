@@ -1,8 +1,8 @@
 # CryptoPulse roadmap backlog
 
-This backlog parks ideas that are useful but outside any currently selected delivery phase. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
+This backlog parks ideas that are useful but outside the currently selected Phase 13 shaping/delivery-planning direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots now carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use. No successor phase is selected by Phase 12 close-out.
+Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots now carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is now selected for shaping/delivery planning under #443/#444, but is not yet implemented. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is currently approved for operational use.
 
 ## Candidate future phases
 
@@ -18,13 +18,13 @@ Compare consecutive validated snapshots deterministically to identify changes in
 
 Status: complete. Delivered under Phase 10 with the frozen exact-hour, immediate-prior, no-skip/no-fallback contract. See `phase-10-previous-hour-comparison.md` and `../delivery/phase-10-previous-hour-comparison.md`.
 
-### Observation-hour comparison / temporal consumer — prerequisite delivered, consumer still parked
+### Observation-hour comparison / temporal consumer — promoted as Phase 13
 
 Use validated `phase12-observation-hour/v1` identity to define an operational cadence-aware comparison/temporal contract for future slot-ready snapshots.
 
-Status: Phase 12 delivered the prerequisite identity and rolling-ingestion enforcement only. It deliberately did not reinterpret Phase 10 actual-time predecessor semantics or Phase 11 exact-hour temporal semantics.
+Status: promoted into the active Phase 13 roadmap direction under #443/#444 as **Phase 13 — deterministic observation-hour comparison and temporal evidence**. The accepted design defines exact adjacent observation-hour selection, explicit missing/duplicate/invalid evidence, immutable provenance, deterministic comparison/series records and offline proof while preserving frozen Phase 10/11 v1 semantics.
 
-Why parked: a consumer must define missing/duplicate observation-hour handling, predecessor/continuity semantics, immutable provenance, versioning and fail-closed proof as a new separately reviewed contract. It must not silently substitute observation-hour adjacency for Phase 10's frozen exact `3,600`-second actual-time rule.
+Phase 13 is not yet implemented. Public/site integration remains outside Phase 13 and separately parked below.
 
 ### Deterministic charts and visual market cards — offline foundation delivered in Phase 11
 
@@ -32,9 +32,9 @@ Generate deterministic temporal visual evidence from the frozen Phase 10 compari
 
 Status: the bounded offline foundation is complete under Phase 11. `crypto-temporal-series/v1`, repository-bound replay validation, deterministic accessible HTML/SVG rendering and the closed repeatability proof corpus are delivered and recorded in `../delivery/phase-11-deterministic-temporal-visualisation.md`.
 
-Operational prerequisite: Phase 12 now provides future slot-ready observation-hour identity, but no observation-hour comparison/temporal consumer exists yet.
+Operational prerequisite: Phase 12 provides future slot-ready observation-hour identity and Phase 13 is now selected to build the separately versioned observation-hour comparison/temporal consumer.
 
-Still parked: public-site integration, publication paths and broader visual market-card product work. Before any public use of the proven renderer, a separately governed consumer must define and prove how validated observation-hour evidence is compared/consumed without silently reinterpreting Phase 10/11 v1 semantics.
+Still parked: public-site integration, publication paths and broader visual market-card product work. These remain separately governed even after Phase 13 is delivered and proved; no public use of the renderer is selected by Phase 13.
 
 ### Technical-level calculation policy
 
@@ -86,14 +86,14 @@ Why parked: There is no active generated-narrative delivery path to optimise. Re
 
 ## Parking lot from the original analyst prompt
 
-These original prompt features remain parked after completion of the Phase 10–12 evidence foundations. Each requires separate product, evidence and governance decisions before implementation:
+These original prompt features remain parked after completion of the Phase 10–12 evidence foundations and selection of Phase 13. Each requires separate product, evidence and governance decisions before implementation:
 
 - live or most-recent data collection by a model;
 - model-selected credible sources;
 - ongoing event summaries from news feeds;
 - whale, treasury or exchange-wallet movements;
 - ETF flow updates;
-- public/site chart integration beyond the delivered offline Phase 11 capability;
+- public/site chart integration beyond the delivered offline Phase 11 capability and selected Phase 13 evidence consumer;
 - support and resistance levels;
 - trader watchlists;
 - causal claims about why price moved;
