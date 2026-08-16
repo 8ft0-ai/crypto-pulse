@@ -40,19 +40,17 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-Phase 12 — canonical observation-hour evidence — is the sole active shaping direction after #431 accepted `phase12-observation-hour/v1` in comment `5305450450` and separately authorised roadmap promotion in comment `5305450958`.
+There is no active successor phase selected. Phase 12 — canonical observation-hour evidence — is complete under #436/#441 and `phase12-observation-hour/v1`.
 
-Phase 12 addresses an operational prerequisite discovered after Phase 11: real source snapshots preserve actual runtime `run.generated_at_utc`, while the frozen Phase 10/11 v1 contracts use strict actual-time and exact-hour semantics. Phase 12 may add a truthful future-snapshot `run.observation_hour_utc` containing-hour identity while preserving actual generation/fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities.
+Phase 12 now gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
 
-Phase 12 does **not** make Phase 10/11 v1 a live hourly temporal pipeline. Any future comparison or temporal consumer that uses observation-hour identity requires a new separately reviewed versioned contract. Public/site integration of the proven Phase 11 renderer therefore remains parked.
+Phase 12 does **not** make Phase 10/11 v1 a live hourly temporal pipeline. Phase 10 still uses actual timestamps and exact `3,600`-second predecessor semantics, while Phase 11 remains the frozen offline temporal evidence/rendering capability. Any observation-hour comparison or temporal consumer requires a new separately reviewed versioned contract before public/site integration can be reconsidered.
 
-The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`, Phase 10 remains the frozen deterministic previous-hour comparison boundary, and Phase 11 remains the completed offline temporal evidence/rendering capability.
+The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`.
 
 ## Active roadmap direction
 
-| Phase | Status | Planning record | Delivery record |
-| --- | --- | --- | --- |
-| Phase 12 — Canonical observation-hour evidence | Shaping; design accepted under #431; implementation separately gated | [phase-12-canonical-observation-hour-evidence.md](phase-12-canonical-observation-hour-evidence.md) | Pending |
+No phase is currently selected for active delivery. A future direction must be promoted from the backlog or newly shaped under separate owner authority.
 
 ## Completed roadmap directions
 
@@ -63,10 +61,9 @@ The deterministic selector delivered in Phase 6 remains the sole active selector
 | Phase 9 — GPT-OSS quality and stability comparison | Complete; `no-stable-material-uplift` | [phase-09-gpt-oss-quality-decision.md](phase-09-gpt-oss-quality-decision.md) | [../delivery/phase-09-gpt-oss-quality-comparison.md](../delivery/phase-09-gpt-oss-quality-comparison.md) |
 | Phase 10 — Deterministic previous-hour comparison engine | Complete; exact-hour deterministic comparison evidence | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | [../delivery/phase-10-previous-hour-comparison.md](../delivery/phase-10-previous-hour-comparison.md) |
 | Phase 11 — Deterministic temporal visualisation | Complete; offline deterministic temporal evidence/rendering proof | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) | [../delivery/phase-11-deterministic-temporal-visualisation.md](../delivery/phase-11-deterministic-temporal-visualisation.md) |
+| Phase 12 — Canonical observation-hour evidence | Complete; future snapshot cadence-bucket identity and enforcement | [phase-12-canonical-observation-hour-evidence.md](phase-12-canonical-observation-hour-evidence.md) | [../delivery/phase-12-canonical-observation-hour-evidence.md](../delivery/phase-12-canonical-observation-hour-evidence.md) |
 
-Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering while preserving explicit gaps, ambiguity, side-specific degraded evidence and exact identity continuity.
-
-Neither Phase 10 nor Phase 11 is integrated as a causal dependency of the active report/site/publication path. Phase 12 is limited to establishing honest future operational cadence-bucket evidence and grants no publication authority.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity, but deliberately leaves observation-hour comparison/consumption undefined for later governance.
 
 ## Superseded active direction
 
@@ -83,13 +80,13 @@ The chronology and lessons remain recorded in:
 
 ## Backlog
 
-Ideas that are useful but not ready for the active Phase 12 evidence prerequisite are parked in:
+Ideas that are useful but not ready for an active phase are parked in:
 
 ```text
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without expanding Phase 12 into a comparison consumer, site integration or other successor capability implicitly.
+Use the backlog to preserve follow-on ideas without selecting an observation-hour consumer, site integration or other successor capability implicitly.
 
 ## Retrospective roadmap specs
 

@@ -44,6 +44,11 @@ flowchart LR
   boundary_no_advice_like_content["Boundary\nNo advice-like report content"]
   lesson_source_snapshots_as_evidence["Lesson\nTreat source snapshots as immutable evidence"]
   lesson_layered_validation["Lesson\nTreat pre-PR proof and downstream validation as layered controls"]
+  phase_12["Phase\nPhase 12 — Canonical observation-hour evidence"]
+  issue_436["Issue #436\nPhase 12 delivery control — canonical observation-hour evidence"]
+  pr_440["PR #440\nEnforce Phase 12 observation-hour workflow evidence"]
+  artifact_observation_hour_validator["Artifact\nObservation-hour evidence validator"]
+  boundary_observation_hour_identity["Boundary\nObservation-hour identity preserves actual time"]
 
   pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
@@ -86,4 +91,10 @@ flowchart LR
   phase_3 -->|preserved| boundary_no_llm_report_narrative
   phase_3 -->|preserved| boundary_no_advice_like_content
   phase_3 -->|carried forward| lesson_layered_validation
+  phase_1 -->|extended source evidence spine| phase_12
+  phase_12 -->|governed by| issue_436
+  phase_12 -->|proved rolling enforcement| pr_440
+  phase_12 -->|implemented by| artifact_observation_hour_validator
+  phase_12 -->|established| boundary_observation_hour_identity
+  phase_12 -->|preserved| boundary_no_committed_site
 ```

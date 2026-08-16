@@ -299,3 +299,38 @@ Delivery notes:
 - No provider/model call, credential, source snapshot/acquisition, selector, report/site, workflow/publication or generated `_site/` change was required.
 - `planning/delivery/delivery.yaml` and `planning/delivery/graph.md` remain unchanged because Phase 11 is an offline deterministic evidence/rendering capability and has not become a causal dependency of the active ingestion/report/site/publication pipeline.
 - Public/site integration of the proven temporal renderer and broader visual market-card product work remain parked for separate future governance. No successor phase is selected by Phase 11 close-out.
+
+## Phase 12 — Canonical observation-hour evidence
+
+Status: complete.
+
+Primary outcome: future source snapshots now preserve actual generation/fetch timing while adding a separately validated canonical UTC containing-hour identity before rolling PR publication.
+
+```text
+Discovery/shaping issues: #430, #431
+Roadmap promotion: #432 / PR #435
+Parent issue: #436
+Implementation issues: #437, #439
+Close-out issue: #441
+Implementation PRs: #438, #440
+Slice 1 merge: 188d2c824e7bca30fdfd2ee6e1ab36006d314a6c
+Slice 1 exact-head validation: 31924056018
+Slice 2 merge: cb251970eb671d39cfcb8650b03b8fa55f6dfa23
+Slice 2 exact-head validation: 31924356028
+Contract: phase12-observation-hour/v1
+Delivery record: planning/delivery/phase-12-canonical-observation-hour-evidence.md
+Delivery graph update: yes — active source-evidence causal boundary
+_site committed: no
+```
+
+Delivery notes:
+
+- New snapshots remain schema `0.2` and keep actual `run.generated_at_utc`, local generation metadata, source `fetched_at_utc`, path naming and source/quality semantics while adding canonical `run.observation_hour_utc`.
+- `scripts/validate_crypto_observation_hour.py` first requires the frozen snapshot validator and then fails closed unless the observation-hour field is canonical and exactly equals the UTC hour containing actual `run.generated_at_utc`.
+- Legacy snapshots remain valid under the frozen validator but are not Phase-12 slot-ready; historical snapshot paths and bytes were not edited or backfilled.
+- Regression proof pins the frozen snapshot-validator/config identities unchanged and covers exact boundary/mid/end-hour derivation, offset normalisation, preserved actual/fetched timestamps and malformed/non-canonical/mismatched rejection.
+- Rolling ingestion now validates observation-hour evidence before PR evidence or any branch/commit/push/PR mutation and shows reviewers both actual generation time and the containing evidence hour.
+- The schedule, manual dispatch, stable rolling branch/PR, snapshot-only commit scope, no-auto-merge, no-report and no-LLM boundaries remain unchanged.
+- Phase 12 does not reinterpret Phase 10's exact `3,600`-second actual-time predecessor rule or Phase 11 temporal semantics and defines no duplicate-hour winner, fallback, interpolation, backfill or live temporal consumer.
+- The compact delivery graph is updated because Phase 12 changes the active source-evidence spine and establishes an enduring evidence boundary that a later separately governed consumer may depend on.
+- Observation-hour comparison/temporal consumption and public/site integration remain parked. No successor phase is selected by this close-out.

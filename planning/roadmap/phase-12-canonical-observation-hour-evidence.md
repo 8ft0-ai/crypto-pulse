@@ -1,6 +1,6 @@
 # Phase 12 — Canonical observation-hour evidence
 
-Status: shaping; design accepted, implementation separately gated.
+Status: complete.
 
 Shaping issue: #431
 
@@ -14,19 +14,25 @@ Roadmap-promotion authority: #431 comment `5305450958`
 
 Trusted design base: `48b027ab8c5d1cff8a30b2ef72236f74c9dff915`
 
-This is a forward-looking roadmap specification. It promotes the reviewed `phase12-observation-hour/v1` design into the roadmap only. It does not authorise implementation, source-snapshot mutation, a new comparison/temporal consumer, public-site integration, publication changes, provider/model use, credentials, auto-merge or generated `_site/` changes.
+Delivery control: #436
+
+Close-out issue: #441
+
+Delivery record: `planning/delivery/phase-12-canonical-observation-hour-evidence.md`
+
+This roadmap specification records the completed `phase12-observation-hour/v1` direction. Implementation was delivered under the separately reviewed three-slice plan on #436. Phase 12 establishes truthful future-snapshot observation-hour identity only; it does not reinterpret frozen Phase 10/11 semantics or authorise a comparison/temporal consumer, public-site integration, provider/model use, credentials, auto-merge or generated `_site/` changes.
 
 ## Problem statement
 
 CryptoPulse source snapshots preserve the actual execution time in `run.generated_at_utc`. The current scheduled ingestion runs during an hour rather than exactly on the UTC-hour boundary, and real repository snapshots therefore carry timestamps such as `2026-07-10T08:44:26Z`.
 
-The frozen Phase 10 predecessor contract orders and measures snapshots by that actual timestamp and accepts exactly `3,600` elapsed seconds. The frozen Phase 11 temporal-series contract requests exact UTC-hour slots and indexes current candidates by exact `run.generated_at_utc` equality. Those contracts are intentionally strict and must not be weakened or reinterpreted merely to make operational data look hourly.
+The frozen Phase 10 predecessor contract orders and measures snapshots by that actual timestamp and accepts exactly `3,600` elapsed seconds. The frozen Phase 11 temporal-series contract requests exact UTC-hour slots and indexes current candidates by exact `run.generated_at_utc` equality. Those contracts are intentionally strict and were not weakened or reinterpreted merely to make operational data look hourly.
 
-Before any live temporal consumer or public chart can be designed safely, future snapshots need an explicit cadence-bucket identity that says which UTC observation hour contains the real generation time while retaining the real generation/fetch timestamps unchanged.
+Phase 12 therefore adds an explicit cadence-bucket identity for future snapshots that says which UTC observation hour contains the real generation time while retaining the real generation/fetch timestamps unchanged.
 
 ## Goal
 
-Prove a small additive operational evidence contract in which future source snapshots can carry:
+Phase 12 delivers a small additive operational evidence contract in which future source snapshots can carry:
 
 ```text
 run.observation_hour_utc
@@ -38,9 +44,9 @@ under:
 phase12-observation-hour/v1
 ```
 
-The field must be deterministic, independently validated and truthful: it identifies the UTC hour containing the actual `run.generated_at_utc`; it is not a claim that collection occurred at the hour boundary.
+The field is deterministic, independently validated and truthful: it identifies the UTC hour containing the actual `run.generated_at_utc`; it is not a claim that collection occurred at the hour boundary.
 
-Phase 12 is successful when future snapshots can be classified as slot-ready evidence without changing historical snapshots, the pinned Phase 10 validator/config identities, or any frozen Phase 10/11 time/comparison/rendering semantics.
+Future snapshots can now be classified as slot-ready evidence without changing historical snapshots, the pinned Phase 10 validator/config identities, or any frozen Phase 10/11 time/comparison/rendering semantics.
 
 ## Non-goals
 
@@ -103,7 +109,7 @@ The new field is an additive metadata extension to source snapshot schema `0.2`.
 
 The existing frozen snapshot validator requires a defined subset of `run` keys and permits additional metadata. The Phase 10 semantic gate continues to require schema `0.2`, cadence `hourly`, the existing producer and closed asset/stablecoin/source identities; it does not assign new meaning to additional `run` metadata.
 
-Phase 12 must not modify:
+Phase 12 did not modify:
 
 ```text
 scripts/validate_crypto_snapshot.py
@@ -116,9 +122,9 @@ A legacy `0.2` snapshot without `run.observation_hour_utc` remains a valid legac
 
 ## Separate fail-closed validation
 
-Phase 12 owns its new semantics in a separate repository validator rather than changing the frozen snapshot validator.
+Phase 12 owns its new semantics in `scripts/validate_crypto_observation_hour.py` rather than changing the frozen snapshot validator.
 
-The Phase 12 validator must first require ordinary snapshot validity under the existing validator/config path, then require:
+The Phase 12 validator first requires ordinary snapshot validity under the existing validator/config path, then requires:
 
 - `run.observation_hour_utc` is present;
 - canonical UTC-hour syntax is exact;
@@ -131,9 +137,9 @@ Validation is deterministic and network-free. Branch names, wall clock, filesyst
 
 Scheduled and manual ingestion derive the observation hour from the same actual generation timestamp used to build the snapshot.
 
-The existing `--now` override remains the deterministic test seam. Offset-aware timestamps are normalised to UTC before deriving the observation hour; existing accepted `--now` behaviour is not silently repurposed into a schedule-time claim.
+The existing `--now` override remains the deterministic test seam. Offset-aware timestamps are normalised to UTC before deriving the observation hour; accepted `--now` behaviour is not repurposed into a schedule-time claim.
 
-No cron change is required merely to establish observation-hour evidence. If a delayed execution crosses an hour boundary, it belongs to the later hour in which it actually executed.
+The existing cron remains unchanged. If a delayed execution crosses an hour boundary, it belongs to the later hour in which it actually executed.
 
 ## Missing, duplicate and delayed observations
 
@@ -151,15 +157,15 @@ There is no fallback to an older observation and no silent winner selection.
 
 Phase 10 v1 continues to use actual `run.generated_at_utc` and still requires exactly `3,600` elapsed seconds. Runtime jitter can therefore make two consecutive observation-hour snapshots fail the frozen Phase 10 predecessor interval even when their observation-hour identities are adjacent.
 
-Accordingly, `phase12-observation-hour/v1` alone does **not** make Phase 10/11 v1 a live hourly temporal pipeline.
+Accordingly, `phase12-observation-hour/v1` does **not** make Phase 10/11 v1 a live hourly temporal pipeline.
 
 Any later comparison or temporal consumer that uses `run.observation_hour_utc` as cadence identity requires a new separately reviewed versioned contract. That future contract may reuse the proven fail-closed, immutable-provenance and explicit-gap principles from Phase 10/11, but it may not silently substitute observation-hour adjacency for frozen actual-time semantics.
 
 Public/site integration remains parked behind that later consumer contract.
 
-## Target workflow
+## Delivered workflow
 
-Subject to separate delivery planning and authority, the intended evidence path is:
+The completed evidence path is:
 
 ```text
 actual generation timestamp
@@ -175,29 +181,34 @@ actual generation timestamp
              Phase 12 slot validator
                        |
                        v
-              reviewed source snapshot PR
+                PR evidence
+                       |
+                       v
+              rolling snapshot PR
 ```
+
+The Phase 12 validator runs before PR evidence and before branch, commit, push or PR mutation.
 
 A later separately governed consumer may use only validated slot-ready evidence under its own versioned semantics.
 
 ## Acceptance gates
 
-- [ ] Future ingestion deterministically emits canonical `run.observation_hour_utc` from the actual generation timestamp.
-- [ ] Actual `run.generated_at_utc` remains unrounded and independently visible.
-- [ ] Existing source fetch timestamps remain unchanged.
-- [ ] A separate Phase 12 validator rejects missing, malformed, non-canonical or mismatched observation-hour identity.
-- [ ] Legacy snapshots continue to pass the frozen snapshot validator but are not classified as Phase-12 slot-ready.
-- [ ] The frozen Phase 10 snapshot-validator and config Git blob identities remain unchanged.
-- [ ] Exact boundary, mid-hour, end-of-hour and offset-normalisation cases are proved deterministically.
-- [ ] Duplicate/missing/delayed observation semantics remain explicit with no winner/fallback rule.
-- [ ] No historical snapshot path or byte is changed.
-- [ ] Rolling workflow evidence exposes both actual generation time and observation hour before a slot-ready snapshot PR can proceed.
-- [ ] Repository-wide exact-head validation succeeds for every implementation candidate.
-- [ ] No Phase 10/11 semantic, site/publication, model/provider, credential or `_site/` change occurs.
+- [x] Future ingestion deterministically emits canonical `run.observation_hour_utc` from the actual generation timestamp.
+- [x] Actual `run.generated_at_utc` remains unrounded and independently visible.
+- [x] Existing source fetch timestamps remain unchanged.
+- [x] A separate Phase 12 validator rejects missing, malformed, non-canonical or mismatched observation-hour identity.
+- [x] Legacy snapshots continue to pass the frozen snapshot validator but are not classified as Phase-12 slot-ready.
+- [x] The frozen Phase 10 snapshot-validator and config Git blob identities remain unchanged.
+- [x] Exact boundary, mid-hour, end-of-hour and offset-normalisation cases are proved deterministically.
+- [x] Duplicate/missing/delayed observation semantics remain explicit with no winner/fallback rule.
+- [x] No historical snapshot path or byte is changed.
+- [x] Rolling workflow evidence exposes both actual generation time and observation hour before a slot-ready snapshot PR can proceed.
+- [x] Repository-wide exact-head validation succeeded for every implementation candidate.
+- [x] No Phase 10/11 semantic, site/publication, model/provider, credential or `_site/` change occurred.
 
-## Anticipated bounded implementation surface
+## Delivered implementation surface
 
-This roadmap does not authorise implementation. Subject to a separately reviewed delivery plan, the minimal expected files are:
+Phase 12 implementation changed only:
 
 ```text
 scripts/ingest_crypto_sources.py
@@ -208,19 +219,28 @@ tests/test_validate_crypto_observation_hour.py
 tests/test_ingest_crypto_sources_workflow.py
 ```
 
-If implementation requires changing a frozen Phase 10/11 file, historical snapshot, report/site path or a wider workflow surface, stop and return to governance rather than widening the phase opportunistically.
+No frozen Phase 10/11 file, historical snapshot, report/site path or broader workflow surface was changed.
 
-## Proposed delivery shape
+## Delivered slices
 
-After roadmap promotion, a separately authorised delivery-control issue should first produce an exact implementation plan. A likely bounded shape is:
+The accepted three-slice plan in #436 comment `5305485934` delivered:
 
 ```text
 1. observation-hour derivation + separate validator
-2. rolling-ingestion workflow evidence and deterministic proof
-3. Phase 12 close-out and roadmap reconciliation
+   PR #438
+   validation 31924056018
+   merge 188d2c824e7bca30fdfd2ee6e1ab36006d314a6c
+
+2. rolling-ingestion workflow evidence and enforcement
+   PR #440
+   validation 31924356028
+   merge cb251970eb671d39cfcb8650b03b8fa55f6dfa23
+
+3. Phase 12 close-out and causal-graph reconciliation
+   close-out issue #441
 ```
 
-Each implementation candidate requires exact-head repository validation, fresh substantive review and separate merge authority.
+Each implementation candidate passed exact-head repository validation and fresh substantive review before separate merge authority.
 
 ## Risks and mitigations
 
@@ -246,19 +266,21 @@ Mitigation: keep site/publication integration explicitly parked until a later co
 
 ## Definition of done
 
-Phase 12 is complete only when:
+Phase 12 is complete:
 
-- [ ] a separately authorised delivery-control issue adopts the accepted `phase12-observation-hour/v1` design without relaxation;
-- [ ] bounded implementation work is merged after exact-head validation and fresh review;
-- [ ] deterministic proof covers the accepted derivation and fail-closed validation cases;
-- [ ] actual timing evidence and historical snapshots remain unchanged;
-- [ ] frozen Phase 10/11 validator/config and evidence contracts remain unchanged;
-- [ ] rolling workflow evidence proves slot-ready snapshots before PR publication;
-- [ ] public/site temporal integration remains unimplemented and separately governed;
-- [ ] close-out delivery records and roadmap state are reconciled;
-- [ ] delivery-graph disposition is reviewed against the final active ingestion dependency rather than assumed in advance;
-- [ ] generated `_site/` output is not committed.
+- [x] a separately authorised delivery-control issue adopted the accepted `phase12-observation-hour/v1` design without relaxation;
+- [x] bounded implementation work merged after exact-head validation and fresh review;
+- [x] deterministic proof covers the accepted derivation and fail-closed validation cases;
+- [x] actual timing evidence and historical snapshots remain unchanged;
+- [x] frozen Phase 10/11 validator/config and evidence contracts remain unchanged;
+- [x] rolling workflow evidence proves slot-ready snapshots before PR publication;
+- [x] public/site temporal integration remains unimplemented and separately governed;
+- [x] close-out delivery records and roadmap state are reconciled;
+- [x] the delivery graph is updated because Phase 12 changes the active source-evidence dependency story;
+- [x] generated `_site/` output is not committed.
 
 ## Follow-on boundary
 
-After Phase 12 proof, a separate shaping gate may decide whether a new observation-hour comparison/temporal contract is justified. Only after that consumer is independently proven may public/site temporal integration be reconsidered.
+A separate shaping gate may decide whether a new observation-hour comparison/temporal contract is justified. Only after that consumer is independently proven may public/site temporal integration be reconsidered.
+
+No successor phase is selected or authorised by Phase 12 close-out.

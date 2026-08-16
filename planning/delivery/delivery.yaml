@@ -247,6 +247,40 @@ nodes:
     title: Treat pre-PR proof and downstream validation as layered controls
     summary: Self-proofing makes generated PRs reviewable before downstream validation, but does not make downstream validation unnecessary.
 
+  - id: phase-12
+    type: phase
+    title: Phase 12 — Canonical observation-hour evidence
+    status: complete
+    summary: Future source snapshots preserve actual generation and fetch timestamps while adding separately validated canonical containing-hour identity for later governed consumers.
+    record: planning/delivery/phase-12-canonical-observation-hour-evidence.md
+
+  - id: issue-436
+    type: issue
+    title: Phase 12 delivery control — canonical observation-hour evidence
+    number: 436
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/436
+    status: closed
+
+  - id: pr-440
+    type: pull_request
+    title: Enforce Phase 12 observation-hour workflow evidence
+    number: 440
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/440
+    status: merged
+    merge_commit: cb251970eb671d39cfcb8650b03b8fa55f6dfa23
+
+  - id: artifact-observation-hour-validator
+    type: artifact
+    title: Observation-hour evidence validator
+    path: scripts/validate_crypto_observation_hour.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-observation-hour-identity
+    type: boundary
+    title: Observation-hour identity preserves actual time
+    summary: Phase 12 identifies the UTC hour containing actual generation time without changing run.generated_at_utc, historical evidence, or frozen Phase 10 exact-time semantics.
+
 edges:
   - from: pre-phase-baseline
     to: phase-1
@@ -452,3 +486,33 @@ edges:
     to: lesson-layered-validation
     type: carried_forward_to
     label: carried forward
+
+  - from: phase-1
+    to: phase-12
+    type: carried_forward_to
+    label: extended source evidence spine
+
+  - from: phase-12
+    to: issue-436
+    type: depends_on
+    label: governed by
+
+  - from: phase-12
+    to: pr-440
+    type: proved_by
+    label: proved rolling enforcement
+
+  - from: phase-12
+    to: artifact-observation-hour-validator
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-12
+    to: boundary-observation-hour-identity
+    type: produced
+    label: established
+
+  - from: phase-12
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
