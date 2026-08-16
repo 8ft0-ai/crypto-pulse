@@ -89,9 +89,25 @@ class IngestCryptoSourcesWorkflowTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertNotIn(marker, self.body)
 
+    def test_observation_hour_validation_and_evidence_are_required(self) -> None:
+        required_markers = [
+            "- name: Validate observation hour",
+            'python scripts/validate_crypto_observation_hour.py "$SNAPSHOT_PATH"',
+            'generated_at_utc = run.get("generated_at_utc", "not recorded")',
+            'observation_hour_utc = run.get("observation_hour_utc", "not recorded")',
+            "Actual `generated_at_utc`: `{generated_at_utc}`",
+            "Containing `observation_hour_utc`: `{observation_hour_utc}`",
+            "`observation_hour_utc` is the canonical UTC hour containing the actual generation time; it is not the exact capture time.",
+            "Ran `python scripts/validate_crypto_observation_hour.py {snapshot_path.as_posix()}`.",
+        ]
+        for marker in required_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.body)
+
     def test_publish_order_remains_safe(self) -> None:
         self.assert_ordered(
             "- name: Validate source snapshot",
+            "- name: Validate observation hour",
             "- name: Build PR evidence",
             "- name: Inspect generated snapshot changes",
             "- name: Create rolling automation branch",
