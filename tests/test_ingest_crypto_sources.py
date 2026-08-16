@@ -83,6 +83,20 @@ class ExchangeCrosscheckIngestionTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["okx"], [])
         self.assertEqual(len(warnings), 3)
 
+    def test_observation_hour_uses_containing_utc_hour(self) -> None:
+        cases = [
+            (datetime(2026, 7, 10, 8, 0, 0, tzinfo=timezone.utc), "2026-07-10T08:00:00Z"),
+            (datetime(2026, 7, 10, 8, 17, 45, tzinfo=timezone.utc), "2026-07-10T08:00:00Z"),
+            (datetime(2026, 7, 10, 8, 59, 59, tzinfo=timezone.utc), "2026-07-10T08:00:00Z"),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(ingest.observation_hour_utc(value), expected)
+
+        offset_value = ingest.utc_now("2026-07-10T19:17:45+10:00")
+        self.assertEqual(ingest.isoformat_utc(offset_value), "2026-07-10T09:17:45Z")
+        self.assertEqual(ingest.observation_hour_utc(offset_value), "2026-07-10T09:00:00Z")
+
     def test_build_snapshot_embeds_computed_quality(self) -> None:
         market = {
             "assets": [
@@ -153,6 +167,12 @@ class ExchangeCrosscheckIngestionTests(unittest.TestCase):
         ):
             snapshot = ingest.build_snapshot(config(), datetime(2026, 7, 8, 4, 34, 52, tzinfo=timezone.utc), "Australia/Sydney")
 
+        self.assertEqual(snapshot["schema_version"], "0.2")
+        self.assertEqual(snapshot["run"]["generated_at_utc"], "2026-07-08T04:34:52Z")
+        self.assertEqual(snapshot["run"]["observation_hour_utc"], "2026-07-08T04:00:00Z")
+        self.assertEqual(snapshot["sources"]["coingecko"]["fetched_at_utc"], "2026-07-08T04:34:52Z")
+        self.assertEqual(snapshot["sources"]["defillama"]["fetched_at_utc"], "2026-07-08T04:34:52Z")
+        self.assertEqual(snapshot["sources"]["coinbase_exchange"]["fetched_at_utc"], "2026-07-08T04:34:52Z")
         self.assertIn("quality", snapshot)
         self.assertEqual(snapshot["quality"]["status"], "valid-ok")
         self.assertEqual(snapshot["quality"]["blocking_issues"], [])

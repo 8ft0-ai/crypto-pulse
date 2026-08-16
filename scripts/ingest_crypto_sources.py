@@ -135,6 +135,16 @@ def isoformat_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def observation_hour_utc(value: datetime) -> str:
+    """Return the canonical UTC hour containing the actual generation time."""
+    return (
+        value.astimezone(timezone.utc)
+        .replace(minute=0, second=0, microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
 def source_status(status: str, fetched_at_utc: datetime | None, **extra: Any) -> dict[str, Any]:
     if status not in SOURCE_STATUS_VALUES:
         raise ValueError(f"Invalid source status: {status}")
@@ -541,6 +551,7 @@ def build_snapshot(config: dict[str, Any], now_utc: datetime, timezone_name: str
         "schema_version": "0.2",
         "run": {
             "generated_at_utc": isoformat_utc(now_utc),
+            "observation_hour_utc": observation_hour_utc(now_utc),
             "generated_at_local": local_now.replace(microsecond=0).isoformat(),
             "timezone": timezone_name,
             "timezone_abbreviation": local_now.tzname(),
