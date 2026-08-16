@@ -40,19 +40,23 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
+Phase 14 — deterministic site publication — is the selected active successor direction under #455/#456 and `deterministic-site-publication/v3`. It is limited to restoring recent deterministic report freshness through immutable publication PRs into `main`, followed by the existing Pages/live-verification path. Implementation must remain inert with activation `disabled` until later separately authorised provisioning, pilot and recurring gates.
+
 Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453. It delivers the separately versioned `phase13-observation-hour-adjacency/v1`, `crypto-observation-hour-comparison/v1` and `crypto-observation-hour-series/v1` evidence family over Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
 
 Phase 12 — canonical observation-hour evidence — remains complete under #436/#441 and `phase12-observation-hour/v1`. It gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
 
-Phase 13 now proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Public/site rendering remains outside the completed phase.
+Phase 13 proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Public/site rendering of that temporal evidence remains outside the completed phase and outside Phase 14.
 
 The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`.
 
 ## Active roadmap direction
 
-No successor phase is currently selected. Any next phase requires separate shaping, acceptance gates, proof path and owner authority.
+Phase 14 — deterministic site publication — is promoted for delivery planning. The accepted design keeps `main` as sole publication authority and introduces only the minimum deterministic promotion boundary required for freshness: immutable trusted-generation attestation, exact-head credential-free PR validation, a metadata-only merge gate, strict stale-base refusal, and a separately provisioned repository-scoped publication App with PR-only trusted-main bypass.
 
-Public/site integration of temporal evidence remains parked and was not authorised by Phase 13.
+Roadmap promotion does not provision the App, create secrets/environments, alter branch protection/rulesets, activate pilot/recurring publication or change production behaviour. Those remain separate gates in the Phase 14 roadmap.
+
+Public/site integration of Phase 11/13 temporal evidence remains parked and was not authorised by Phase 13 or Phase 14.
 
 ## Completed roadmap directions
 
@@ -83,13 +87,13 @@ The chronology and lessons remain recorded in:
 
 ## Backlog
 
-Ideas that are useful but not ready for an active phase are parked in:
+Ideas that are useful but not part of the selected Phase 14 direction are parked in:
 
 ```text
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without implicitly selecting a successor to Phase 13 or authorising public/site integration, model work or another capability.
+Use the backlog to preserve follow-on ideas without broadening Phase 14 into Phase 13 temporal public rendering, model work or another capability.
 
 ## Retrospective roadmap specs
 
