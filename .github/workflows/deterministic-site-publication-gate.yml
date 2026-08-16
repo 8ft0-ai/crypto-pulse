@@ -1,0 +1,276 @@
+name: Deterministic Site Publication Gate
+
+on:
+  workflow_run:
+    workflows:
+      - Validate CryptoPulse PR
+    types:
+      - completed
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: deterministic-site-publication-gate
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Reconstruct immutable publication eligibility
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'automation/deterministic-publication-')
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.policy.outputs.eligible }}
+      pr_number: ${{ steps.identity.outputs.pr_number }}
+      candidate_head_sha: ${{ steps.identity.outputs.candidate_head_sha }}
+      main_base_sha: ${{ steps.identity.outputs.main_base_sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+      PILOT_RUN_ID: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID || '' }}
+
+    steps:
+      - name: Check out trusted default-branch policy only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve trusted generation identity
+        id: branch
+        env:
+          CANDIDATE_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          python scripts/deterministic_site_publication.py branch-identity \
+            --branch "$CANDIDATE_BRANCH" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Fetch immutable attestation and repository metadata
+        id: metadata
+        env:
+          GENERATION_RUN_ID: ${{ steps.branch.outputs.generation_workflow_run_id }}
+          GENERATION_RUN_ATTEMPT: ${{ steps.branch.outputs.generation_workflow_run_attempt }}
+        run: |
+          set -euo pipefail
+
+          work="$RUNNER_TEMP/deterministic-publication-gate"
+          mkdir -p "$work/candidate"
+          cp "$GITHUB_EVENT_PATH" "$work/event.json"
+
+          validation_pr_count="$(jq '.workflow_run.pull_requests | length' "$work/event.json")"
+          if [[ "$validation_pr_count" != "1" ]]; then
+            echo "Expected exactly one pull request on the successful validation run; found $validation_pr_count." >&2
+            exit 1
+          fi
+
+          pr_number="$(jq -r '.workflow_run.pull_requests[0].number' "$work/event.json")"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" > "$work/pr.json"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" > "$work/validation-run.json"
+
+          expected_artifact="deterministic-publication-attestation-${GENERATION_RUN_ID}-${GENERATION_RUN_ATTEMPT}"
+          ready=false
+          for poll in $(seq 1 12); do
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${GENERATION_RUN_ID}" > "$work/generation-run.json"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${GENERATION_RUN_ID}/artifacts" > "$work/artifacts.json"
+
+            generation_status="$(jq -r '.status // ""' "$work/generation-run.json")"
+            generation_conclusion="$(jq -r '.conclusion // ""' "$work/generation-run.json")"
+            artifact_count="$(jq --arg name "$expected_artifact" '[.artifacts[] | select(.name == $name)] | length' "$work/artifacts.json")"
+
+            if [[ "$artifact_count" -gt 1 ]]; then
+              echo "Ambiguous immutable attestation artifact name $expected_artifact: found $artifact_count." >&2
+              exit 1
+            fi
+
+            if [[ "$generation_status" == "completed" && "$generation_conclusion" != "success" ]]; then
+              echo "Trusted publication-generation run completed without success: $generation_conclusion." >&2
+              exit 1
+            fi
+
+            if [[ "$generation_status" == "completed" && "$generation_conclusion" == "success" && "$artifact_count" == "1" ]]; then
+              ready=true
+              break
+            fi
+
+            if [[ "$poll" == "12" ]]; then
+              break
+            fi
+            sleep 5
+          done
+
+          if [[ "$ready" != "true" ]]; then
+            echo "Trusted publication-generation run/attestation did not become unambiguously available inside the bounded wait." >&2
+            exit 1
+          fi
+
+          artifact_id="$(jq -r --arg name "$expected_artifact" '.artifacts[] | select(.name == $name) | .id' "$work/artifacts.json")"
+          artifact_expired="$(jq -r --arg name "$expected_artifact" '.artifacts[] | select(.name == $name) | .expired' "$work/artifacts.json")"
+          if [[ "$artifact_expired" == "true" ]]; then
+            echo "Immutable attestation artifact is expired." >&2
+            exit 1
+          fi
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/${artifact_id}/zip" > "$work/attestation.zip"
+          unzip -q "$work/attestation.zip" -d "$work/attestation"
+          mapfile -t attestation_files < <(find "$work/attestation" -type f -name 'deterministic-publication-attestation.json' -print)
+          if [[ "${#attestation_files[@]}" != "1" ]]; then
+            echo "Expected one deterministic-publication-attestation.json in immutable artifact." >&2
+            exit 1
+          fi
+          cp "${attestation_files[0]}" "$work/attestation.json"
+
+          echo "work=$work" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Validate attestation shape before reading candidate bytes
+        id: attestation
+        env:
+          WORK: ${{ steps.metadata.outputs.work }}
+        run: |
+          set -euo pipefail
+          python scripts/deterministic_site_publication.py validate-attestation \
+            --attestation "$WORK/attestation.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Read exact candidate bytes and decision metadata
+        env:
+          WORK: ${{ steps.metadata.outputs.work }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
+          SNAPSHOT_PATH: ${{ steps.attestation.outputs.snapshot_path }}
+          REPORT_PATH: ${{ steps.attestation.outputs.report_path }}
+          CANDIDATE_HEAD_SHA: ${{ steps.attestation.outputs.candidate_head_sha }}
+        run: |
+          set -euo pipefail
+
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" > "$WORK/files.json"
+          gh api -H "Accept: application/vnd.github+json" \
+            "/repos/$GITHUB_REPOSITORY/commits/$CANDIDATE_HEAD_SHA/check-runs?per_page=100" > "$WORK/check-runs.json"
+          gh api --paginate --slurp \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" \
+            | jq 'add // []' > "$WORK/reviews.json"
+          gh api "/repos/$GITHUB_REPOSITORY/commits/main" > "$WORK/main.json"
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY#*/}"
+          gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){totalCount pageInfo{hasNextPage} nodes{isResolved}}}}}' \
+            -f owner="$owner" \
+            -f name="$name" \
+            -F number="$PR_NUMBER" > "$WORK/threads.json"
+
+          if ! jq -e '
+            .data.repository.pullRequest.reviewThreads
+            | (.pageInfo.hasNextPage == false)
+              and (.totalCount == (.nodes | length))
+          ' "$WORK/threads.json" >/dev/null; then
+            echo "Review thread metadata is incomplete; refusing publication eligibility." >&2
+            exit 1
+          fi
+
+          gh api -H "Accept: application/vnd.github.raw+json" \
+            "/repos/$GITHUB_REPOSITORY/contents/$SNAPSHOT_PATH?ref=$CANDIDATE_HEAD_SHA" > "$WORK/candidate/snapshot.json"
+          gh api -H "Accept: application/vnd.github.raw+json" \
+            "/repos/$GITHUB_REPOSITORY/contents/$REPORT_PATH?ref=$CANDIDATE_HEAD_SHA" > "$WORK/candidate/report.md"
+
+      - name: Build credential-free gate facts
+        env:
+          WORK: ${{ steps.metadata.outputs.work }}
+        run: |
+          set -euo pipefail
+          python scripts/deterministic_site_publication.py build-gate-facts \
+            --attestation "$WORK/attestation.json" \
+            --pr-json "$WORK/pr.json" \
+            --generation-run-json "$WORK/generation-run.json" \
+            --validation-run-json "$WORK/validation-run.json" \
+            --check-runs-json "$WORK/check-runs.json" \
+            --reviews-json "$WORK/reviews.json" \
+            --threads-json "$WORK/threads.json" \
+            --main-json "$WORK/main.json" \
+            --files-json "$WORK/files.json" \
+            --snapshot-file "$WORK/candidate/snapshot.json" \
+            --report-file "$WORK/candidate/report.md" \
+            --main-root . \
+            --activation "$ACTIVATION" \
+            --pilot-run-id "$PILOT_RUN_ID" \
+            --attestation-count 1 \
+            --output "$WORK/facts.json"
+
+      - name: Evaluate closed publication contract
+        id: policy
+        env:
+          WORK: ${{ steps.metadata.outputs.work }}
+        run: |
+          set -euo pipefail
+          python scripts/deterministic_site_publication.py gate \
+            --attestation "$WORK/attestation.json" \
+            --facts "$WORK/facts.json" \
+            --output "$WORK/decision.json" \
+            --github-output "$GITHUB_OUTPUT"
+          cat "$WORK/decision.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Export SHA-bound merge identity
+        id: identity
+        env:
+          WORK: ${{ steps.metadata.outputs.work }}
+        run: |
+          set -euo pipefail
+          echo "pr_number=$(jq -r '.pull_request_number' "$WORK/attestation.json")" >> "$GITHUB_OUTPUT"
+          echo "candidate_head_sha=$(jq -r '.candidate_head_sha' "$WORK/attestation.json")" >> "$GITHUB_OUTPUT"
+          echo "main_base_sha=$(jq -r '.main_base_sha' "$WORK/attestation.json")" >> "$GITHUB_OUTPUT"
+
+  merge:
+    name: Merge exact eligible publication candidate
+    needs: preflight
+    if: needs.preflight.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    environment: deterministic-publication-control
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
+      CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
+      MAIN_BASE_SHA: ${{ needs.preflight.outputs.main_base_sha }}
+
+    steps:
+      - name: Final read-only stale/head check before token minting
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_head="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')"
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_head" = "$CANDIDATE_HEAD_SHA"
+          test "$current_main" = "$MAIN_BASE_SHA"
+
+      - name: Mint short-lived repository-scoped publication App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          private-key: ${{ secrets.DETERMINISTIC_PUBLICATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: SHA-bound pull-request merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh api \
+            --method PUT \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
+            -f sha="$CANDIDATE_HEAD_SHA" \
+            -f merge_method=merge

@@ -8,6 +8,7 @@ on:
     - cron: "17 * * * *"
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
 
@@ -280,6 +281,45 @@ jobs:
           echo "Files staged for commit:"
           git diff --cached --name-only
           git commit -m "Update rolling crypto source snapshot"
+
+      - name: Build immutable publication source intent
+        if: steps.publish_context.outputs.should_publish == 'true'
+        id: publication_intent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/deterministic-publication-intent"
+          mkdir -p "$work/payload"
+          workflow_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.workflow_id')"
+          snapshot_commit_sha="$(git rev-parse HEAD)"
+          artifact_name="deterministic-publication-intent-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          python scripts/deterministic_site_publication.py build-intent \
+            --snapshot "$SNAPSHOT_PATH" \
+            --config config/crypto_sources.yml \
+            --snapshot-commit-sha "$snapshot_commit_sha" \
+            --main-base-sha "$GITHUB_SHA" \
+            --source-workflow-id "$workflow_id" \
+            --source-run-id "$GITHUB_RUN_ID" \
+            --source-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --source-workflow-head-sha "$GITHUB_SHA" \
+            --output "$work/deterministic-publication-intent.json"
+
+          cp "$SNAPSHOT_PATH" "$work/payload/snapshot.json"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable publication source intent
+        if: steps.publish_context.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.publication_intent.outputs.artifact_name }}
+          path: |
+            ${{ runner.temp }}/deterministic-publication-intent/deterministic-publication-intent.json
+            ${{ runner.temp }}/deterministic-publication-intent/payload/snapshot.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Push rolling automation branch
         if: steps.publish_context.outputs.should_publish == 'true'
