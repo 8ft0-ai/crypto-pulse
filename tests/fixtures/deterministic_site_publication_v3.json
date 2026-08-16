@@ -1,0 +1,91 @@
+{
+  "attestation": {
+    "blocking_issues": [],
+    "candidate_branch": "automation/deterministic-publication-12345-1-20260817T0000Z",
+    "candidate_head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "errors": [],
+    "generation_workflow_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generation_workflow_id": 274000001,
+    "generation_workflow_path": ".github/workflows/generate-deterministic-site-publication.yml",
+    "generation_workflow_run_attempt": 1,
+    "generation_workflow_run_id": 12345,
+    "main_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "non_blocking_warnings": [],
+    "observation_hour_utc": "2026-08-17T00:00:00Z",
+    "publication_app_actor_id": 987654,
+    "publication_app_slug": "cryptopulse-deterministic-publication",
+    "publication_contract": "deterministic-site-publication/v3",
+    "publication_intent_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "pull_request_number": 600,
+    "report_path": "reports/crypto/hourly/2026/08/17/20260817_100000_AEST.md",
+    "report_sha256": "794df5d7852777046bf3f91aade111e3e72568222a0926e65007969882b52c05",
+    "snapshot_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "snapshot_path": "data/crypto/hourly/2026/08/17/20260817_100000_AEST_source_snapshot.json",
+    "snapshot_quality": "valid-ok",
+    "snapshot_sha256": "340c4ce51a62f8788e439777b7beeb94b43a22df7e7ca7fd3af74493de3ef09d",
+    "source_workflow_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_workflow_id": 273000001,
+    "source_workflow_run_attempt": 1,
+    "source_workflow_run_id": 54321,
+    "warnings": []
+  },
+  "facts": {
+    "activation": "recurring",
+    "attestation_count": 1,
+    "attestation_expired": false,
+    "blocking_reviews": 0,
+    "changed_files": [
+      "data/crypto/hourly/2026/08/17/20260817_100000_AEST_source_snapshot.json",
+      "reports/crypto/hourly/2026/08/17/20260817_100000_AEST.md"
+    ],
+    "current_main_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "duplicate_publication_count": 0,
+    "generation_run": {
+      "conclusion": "success",
+      "event": "workflow_run",
+      "head_branch": "main",
+      "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "id": 12345,
+      "path": ".github/workflows/generate-deterministic-site-publication.yml",
+      "run_attempt": 1,
+      "workflow_id": 274000001
+    },
+    "pilot_run_id": "",
+    "pr": {
+      "author_id": 987654,
+      "author_login": "cryptopulse-deterministic-publication[bot]",
+      "base": "main",
+      "draft": false,
+      "head_ref": "automation/deterministic-publication-12345-1-20260817T0000Z",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "number": 600,
+      "open": true,
+      "same_repository": true
+    },
+    "report": {
+      "path": "reports/crypto/hourly/2026/08/17/20260817_100000_AEST.md",
+      "sha256": "794df5d7852777046bf3f91aade111e3e72568222a0926e65007969882b52c05"
+    },
+    "snapshot": {
+      "blocking_issues": [],
+      "errors": [],
+      "non_blocking_warnings": [],
+      "observation_hour_utc": "2026-08-17T00:00:00Z",
+      "path": "data/crypto/hourly/2026/08/17/20260817_100000_AEST_source_snapshot.json",
+      "quality_status": "valid-ok",
+      "sha256": "340c4ce51a62f8788e439777b7beeb94b43a22df7e7ca7fd3af74493de3ef09d",
+      "warnings": []
+    },
+    "unresolved_threads": 0,
+    "validation": {
+      "check_app_slug": "github-actions",
+      "check_conclusion": "success",
+      "check_name": "Build site and check generated output",
+      "conclusion": "success",
+      "failed_required_checks": 0,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pending_required_checks": 0,
+      "workflow_name": "Validate CryptoPulse PR"
+    }
+  }
+}

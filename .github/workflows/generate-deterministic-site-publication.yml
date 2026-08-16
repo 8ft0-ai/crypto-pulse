@@ -1,0 +1,350 @@
+name: Generate Deterministic Site Publication
+
+on:
+  workflow_run:
+    workflows:
+      - Ingest Crypto Sources
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: deterministic-site-publication-generation
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare exact deterministic publication candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      (
+        vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'recurring' ||
+        (
+          vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'pilot' &&
+          vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == format('{0}', github.event.workflow_run.id)
+        )
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      candidate_branch: ${{ steps.identity.outputs.candidate_branch }}
+      observation_hour_utc: ${{ steps.intent.outputs.observation_hour_utc }}
+      report_path: ${{ steps.report.outputs.report_path }}
+      snapshot_path: ${{ steps.intent.outputs.snapshot_path }}
+      prepared_artifact: ${{ steps.package.outputs.artifact_name }}
+
+    steps:
+      - name: Check out exact trusted publication-generation base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml markdown
+
+      - name: Prove triggering source run and generation base are identical
+        env:
+          SOURCE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          set -euo pipefail
+          test "$SOURCE_HEAD_SHA" = "$GITHUB_SHA"
+          case "$SOURCE_EVENT" in
+            schedule|workflow_dispatch) ;;
+            *)
+              echo "Unexpected source-ingestion event: $SOURCE_EVENT" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Download exact immutable source intent
+        uses: actions/download-artifact@v4
+        with:
+          name: deterministic-publication-intent-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: ${{ runner.temp }}/deterministic-publication-source-intent
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify source intent and restore exact snapshot bytes
+        id: intent
+        run: |
+          set -euo pipefail
+          intent="$RUNNER_TEMP/deterministic-publication-source-intent/deterministic-publication-intent.json"
+          snapshot="$RUNNER_TEMP/deterministic-publication-source-intent/payload/snapshot.json"
+          python scripts/deterministic_site_publication.py verify-intent \
+            --intent "$intent" \
+            --snapshot "$snapshot" \
+            --expected-main-base-sha "$GITHUB_SHA" \
+            --expected-source-workflow-id "${{ github.event.workflow_run.workflow_id }}" \
+            --expected-source-run-id "${{ github.event.workflow_run.id }}" \
+            --expected-source-run-attempt "${{ github.event.workflow_run.run_attempt }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Refuse an already-published observation hour
+        env:
+          OBSERVATION_HOUR_UTC: ${{ steps.intent.outputs.observation_hour_utc }}
+        run: |
+          set -euo pipefail
+          python scripts/deterministic_site_publication.py assert-unpublished-hour \
+            --root . \
+            --observation-hour-utc "$OBSERVATION_HOUR_UTC"
+
+      - name: Generate deterministic Markdown report
+        id: report
+        env:
+          SNAPSHOT_PATH: ${{ steps.intent.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          report_path="$(python scripts/generate_crypto_report.py \
+            --snapshot "$SNAPSHOT_PATH" \
+            --output-root reports/crypto \
+            --config config/crypto_sources.yml)"
+          test -n "$report_path"
+          test -f "$report_path"
+          echo "report_path=$report_path" >> "$GITHUB_OUTPUT"
+
+      - name: Validate deterministic report and repository proof
+        env:
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_report.py "$REPORT_PATH" --root .
+          python -m unittest discover -s tests
+          python -m site_generator
+
+      - name: Derive immutable generation-run candidate identity
+        id: identity
+        env:
+          OBSERVATION_HOUR_COMPACT: ${{ steps.intent.outputs.observation_hour_compact }}
+        run: |
+          set -euo pipefail
+          candidate_branch="automation/deterministic-publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${OBSERVATION_HOUR_COMPACT}"
+          python scripts/deterministic_site_publication.py branch-identity --branch "$candidate_branch"
+          echo "candidate_branch=$candidate_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Prove exact two-file candidate scope
+        env:
+          SNAPSHOT_PATH: ${{ steps.intent.outputs.snapshot_path }}
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          changed="$RUNNER_TEMP/deterministic-publication-changed-files.txt"
+          git status --porcelain --untracked-files=all \
+            | awk '$2 !~ /^_site\// { print $2 }' \
+            | sort > "$changed"
+          cat "$changed"
+          python scripts/deterministic_site_publication.py validate-scope \
+            --changed-files "$changed" \
+            --snapshot-path "$SNAPSHOT_PATH" \
+            --report-path "$REPORT_PATH"
+
+      - name: Package exact credential-free candidate proof
+        id: package
+        env:
+          SNAPSHOT_PATH: ${{ steps.intent.outputs.snapshot_path }}
+          REPORT_PATH: ${{ steps.report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          artifact_name="deterministic-publication-prepared-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          intent="$RUNNER_TEMP/deterministic-publication-source-intent/deterministic-publication-intent.json"
+          package="$RUNNER_TEMP/deterministic-publication-prepared.tar.gz"
+          cp "$intent" publication-intent.json
+          tar -czf "$package" "$SNAPSHOT_PATH" "$REPORT_PATH" publication-intent.json
+          rm publication-intent.json
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable prepared candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ runner.temp }}/deterministic-publication-prepared.tar.gz
+          if-no-files-found: error
+          retention-days: 2
+
+  publish:
+    name: Create exact App-authored publication PR and attestation
+    needs: prepare
+    if: needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    environment: deterministic-publication-control
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    env:
+      CANDIDATE_BRANCH: ${{ needs.prepare.outputs.candidate_branch }}
+      OBSERVATION_HOUR_UTC: ${{ needs.prepare.outputs.observation_hour_utc }}
+      REPORT_PATH: ${{ needs.prepare.outputs.report_path }}
+      SNAPSHOT_PATH: ${{ needs.prepare.outputs.snapshot_path }}
+      PUBLICATION_APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
+
+    steps:
+      - name: Check out exact trusted publication-generation base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download exact prepared candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare.outputs.prepared_artifact }}
+          path: ${{ runner.temp }}/deterministic-publication-prepared
+
+      - name: Restore and re-prove prepared candidate before App use
+        id: repro
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/deterministic-publication-prepared/deterministic-publication-prepared.tar.gz"
+          tar -xzf "$package" "$SNAPSHOT_PATH" "$REPORT_PATH"
+          tar -xOf "$package" publication-intent.json > "$RUNNER_TEMP/publication-intent.json"
+
+          python scripts/deterministic_site_publication.py verify-intent \
+            --intent "$RUNNER_TEMP/publication-intent.json" \
+            --snapshot "$SNAPSHOT_PATH" \
+            --expected-main-base-sha "$GITHUB_SHA" \
+            --expected-source-workflow-id "${{ github.event.workflow_run.workflow_id }}" \
+            --expected-source-run-id "${{ github.event.workflow_run.id }}" \
+            --expected-source-run-attempt "${{ github.event.workflow_run.run_attempt }}"
+
+          changed="$RUNNER_TEMP/deterministic-publication-restored-files.txt"
+          git status --porcelain --untracked-files=all | awk '$2 !~ /^_site\// { print $2 }' | sort > "$changed"
+          python scripts/deterministic_site_publication.py validate-scope \
+            --changed-files "$changed" \
+            --snapshot-path "$SNAPSHOT_PATH" \
+            --report-path "$REPORT_PATH"
+
+          python scripts/deterministic_site_publication.py branch-identity --branch "$CANDIDATE_BRANCH"
+          generation_workflow_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.workflow_id')"
+          echo "generation_workflow_id=$generation_workflow_id" >> "$GITHUB_OUTPUT"
+
+      - name: Create exact immutable publication commit
+        run: |
+          set -euo pipefail
+          git checkout -b "$CANDIDATE_BRANCH"
+          git config user.name "cryptopulse-deterministic-publication[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$SNAPSHOT_PATH" "$REPORT_PATH"
+          staged="$RUNNER_TEMP/deterministic-publication-staged-files.txt"
+          git diff --cached --name-only | sort > "$staged"
+          python scripts/deterministic_site_publication.py validate-scope \
+            --changed-files "$staged" \
+            --snapshot-path "$SNAPSHOT_PATH" \
+            --report-path "$REPORT_PATH"
+          git commit -m "Publish deterministic crypto report ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Mint short-lived repository-scoped publication App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          private-key: ${{ secrets.DETERMINISTIC_PUBLICATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Push exact candidate and open App-authored PR
+        id: pull_request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          candidate_head_sha="$(git rev-parse HEAD)"
+          snapshot_sha256="$(sha256sum "$SNAPSHOT_PATH" | awk '{print $1}')"
+          report_sha256="$(sha256sum "$REPORT_PATH" | awk '{print $1}')"
+          main_base_sha="$(jq -r '.main_base_sha' "$RUNNER_TEMP/publication-intent.json")"
+          snapshot_commit_sha="$(jq -r '.snapshot_commit_sha' "$RUNNER_TEMP/publication-intent.json")"
+
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            push "https://github.com/$GITHUB_REPOSITORY.git" \
+            "HEAD:refs/heads/$CANDIDATE_BRANCH"
+
+          body="$RUNNER_TEMP/deterministic-publication-pr-body.md"
+          cat > "$body" <<EOF
+          ## Deterministic publication identity
+
+          \`\`\`text
+          publication_contract: deterministic-site-publication/v3
+          generation_workflow_run_id: $GITHUB_RUN_ID
+          generation_workflow_run_attempt: $GITHUB_RUN_ATTEMPT
+          main_base_sha: $main_base_sha
+          snapshot_commit_sha: $snapshot_commit_sha
+          observation_hour_utc: $OBSERVATION_HOUR_UTC
+          snapshot_path: $SNAPSHOT_PATH
+          snapshot_sha256: $snapshot_sha256
+          report_path: $REPORT_PATH
+          report_sha256: $report_sha256
+          candidate_branch: $CANDIDATE_BRANCH
+          candidate_head_sha: $candidate_head_sha
+          \`\`\`
+
+          This PR is an immutable deterministic publication candidate. Its body is reviewer-visible evidence only; the merge gate trusts the immutable trusted-generation attestation and exact candidate bytes instead.
+
+          Automatic eligibility is limited to exactly one \`valid-ok\` snapshot plus one deterministic Markdown report. No \`_site/\`, model/provider path, forecasting, sentiment, advice or Phase 13 temporal public rendering is included.
+          EOF
+
+          pr_url="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Publish deterministic crypto report $OBSERVATION_HOUR_UTC" \
+            --body-file "$body" \
+            --base main \
+            --head "${GITHUB_REPOSITORY_OWNER}:$CANDIDATE_BRANCH")"
+          pr_number="$(gh pr view "$pr_url" --repo "$GITHUB_REPOSITORY" --json number --jq '.number')"
+          pr_actor_id="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.user.id')"
+          pr_actor_login="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.user.login')"
+
+          if [[ "$pr_actor_login" != "${PUBLICATION_APP_SLUG}[bot]" ]]; then
+            echo "PR was not created by the configured publication App: $pr_actor_login" >&2
+            exit 1
+          fi
+
+          echo "candidate_head_sha=$candidate_head_sha" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "publication_app_actor_id=$pr_actor_id" >> "$GITHUB_OUTPUT"
+
+      - name: Build immutable trusted-generation attestation
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/deterministic-publication-attestation"
+          mkdir -p "$work"
+          python scripts/deterministic_site_publication.py build-attestation \
+            --intent "$RUNNER_TEMP/publication-intent.json" \
+            --report-path "$REPORT_PATH" \
+            --generation-workflow-id "${{ steps.repro.outputs.generation_workflow_id }}" \
+            --generation-run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --generation-workflow-head-sha "$GITHUB_SHA" \
+            --candidate-branch "$CANDIDATE_BRANCH" \
+            --candidate-head-sha "${{ steps.pull_request.outputs.candidate_head_sha }}" \
+            --pull-request-number "${{ steps.pull_request.outputs.pr_number }}" \
+            --publication-app-actor-id "${{ steps.pull_request.outputs.publication_app_actor_id }}" \
+            --publication-app-slug "$PUBLICATION_APP_SLUG" \
+            --output "$work/deterministic-publication-attestation.json"
+
+      - name: Upload immutable trusted-generation attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-publication-attestation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deterministic-publication-attestation/deterministic-publication-attestation.json
+          if-no-files-found: error
+          retention-days: 14
