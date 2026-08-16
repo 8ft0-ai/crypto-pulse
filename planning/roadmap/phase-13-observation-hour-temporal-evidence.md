@@ -1,8 +1,8 @@
 # Phase 13 — Deterministic observation-hour comparison and temporal evidence
 
-Status: shaping / delivery planning.
+Status: complete.
 
-This is a forward-looking roadmap spec. It selects the accepted Phase 13 contract for delivery planning; it does not itself authorise implementation.
+This retained roadmap spec records the accepted Phase 13 contract that has now been delivered and proved. Completed delivery evidence is recorded in `planning/delivery/phase-13-observation-hour-temporal-evidence.md`.
 
 ## Governance
 
@@ -13,6 +13,12 @@ Substantive design approval: #443 comment 5305767217
 Roadmap-promotion authority: #443 comment 5305767801
 Roadmap-promotion issue: #444
 Trusted promotion baseline: d74d565ba8d223fcb346a1c43c0f4738b38ce5d4
+Roadmap-promotion PR: #445
+Roadmap merge: 950fae81ee7ccbd01c6be3c913fc9ec979b2a03f
+Delivery control: #446
+Approved implementation plan: #446 comment 5305791766
+Fresh plan approval: #446 comment 5305792477
+Close-out issue: #453
 ```
 
 ## Problem statement
@@ -194,33 +200,33 @@ No interpolation, aggregation, smoothing, moving averages, normalisation, rebasi
 
 ## Acceptance gates
 
-- [ ] Immutable commit/tree candidate enumeration is deterministic and legacy snapshots without observation-hour identity remain non-participating.
-- [ ] Malformed participating slot metadata fails `candidate-set-unorderable` rather than being skipped.
-- [ ] Exact current/predecessor slot cardinality, identity and Phase 12 validation fail closed with the frozen status precedence.
-- [ ] Adjacent-slot success works with actual elapsed times both below and above 3,600 seconds while preserving those actual timestamps as evidence.
-- [ ] No older-slot fallback exists.
-- [ ] Frozen validator/config/Phase-12-validator/adapter/semantic dependency identities are mechanically bound.
-- [ ] Pair semantics and full 26-metric/8-source comparison evidence remain closed and deterministic.
-- [ ] `crypto-observation-hour-comparison/v1` canonical records and `comparison_id` are deterministic and repository-bound.
-- [ ] `crypto-observation-hour-series/v1` exposes only the frozen 12-metric/8-source series vocabulary and replays comparison evidence without raw-value bypass.
-- [ ] Missing, duplicate, degraded, invalid and semantic failure evidence remains explicit and side-specific.
-- [ ] Continuity, gaps, tamper rejection and unknown-vocabulary rejection are proved offline.
-- [ ] Two independently materialised repositories produce byte-identical canonical comparison/series outputs and stable IDs.
-- [ ] Full repository validation passes on every implementation/proof slice.
-- [ ] No excluded public/site/workflow/provider/model/historical-snapshot behaviour changes.
+- [x] Immutable commit/tree candidate enumeration is deterministic and legacy snapshots without observation-hour identity remain non-participating.
+- [x] Malformed participating slot metadata fails `candidate-set-unorderable` rather than being skipped.
+- [x] Exact current/predecessor slot cardinality, identity and Phase 12 validation fail closed with the frozen status precedence.
+- [x] Adjacent-slot success works with actual elapsed times both below and above 3,600 seconds while preserving those actual timestamps as evidence.
+- [x] No older-slot fallback exists.
+- [x] Frozen validator/config/Phase-12-validator/adapter/semantic dependency identities are mechanically bound.
+- [x] Pair semantics and full 26-metric/8-source comparison evidence remain closed and deterministic.
+- [x] `crypto-observation-hour-comparison/v1` canonical records and `comparison_id` are deterministic and repository-bound.
+- [x] `crypto-observation-hour-series/v1` exposes only the frozen 12-metric/8-source series vocabulary and replays comparison evidence without raw-value bypass.
+- [x] Missing, duplicate, degraded, invalid and semantic failure evidence remains explicit and side-specific.
+- [x] Continuity, gaps, tamper rejection and unknown-vocabulary rejection are proved offline.
+- [x] Two independently materialised repositories produce byte-identical canonical comparison/series outputs and stable IDs.
+- [x] Full repository validation passes on every implementation/proof slice.
+- [x] No excluded public/site/workflow/provider/model/historical-snapshot behaviour changes.
 
-## Proposed implementation slices
+## Delivered implementation slices
 
-Delivery planning must refine exact file scope, but the intended bounded order is:
+The accepted bounded delivery order was completed as:
 
 ```text
-1. Observation-hour adjacency resolver + canonical comparison record/validator
-2. Canonical observation-hour temporal-series builder/validator
-3. Closed offline proof corpus and repeatability/tamper evidence
-4. Phase close-out and causal delivery reconciliation
+1. Observation-hour adjacency resolver + canonical comparison record/validator — #447 / PR #448
+2. Canonical observation-hour temporal-series builder/validator — #449 / PR #450
+3. Closed offline proof corpus and repeatability/tamper evidence — #451 / PR #452
+4. Phase close-out and causal delivery reconciliation — #453
 ```
 
-Public/site rendering is not a Phase 13 implementation slice.
+Public/site rendering was not a Phase 13 implementation slice.
 
 ## Non-goals
 
@@ -258,6 +264,6 @@ Mitigation: exact inherited Git blob identities are bound by v1 and changed depe
 
 ## Definition of done
 
-Phase 13 is complete only when the accepted contract family is implemented, repository-bound validation exists, the closed offline proof corpus passes, repeatability/tamper evidence is recorded, planning/delivery records are reconciled, the compact delivery graph is updated or explicitly dispositioned under its rules, and generated `_site/` output is not committed.
+Phase 13 is complete: the accepted contract family is implemented, repository-bound validation exists, the closed offline proof corpus passes, repeatability/tamper evidence is recorded, planning/delivery records are reconciled, the compact delivery graph records the enduring Phase 13 dependency boundary, and generated `_site/` output is not committed.
 
-Public/site integration remains a separately governed successor decision after Phase 13 proof.
+Public/site integration remains a separately governed successor decision after Phase 13 proof. No successor phase is selected by this close-out.

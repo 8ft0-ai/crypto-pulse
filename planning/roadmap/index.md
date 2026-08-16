@@ -40,21 +40,19 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-Phase 13 — deterministic observation-hour comparison and temporal evidence — is the selected shaping/delivery-planning direction under #443/#444. Its accepted design defines a new cadence-slot evidence family over future Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
+Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453. It delivers the separately versioned `phase13-observation-hour-adjacency/v1`, `crypto-observation-hour-comparison/v1` and `crypto-observation-hour-series/v1` evidence family over Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
 
-Phase 12 — canonical observation-hour evidence — is complete under #436/#441 and `phase12-observation-hour/v1`. It gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
+Phase 12 — canonical observation-hour evidence — remains complete under #436/#441 and `phase12-observation-hour/v1`. It gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
 
-Phase 13 is not yet implemented. It must prove exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, a bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence before it can close.
+Phase 13 now proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Public/site rendering remains outside the completed phase.
 
 The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`.
 
 ## Active roadmap direction
 
-| Phase | Status | Planning record | Governing evidence |
-| --- | --- | --- | --- |
-| Phase 13 — Deterministic observation-hour comparison and temporal evidence | Shaping / delivery planning; not implemented | [phase-13-observation-hour-temporal-evidence.md](phase-13-observation-hour-temporal-evidence.md) | #443 design comments `5305763171`, `5305764744`, `5305765770`; approval `5305767217`; promotion #444 |
+No successor phase is currently selected. Any next phase requires separate shaping, acceptance gates, proof path and owner authority.
 
-Public/site integration of temporal evidence remains parked and is not part of Phase 13.
+Public/site integration of temporal evidence remains parked and was not authorised by Phase 13.
 
 ## Completed roadmap directions
 
@@ -66,8 +64,9 @@ Public/site integration of temporal evidence remains parked and is not part of P
 | Phase 10 — Deterministic previous-hour comparison engine | Complete; exact-hour deterministic comparison evidence | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) | [../delivery/phase-10-previous-hour-comparison.md](../delivery/phase-10-previous-hour-comparison.md) |
 | Phase 11 — Deterministic temporal visualisation | Complete; offline deterministic temporal evidence/rendering proof | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) | [../delivery/phase-11-deterministic-temporal-visualisation.md](../delivery/phase-11-deterministic-temporal-visualisation.md) |
 | Phase 12 — Canonical observation-hour evidence | Complete; future snapshot cadence-bucket identity and enforcement | [phase-12-canonical-observation-hour-evidence.md](phase-12-canonical-observation-hour-evidence.md) | [../delivery/phase-12-canonical-observation-hour-evidence.md](../delivery/phase-12-canonical-observation-hour-evidence.md) |
+| Phase 13 — Deterministic observation-hour comparison and temporal evidence | Complete; adjacent-slot comparison and canonical temporal evidence proved offline | [phase-13-observation-hour-temporal-evidence.md](phase-13-observation-hour-temporal-evidence.md) | [../delivery/phase-13-observation-hour-temporal-evidence.md](../delivery/phase-13-observation-hour-temporal-evidence.md) |
 
-Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 is the separately versioned consumer that will use that identity for exact adjacent observation-hour comparison and temporal evidence while leaving Phase 10/11 v1 unchanged.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged.
 
 ## Superseded active direction
 
@@ -90,7 +89,7 @@ Ideas that are useful but not ready for an active phase are parked in:
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without implicitly expanding Phase 13 into public/site integration, model work or another successor capability.
+Use the backlog to preserve follow-on ideas without implicitly selecting a successor to Phase 13 or authorising public/site integration, model work or another capability.
 
 ## Retrospective roadmap specs
 

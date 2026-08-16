@@ -49,6 +49,11 @@ flowchart LR
   pr_440["PR #440\nEnforce Phase 12 observation-hour workflow evidence"]
   artifact_observation_hour_validator["Artifact\nObservation-hour evidence validator"]
   boundary_observation_hour_identity["Boundary\nObservation-hour identity preserves actual time"]
+  phase_13["Phase\nPhase 13 — Deterministic observation-hour comparison and temporal evidence"]
+  issue_446["Issue #446\nPhase 13 delivery control — observation-hour temporal evidence"]
+  pr_452["PR #452\nAdd Phase 13 observation-hour temporal proof corpus"]
+  artifact_observation_hour_series["Artifact\nCanonical observation-hour temporal series"]
+  boundary_phase13_public_integration["Boundary\nPublic temporal integration remains separately governed"]
 
   pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
@@ -97,4 +102,9 @@ flowchart LR
   phase_12 -->|implemented by| artifact_observation_hour_validator
   phase_12 -->|established| boundary_observation_hour_identity
   phase_12 -->|preserved| boundary_no_committed_site
+  phase_12 -->|enabled slot-ready consumer| phase_13
+  phase_13 -->|governed by| issue_446
+  phase_13 -->|proved offline corpus| pr_452
+  phase_13 -->|produced canonical series| artifact_observation_hour_series
+  phase_13 -->|kept separate| boundary_phase13_public_integration
 ```
