@@ -60,6 +60,13 @@ jobs:
           set -euo pipefail
           python scripts/validate_crypto_snapshot.py "$SNAPSHOT_PATH"
 
+      - name: Validate observation hour
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_observation_hour.py "$SNAPSHOT_PATH"
+
       - name: Build PR evidence
         id: evidence
         env:
@@ -81,6 +88,9 @@ jobs:
           snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
           config = load_config(Path("config/crypto_sources.yml"))
           quality = classify_snapshot_quality(snapshot, config)
+          run = snapshot.get("run") if isinstance(snapshot.get("run"), dict) else {}
+          generated_at_utc = run.get("generated_at_utc", "not recorded")
+          observation_hour_utc = run.get("observation_hour_utc", "not recorded")
 
           def bullet_list(values: list[str]) -> str:
               if not values:
@@ -146,6 +156,13 @@ jobs:
           {snapshot_path.as_posix()}
           ```
 
+          ## Observation timing
+
+          Actual `generated_at_utc`: `{generated_at_utc}`
+          Containing `observation_hour_utc`: `{observation_hour_utc}`
+
+          `observation_hour_utc` is the canonical UTC hour containing the actual generation time; it is not the exact capture time.
+
           ## Snapshot quality
 
           Status: `{quality_status}`
@@ -183,6 +200,7 @@ jobs:
 
           - Ran `python scripts/ingest_crypto_sources.py --config config/crypto_sources.yml --output-root data/crypto/hourly --timezone Australia/Sydney`.
           - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()}`.
+          - Ran `python scripts/validate_crypto_observation_hour.py {snapshot_path.as_posix()}`.
           - Committed only generated source snapshots under `data/crypto/hourly/...`.
           - Did not commit generated `_site/` output.
 
