@@ -202,6 +202,17 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ steps.source.outputs.source_run_id }}
 
+      - name: Refuse an already-published observation hour
+        run: |
+          set -euo pipefail
+          intent="$RUNNER_TEMP/deterministic-publication-source-intent/deterministic-publication-intent.json"
+          observation_hour_utc="$(jq -er '.observation_hour_utc | select(type == "string" and length > 0)' "$intent")"
+          # This must run against the clean trusted-main checkout before verify-intent
+          # restores the candidate snapshot into data/crypto/hourly/.
+          python scripts/deterministic_site_publication.py assert-unpublished-hour \
+            --root . \
+            --observation-hour-utc "$observation_hour_utc"
+
       - name: Verify source intent and restore exact snapshot bytes
         id: intent
         run: |
@@ -216,15 +227,6 @@ jobs:
             --expected-source-run-id "${{ steps.source.outputs.source_run_id }}" \
             --expected-source-run-attempt "${{ steps.source.outputs.source_run_attempt }}" \
             --github-output "$GITHUB_OUTPUT"
-
-      - name: Refuse an already-published observation hour
-        env:
-          OBSERVATION_HOUR_UTC: ${{ steps.intent.outputs.observation_hour_utc }}
-        run: |
-          set -euo pipefail
-          python scripts/deterministic_site_publication.py assert-unpublished-hour \
-            --root . \
-            --observation-hour-utc "$OBSERVATION_HOUR_UTC"
 
       - name: Generate deterministic Markdown report
         id: report
