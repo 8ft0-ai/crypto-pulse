@@ -151,8 +151,8 @@ jobs:
             gh api \
               "/repos/$GITHUB_REPOSITORY/actions/workflows/generate-deterministic-site-publication.yml/runs?event=workflow_dispatch&per_page=100" \
               > "$proof_runs"
-            prior_attempts="$(jq --argjson current "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id != $current)] | length' "$proof_runs")"
-            test "$prior_attempts" = "0"
+            prior_successes="$(jq --argjson current "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id != $current and .status == "completed" and .conclusion == "success")] | length' "$proof_runs")"
+            test "$prior_successes" = "0"
 
             source_workflow_id="$(jq -r '.workflow_id' "$source_json")"
             source_run_id="$(jq -r '.id' "$source_json")"
