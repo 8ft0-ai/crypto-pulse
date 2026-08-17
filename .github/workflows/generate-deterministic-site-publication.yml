@@ -1,6 +1,20 @@
 name: Generate Deterministic Site Publication
 
 on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: "Exact separately authorised main SHA for the non-merging proof"
+        required: true
+        type: string
+      proof_source_run_id:
+        description: "Exact successful Ingest Crypto Sources run ID whose immutable intent will be reused"
+        required: true
+        type: string
+      authority_comment_id:
+        description: "Exact OWNER-authored #465 execution-authority comment ID"
+        required: true
+        type: string
   workflow_run:
     workflows:
       - Ingest Crypto Sources
@@ -10,6 +24,7 @@ on:
 permissions:
   actions: read
   contents: read
+  issues: read
   pull-requests: read
 
 concurrency:
@@ -20,15 +35,18 @@ jobs:
   prepare:
     name: Prepare exact deterministic publication candidate
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
       (
-        vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'recurring' ||
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
         (
-          vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'pilot' &&
-          vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == format('{0}', github.event.workflow_run.id)
+          vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'recurring' ||
+          (
+            vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'pilot' &&
+            vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == format('{0}', github.event.workflow_run.id)
+          )
         )
-      )
+      ) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       candidate_branch: ${{ steps.identity.outputs.candidate_branch }}
@@ -36,8 +54,128 @@ jobs:
       report_path: ${{ steps.report.outputs.report_path }}
       snapshot_path: ${{ steps.intent.outputs.snapshot_path }}
       prepared_artifact: ${{ steps.package.outputs.artifact_name }}
+      proof_mode: ${{ steps.source.outputs.proof_mode }}
+      source_workflow_id: ${{ steps.source.outputs.source_workflow_id }}
+      source_run_id: ${{ steps.source.outputs.source_run_id }}
+      source_run_attempt: ${{ steps.source.outputs.source_run_attempt }}
+      authority_comment_id: ${{ steps.source.outputs.authority_comment_id }}
+      authority_body_sha256: ${{ steps.source.outputs.authority_body_sha256 }}
 
     steps:
+      - name: Resolve trusted source run and bounded proof authority
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+          PILOT_RUN_ID: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID || '' }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha || '' }}
+          PROOF_SOURCE_RUN_ID: ${{ inputs.proof_source_run_id || '' }}
+          AUTHORITY_COMMENT_ID: ${{ inputs.authority_comment_id || '' }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || '' }}
+          TRIGGER_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id || '' }}
+          TRIGGER_HEAD_SHA: ${{ github.event.workflow_run.head_sha || '' }}
+          TRIGGER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || '' }}
+          TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event || '' }}
+        run: |
+          set -euo pipefail
+
+          proof_mode=false
+          authority_comment_id=""
+          authority_body_sha256=""
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            test "$TRIGGER_CONCLUSION" = "success"
+            test "$TRIGGER_HEAD_BRANCH" = "main"
+            case "$ACTIVATION" in
+              recurring) ;;
+              pilot)
+                test "$PILOT_RUN_ID" = "$TRIGGER_RUN_ID"
+                ;;
+              *)
+                echo "Trusted generation is not operational while activation is disabled or invalid." >&2
+                exit 1
+                ;;
+            esac
+
+            source_workflow_id="$TRIGGER_WORKFLOW_ID"
+            source_run_id="$TRIGGER_RUN_ID"
+            source_run_attempt="$TRIGGER_RUN_ATTEMPT"
+            source_head_sha="$TRIGGER_HEAD_SHA"
+            source_event="$TRIGGER_EVENT"
+          else
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+            proof_mode=true
+            test "$GITHUB_REF" = "refs/heads/main"
+            test "$ACTIVATION" = "disabled"
+            [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+            test "$GITHUB_SHA" = "$EXPECTED_MAIN_SHA"
+            [[ "$PROOF_SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$AUTHORITY_COMMENT_ID" =~ ^[1-9][0-9]*$ ]]
+
+            authority_json="$RUNNER_TEMP/phase14-proof-authority.json"
+            gh api "/repos/$GITHUB_REPOSITORY/issues/comments/$AUTHORITY_COMMENT_ID" > "$authority_json"
+            jq -e \
+              --arg issue_url "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/465" \
+              --arg owner "$GITHUB_REPOSITORY_OWNER" \
+              '.issue_url == $issue_url and .user.login == $owner and .author_association == "OWNER"' \
+              "$authority_json" >/dev/null
+            authority_body="$(jq -r '.body' "$authority_json")"
+            grep -Fx "PHASE14_CANDIDATE_PROOF_EXECUTION_AUTHORITY" <<<"$authority_body" >/dev/null
+            grep -Fx "issue: 465" <<<"$authority_body" >/dev/null
+            grep -Fx "main_sha: $EXPECTED_MAIN_SHA" <<<"$authority_body" >/dev/null
+            grep -Fx "source_run_id: $PROOF_SOURCE_RUN_ID" <<<"$authority_body" >/dev/null
+            grep -Fx "proof_attempts: 1" <<<"$authority_body" >/dev/null
+            grep -Fx "activation: disabled" <<<"$authority_body" >/dev/null
+            grep -Fx "merge: forbidden" <<<"$authority_body" >/dev/null
+            authority_body_sha256="$(printf '%s' "$authority_body" | sha256sum | awk '{print $1}')"
+            authority_comment_id="$AUTHORITY_COMMENT_ID"
+
+            source_json="$RUNNER_TEMP/phase14-proof-source-run.json"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$PROOF_SOURCE_RUN_ID" > "$source_json"
+            jq -e \
+              --arg head "$EXPECTED_MAIN_SHA" \
+              '.path == ".github/workflows/ingest-crypto-sources.yml"
+               and .head_branch == "main"
+               and .head_sha == $head
+               and .status == "completed"
+               and .conclusion == "success"
+               and (.event == "schedule" or .event == "workflow_dispatch")
+               and (.workflow_id | type == "number")
+               and (.run_attempt | type == "number" and . > 0)' \
+              "$source_json" >/dev/null
+
+            proof_runs="$RUNNER_TEMP/phase14-proof-generation-runs.json"
+            gh api \
+              "/repos/$GITHUB_REPOSITORY/actions/workflows/generate-deterministic-site-publication.yml/runs?event=workflow_dispatch&per_page=100" \
+              > "$proof_runs"
+            prior_success="$(jq --argjson current "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id != $current and .conclusion == "success")] | length' "$proof_runs")"
+            test "$prior_success" = "0"
+
+            source_workflow_id="$(jq -r '.workflow_id' "$source_json")"
+            source_run_id="$(jq -r '.id' "$source_json")"
+            source_run_attempt="$(jq -r '.run_attempt' "$source_json")"
+            source_head_sha="$(jq -r '.head_sha' "$source_json")"
+            source_event="$(jq -r '.event' "$source_json")"
+          fi
+
+          test "$source_head_sha" = "$GITHUB_SHA"
+          case "$source_event" in
+            schedule|workflow_dispatch) ;;
+            *)
+              echo "Unexpected source-ingestion event: $source_event" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "proof_mode=$proof_mode" >> "$GITHUB_OUTPUT"
+          echo "source_workflow_id=$source_workflow_id" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=$source_run_id" >> "$GITHUB_OUTPUT"
+          echo "source_run_attempt=$source_run_attempt" >> "$GITHUB_OUTPUT"
+          echo "authority_comment_id=$authority_comment_id" >> "$GITHUB_OUTPUT"
+          echo "authority_body_sha256=$authority_body_sha256" >> "$GITHUB_OUTPUT"
+
       - name: Check out exact trusted publication-generation base
         uses: actions/checkout@v4
         with:
@@ -55,28 +193,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml markdown
 
-      - name: Prove triggering source run and generation base are identical
-        env:
-          SOURCE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
-        run: |
-          set -euo pipefail
-          test "$SOURCE_HEAD_SHA" = "$GITHUB_SHA"
-          case "$SOURCE_EVENT" in
-            schedule|workflow_dispatch) ;;
-            *)
-              echo "Unexpected source-ingestion event: $SOURCE_EVENT" >&2
-              exit 1
-              ;;
-          esac
-
       - name: Download exact immutable source intent
         uses: actions/download-artifact@v4
         with:
-          name: deterministic-publication-intent-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          name: deterministic-publication-intent-${{ steps.source.outputs.source_run_id }}-${{ steps.source.outputs.source_run_attempt }}
           path: ${{ runner.temp }}/deterministic-publication-source-intent
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.source.outputs.source_run_id }}
 
       - name: Verify source intent and restore exact snapshot bytes
         id: intent
@@ -88,9 +211,9 @@ jobs:
             --intent "$intent" \
             --snapshot "$snapshot" \
             --expected-main-base-sha "$GITHUB_SHA" \
-            --expected-source-workflow-id "${{ github.event.workflow_run.workflow_id }}" \
-            --expected-source-run-id "${{ github.event.workflow_run.id }}" \
-            --expected-source-run-attempt "${{ github.event.workflow_run.run_attempt }}" \
+            --expected-source-workflow-id "${{ steps.source.outputs.source_workflow_id }}" \
+            --expected-source-run-id "${{ steps.source.outputs.source_run_id }}" \
+            --expected-source-run-attempt "${{ steps.source.outputs.source_run_attempt }}" \
             --github-output "$GITHUB_OUTPUT"
 
       - name: Refuse an already-published observation hour
@@ -190,6 +313,13 @@ jobs:
       REPORT_PATH: ${{ needs.prepare.outputs.report_path }}
       SNAPSHOT_PATH: ${{ needs.prepare.outputs.snapshot_path }}
       PUBLICATION_APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
+      PROOF_MODE: ${{ needs.prepare.outputs.proof_mode }}
+      SOURCE_WORKFLOW_ID: ${{ needs.prepare.outputs.source_workflow_id }}
+      SOURCE_RUN_ID: ${{ needs.prepare.outputs.source_run_id }}
+      SOURCE_RUN_ATTEMPT: ${{ needs.prepare.outputs.source_run_attempt }}
+      AUTHORITY_COMMENT_ID: ${{ needs.prepare.outputs.authority_comment_id }}
+      AUTHORITY_BODY_SHA256: ${{ needs.prepare.outputs.authority_body_sha256 }}
+      ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
 
     steps:
       - name: Check out exact trusted publication-generation base
@@ -203,6 +333,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Revalidate proof authority and disabled activation before App use
+        if: env.PROOF_MODE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$ACTIVATION" = "disabled"
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_main" = "$GITHUB_SHA"
+
+          authority_json="$RUNNER_TEMP/phase14-proof-authority-publish.json"
+          gh api "/repos/$GITHUB_REPOSITORY/issues/comments/$AUTHORITY_COMMENT_ID" > "$authority_json"
+          authority_body="$(jq -r '.body' "$authority_json")"
+          authority_body_sha256="$(printf '%s' "$authority_body" | sha256sum | awk '{print $1}')"
+          test "$authority_body_sha256" = "$AUTHORITY_BODY_SHA256"
+          grep -Fx "PHASE14_CANDIDATE_PROOF_EXECUTION_AUTHORITY" <<<"$authority_body" >/dev/null
+          grep -Fx "main_sha: $GITHUB_SHA" <<<"$authority_body" >/dev/null
+          grep -Fx "source_run_id: $SOURCE_RUN_ID" <<<"$authority_body" >/dev/null
+          grep -Fx "activation: disabled" <<<"$authority_body" >/dev/null
+          grep -Fx "merge: forbidden" <<<"$authority_body" >/dev/null
 
       - name: Download exact prepared candidate
         uses: actions/download-artifact@v4
@@ -224,9 +376,9 @@ jobs:
             --intent "$RUNNER_TEMP/publication-intent.json" \
             --snapshot "$SNAPSHOT_PATH" \
             --expected-main-base-sha "$GITHUB_SHA" \
-            --expected-source-workflow-id "${{ github.event.workflow_run.workflow_id }}" \
-            --expected-source-run-id "${{ github.event.workflow_run.id }}" \
-            --expected-source-run-attempt "${{ github.event.workflow_run.run_attempt }}"
+            --expected-source-workflow-id "$SOURCE_WORKFLOW_ID" \
+            --expected-source-run-id "$SOURCE_RUN_ID" \
+            --expected-source-run-attempt "$SOURCE_RUN_ATTEMPT"
 
           changed="$RUNNER_TEMP/deterministic-publication-restored-files.txt"
           git status --porcelain --untracked-files=all | awk '$2 !~ /^_site\// { print $2 }' | sort > "$changed"
@@ -303,9 +455,25 @@ jobs:
           Automatic eligibility is limited to exactly one \`valid-ok\` snapshot plus one deterministic Markdown report. No \`_site/\`, model/provider path, forecasting, sentiment, advice or Phase 13 temporal public rendering is included.
           EOF
 
+          pr_title="Publish deterministic crypto report $OBSERVATION_HOUR_UTC"
+          if [[ "$PROOF_MODE" == "true" ]]; then
+            pr_title="Phase 14 non-merging attestation proof $OBSERVATION_HOUR_UTC"
+            cat >> "$body" <<EOF
+
+          ## Non-merging proof boundary
+
+          This PR was created by the separately governed Phase 14 candidate-attestation proof mode.
+
+          It **must never be merged**. The production metadata-only gate must reject it because the generation run event is \`workflow_dispatch\` rather than trusted \`workflow_run\`, and publication activation remains \`disabled\`.
+
+          Issue: #465
+          Authority comment: $AUTHORITY_COMMENT_ID
+          EOF
+          fi
+
           pr_url="$(gh pr create \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Publish deterministic crypto report $OBSERVATION_HOUR_UTC" \
+            --title "$pr_title" \
             --body-file "$body" \
             --base main \
             --head "${GITHUB_REPOSITORY_OWNER}:$CANDIDATE_BRANCH")"
