@@ -107,6 +107,7 @@ jobs:
           else
             test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
             proof_mode=true
+            test "$GITHUB_RUN_ATTEMPT" = "1"
             test "$GITHUB_REF" = "refs/heads/main"
             test "$ACTIVATION" = "disabled"
             [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -150,8 +151,8 @@ jobs:
             gh api \
               "/repos/$GITHUB_REPOSITORY/actions/workflows/generate-deterministic-site-publication.yml/runs?event=workflow_dispatch&per_page=100" \
               > "$proof_runs"
-            prior_success="$(jq --argjson current "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id != $current and .conclusion == "success")] | length' "$proof_runs")"
-            test "$prior_success" = "0"
+            prior_attempts="$(jq --argjson current "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id != $current)] | length' "$proof_runs")"
+            test "$prior_attempts" = "0"
 
             source_workflow_id="$(jq -r '.workflow_id' "$source_json")"
             source_run_id="$(jq -r '.id' "$source_json")"
