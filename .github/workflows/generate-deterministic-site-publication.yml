@@ -142,7 +142,7 @@ jobs:
                and .head_sha == $head
                and .status == "completed"
                and .conclusion == "success"
-               and (.event == "schedule" or .event == "workflow_dispatch")
+               and .event == "schedule"
                and (.workflow_id | type == "number")
                and (.run_attempt | type == "number" and . > 0)' \
               "$source_json" >/dev/null
@@ -407,6 +407,28 @@ jobs:
             --snapshot-path "$SNAPSHOT_PATH" \
             --report-path "$REPORT_PATH"
           git commit -m "Publish deterministic crypto report ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Revalidate proof authority immediately before App-backed mutation
+        if: env.PROOF_MODE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$ACTIVATION" = "disabled"
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_main" = "$GITHUB_SHA"
+
+          authority_json="$RUNNER_TEMP/phase14-proof-authority-final.json"
+          gh api "/repos/$GITHUB_REPOSITORY/issues/comments/$AUTHORITY_COMMENT_ID" > "$authority_json"
+          authority_body="$(jq -r '.body' "$authority_json")"
+          authority_body_sha256="$(printf '%s' "$authority_body" | sha256sum | awk '{print $1}')"
+          test "$authority_body_sha256" = "$AUTHORITY_BODY_SHA256"
+          grep -Fx "PHASE14_CANDIDATE_PROOF_EXECUTION_AUTHORITY" <<<"$authority_body" >/dev/null
+          grep -Fx "main_sha: $GITHUB_SHA" <<<"$authority_body" >/dev/null
+          grep -Fx "source_run_id: $SOURCE_RUN_ID" <<<"$authority_body" >/dev/null
+          grep -Fx "activation: disabled" <<<"$authority_body" >/dev/null
+          grep -Fx "merge: forbidden" <<<"$authority_body" >/dev/null
 
       - name: Mint short-lived repository-scoped publication App token
         id: app-token
