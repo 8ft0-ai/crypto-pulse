@@ -307,6 +307,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
       pull-requests: read
     env:
       CANDIDATE_BRANCH: ${{ needs.prepare.outputs.candidate_branch }}
