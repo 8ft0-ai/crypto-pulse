@@ -377,8 +377,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          test "$ACTIVATION" = "disabled"
-
           current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           test "$current_main" = "$EXPECTED_MAIN_SHA"
 
@@ -440,7 +438,70 @@ jobs:
             echo "- validation conclusion: \`$VALIDATION_CONCLUSION\`"
             echo "- cleanup step: \`$CLEANUP_OUTCOME\`"
             echo "- cleanup readback: \`$CLEANUP_READBACK_OUTCOME\`"
-            echo "- activation: \`$ACTIVATION\`"
+            echo "- activation at proof-job start: \`$ACTIVATION\`"
             echo
             echo "No private key, JWT or installation token is retained in this summary."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  final_readback:
+    name: Re-read post-cleanup governance boundary
+    needs: proof
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FRESH_ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+      EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      PROBE_BRANCH: phase14/app-integration-proof-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Verify fresh activation, disposal, and immutable main
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$FRESH_ACTIVATION" = "disabled"
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          prs="$RUNNER_TEMP/probe-pr-post-cleanup.json"
+          gh api \
+            --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f head="$owner:$PROBE_BRANCH" \
+            -f base=main \
+            -f per_page=100 > "$prs"
+
+          pr_count="$(jq 'length' "$prs")"
+          if [[ "$pr_count" -gt 1 ]]; then
+            echo "Ambiguous disposable probe PR post-cleanup readback: found $pr_count PRs." >&2
+            exit 1
+          fi
+          if [[ "$pr_count" == "1" ]]; then
+            jq -e '.[0].state == "closed" and .[0].merged_at == null' "$prs" >/dev/null
+          fi
+
+          refs="$RUNNER_TEMP/probe-branch-post-cleanup.json"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$PROBE_BRANCH" \
+            > "$refs"
+          jq -e --arg ref "refs/heads/$PROBE_BRANCH" \
+            '[.[] | select(.ref == $ref)] | length == 0' \
+            "$refs" >/dev/null
+
+      - name: Record fresh post-cleanup readback
+        if: always()
+        run: |
+          {
+            echo
+            echo "## Phase 14 fresh post-cleanup governance readback"
+            echo
+            echo "- main SHA: \`$EXPECTED_MAIN_SHA\`"
+            echo "- probe branch: \`$PROBE_BRANCH\`"
+            echo "- fresh activation: \`$FRESH_ACTIVATION\`"
+            echo "- proof job outcome: \`${{ needs.proof.result }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
