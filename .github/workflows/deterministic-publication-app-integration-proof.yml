@@ -1,0 +1,507 @@
+name: Deterministic Publication App Integration Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: "Exact separately authorised main SHA for this one proof run"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: deterministic-publication-app-integration-proof
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Refuse unsafe proof dispatch
+    runs-on: ubuntu-latest
+    outputs:
+      main_sha: ${{ steps.guard.outputs.main_sha }}
+
+    steps:
+      - name: Require exact current main with activation disabled
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+          AUTHORISED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$ACTIVATION" = "disabled"
+          [[ "$AUTHORISED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$GITHUB_SHA" = "$AUTHORISED_MAIN_SHA"
+          test "$current_main" = "$AUTHORISED_MAIN_SHA"
+
+          echo "main_sha=$current_main" >> "$GITHUB_OUTPUT"
+
+  proof:
+    name: Run disposable non-publication App probe
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: deterministic-publication-control
+    env:
+      EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
+      ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+      EXPECTED_APP_ID: "4618782"
+      EXPECTED_APP_SLUG: cryptopulse-deterministic-pub
+      EXPECTED_REPOSITORY_ID: "1233729904"
+
+    steps:
+      - name: Revalidate protected environment identity and activation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIGURED_APP_ID: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          CONFIGURED_APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$ACTIVATION" = "disabled"
+          test "$CONFIGURED_APP_ID" = "$EXPECTED_APP_ID"
+          test "$CONFIGURED_APP_SLUG" = "$EXPECTED_APP_SLUG"
+
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$GITHUB_SHA" = "$EXPECTED_MAIN_SHA"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+      - name: Define disposable probe identity
+        id: identity
+        run: |
+          set -euo pipefail
+
+          branch="phase14/app-integration-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          sentinel="docs/proofs/phase14-app-integration-probe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+
+          case "$branch" in
+            automation/deterministic-publication-*)
+              echo "Probe branch must never use the deterministic publication prefix." >&2
+              exit 1
+              ;;
+          esac
+
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "sentinel=$sentinel" >> "$GITHUB_OUTPUT"
+
+      - name: Mint exact repository-scoped publication App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          private-key: ${{ secrets.DETERMINISTIC_PUBLICATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Prove exact App identity and token repository scope
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+
+          test "$APP_SLUG" = "$EXPECTED_APP_SLUG"
+          test -n "$INSTALLATION_ID"
+
+          scope="$RUNNER_TEMP/installation-repositories.json"
+          gh api "/installation/repositories?per_page=100" > "$scope"
+
+          jq -e \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --argjson repo_id "$EXPECTED_REPOSITORY_ID" \
+            '
+              .total_count == 1
+              and (.repositories | length) == 1
+              and .repositories[0].full_name == $repo
+              and .repositories[0].id == $repo_id
+            ' "$scope" >/dev/null
+
+      - name: Check out exact trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create and push one disposable sentinel branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROBE_BRANCH: ${{ steps.identity.outputs.branch }}
+          SENTINEL_PATH: ${{ steps.identity.outputs.sentinel }}
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN_SHA"
+          test "$ACTIVATION" = "disabled"
+
+          git checkout -b "$PROBE_BRANCH"
+
+          bot_login="${EXPECTED_APP_SLUG}[bot]"
+          bot_id="$(gh api "/users/$bot_login" --jq '.id')"
+          git config user.name "$bot_login"
+          git config user.email "${bot_id}+${bot_login}@users.noreply.github.com"
+
+          mkdir -p "$(dirname "$SENTINEL_PATH")"
+          cat > "$SENTINEL_PATH" <<EOF
+          # Phase 14 App integration proof sentinel
+
+          Disposable non-publication probe for workflow run ${GITHUB_RUN_ID}, attempt ${GITHUB_RUN_ATTEMPT}.
+
+          This file must never be merged into \`main\`.
+          EOF
+
+          git add "$SENTINEL_PATH"
+          staged="$(git diff --cached --name-only)"
+          test "$staged" = "$SENTINEL_PATH"
+
+          git commit -m "Add disposable Phase 14 App integration probe"
+          probe_head="$(git rev-parse HEAD)"
+
+          auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth_header"
+          git -c http.extraheader="AUTHORIZATION: basic $auth_header" \
+            push "https://github.com/$GITHUB_REPOSITORY.git" \
+            "HEAD:refs/heads/$PROBE_BRANCH"
+          unset auth_header
+
+          echo "head_sha=$probe_head" >> "$GITHUB_OUTPUT"
+
+      - name: Open and verify one App-authored disposable PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROBE_BRANCH: ${{ steps.identity.outputs.branch }}
+          SENTINEL_PATH: ${{ steps.identity.outputs.sentinel }}
+          PROBE_HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+
+          body="$RUNNER_TEMP/probe-pr-body.md"
+          cat > "$body" <<EOF
+          ## Phase 14 disposable App integration probe
+
+          This PR exists only to prove the separately governed non-merging GitHub App integration path.
+
+          - proof run: ${GITHUB_RUN_ID}
+          - proof attempt: ${GITHUB_RUN_ATTEMPT}
+          - base: ${EXPECTED_MAIN_SHA}
+          - sentinel: ${SENTINEL_PATH}
+
+          It is not a deterministic publication candidate and must be closed without merge.
+          EOF
+
+          pr_json="$RUNNER_TEMP/probe-pr.json"
+          gh api \
+            --method POST \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f title="Phase 14 disposable App integration probe ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            -F head="$PROBE_BRANCH" \
+            -f base=main \
+            -F body=@"$body" > "$pr_json"
+
+          pr_number="$(jq -r '.number' "$pr_json")"
+          test -n "$pr_number"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+          pr_readback="$RUNNER_TEMP/probe-pr-readback.json"
+          files="$RUNNER_TEMP/probe-pr-files.json"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" > "$pr_readback"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number/files?per_page=100" > "$files"
+
+          jq -e \
+            --arg actor "${EXPECTED_APP_SLUG}[bot]" \
+            --arg branch "$PROBE_BRANCH" \
+            --arg head "$PROBE_HEAD_SHA" \
+            '
+              .state == "open"
+              and .merged_at == null
+              and .user.login == $actor
+              and .head.ref == $branch
+              and .head.sha == $head
+              and .base.ref == "main"
+            ' "$pr_readback" >/dev/null
+
+          jq -e \
+            --arg sentinel "$SENTINEL_PATH" \
+            'length == 1 and .[0].filename == $sentinel' \
+            "$files" >/dev/null
+
+      - name: Prove exact-head PR validation starts without manual approval
+        id: validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+
+          ready=false
+          for poll in $(seq 1 18); do
+            runs="$RUNNER_TEMP/probe-validation-runs.json"
+            gh api \
+              "/repos/$GITHUB_REPOSITORY/actions/workflows/pr-validation.yml/runs?event=pull_request&head_sha=$PROBE_HEAD_SHA&per_page=20" \
+              > "$runs"
+
+            count="$(jq --arg head "$PROBE_HEAD_SHA" '[.workflow_runs[] | select(.head_sha == $head)] | length' "$runs")"
+            if [[ "$count" -gt 1 ]]; then
+              echo "Ambiguous PR-validation evidence for exact probe head: found $count runs." >&2
+              exit 1
+            fi
+
+            if [[ "$count" == "1" ]]; then
+              run_id="$(jq -r --arg head "$PROBE_HEAD_SHA" '.workflow_runs[] | select(.head_sha == $head) | .id' "$runs")"
+              conclusion="$(jq -r --arg head "$PROBE_HEAD_SHA" '.workflow_runs[] | select(.head_sha == $head) | (.conclusion // "")' "$runs")"
+
+              if [[ "$conclusion" == "action_required" ]]; then
+                echo "PR validation requires manual workflow approval." >&2
+                exit 1
+              fi
+
+              jobs="$RUNNER_TEMP/probe-validation-jobs.json"
+              gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" > "$jobs"
+
+              job_count="$(jq '[.jobs[] | select(.name == "Build site and check generated output")] | length' "$jobs")"
+              if [[ "$job_count" -gt 1 ]]; then
+                echo "Ambiguous validation job evidence for exact probe head." >&2
+                exit 1
+              fi
+
+              if [[ "$job_count" == "1" ]]; then
+                started_at="$(jq -r '.jobs[] | select(.name == "Build site and check generated output") | (.started_at // "")' "$jobs")"
+                status="$(jq -r '.jobs[] | select(.name == "Build site and check generated output") | .status' "$jobs")"
+                if [[ -n "$started_at" || "$status" == "completed" ]]; then
+                  echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+                  echo "status=$status" >> "$GITHUB_OUTPUT"
+                  echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+                  ready=true
+                  break
+                fi
+              fi
+            fi
+
+            sleep 5
+          done
+
+          if [[ "$ready" != "true" ]]; then
+            echo "Exact-head PR validation did not start inside the bounded observation window." >&2
+            exit 1
+          fi
+
+      - name: Close probe PR and delete probe branch
+        id: cleanup
+        if: always() && steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROBE_BRANCH: ${{ steps.identity.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          cleanup_failed=false
+          owner="${GITHUB_REPOSITORY%%/*}"
+
+          prs="$RUNNER_TEMP/probe-pr-cleanup.json"
+          if ! gh api \
+            --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f head="$owner:$PROBE_BRANCH" \
+            -f base=main \
+            -f per_page=100 > "$prs"; then
+            echo "Failed to enumerate disposable probe PR residue." >&2
+            cleanup_failed=true
+          else
+            pr_count="$(jq 'length' "$prs")"
+            if [[ "$pr_count" -gt 1 ]]; then
+              echo "Ambiguous disposable probe PR residue: found $pr_count PRs." >&2
+              cleanup_failed=true
+            elif [[ "$pr_count" == "1" ]]; then
+              pr_number="$(jq -r '.[0].number' "$prs")"
+              merged_at="$(jq -r '.[0].merged_at // ""' "$prs")"
+              if [[ -n "$merged_at" ]]; then
+                echo "Disposable probe PR #$pr_number was unexpectedly merged." >&2
+                cleanup_failed=true
+              fi
+              if ! gh api \
+                --method PATCH \
+                "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" \
+                -f state=closed \
+                > "$RUNNER_TEMP/probe-pr-close.json"; then
+                echo "Failed to close disposable probe PR #$pr_number." >&2
+                cleanup_failed=true
+              fi
+            fi
+          fi
+
+          refs="$RUNNER_TEMP/probe-branch-cleanup.json"
+          if ! gh api \
+            "/repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$PROBE_BRANCH" \
+            > "$refs"; then
+            echo "Failed to enumerate disposable probe branch residue." >&2
+            cleanup_failed=true
+          else
+            ref_count="$(jq --arg ref "refs/heads/$PROBE_BRANCH" '[.[] | select(.ref == $ref)] | length' "$refs")"
+            if [[ "$ref_count" -gt 1 ]]; then
+              echo "Ambiguous disposable probe branch residue." >&2
+              cleanup_failed=true
+            elif [[ "$ref_count" == "1" ]]; then
+              if ! gh api \
+                --method DELETE \
+                "/repos/$GITHUB_REPOSITORY/git/refs/heads/$PROBE_BRANCH"; then
+                echo "Failed to delete disposable probe branch $PROBE_BRANCH." >&2
+                cleanup_failed=true
+              fi
+            fi
+          fi
+
+          if [[ "$cleanup_failed" == "true" ]]; then
+            exit 1
+          fi
+
+      - name: Verify disposal and immutable governance boundary
+        id: cleanup_readback
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_BRANCH: ${{ steps.identity.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          prs="$RUNNER_TEMP/probe-pr-final.json"
+          gh api \
+            --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f head="$owner:$PROBE_BRANCH" \
+            -f base=main \
+            -f per_page=100 > "$prs"
+
+          pr_count="$(jq 'length' "$prs")"
+          if [[ "$pr_count" -gt 1 ]]; then
+            echo "Ambiguous disposable probe PR readback: found $pr_count PRs." >&2
+            exit 1
+          fi
+          if [[ "$pr_count" == "1" ]]; then
+            jq -e '.[0].state == "closed" and .[0].merged_at == null' "$prs" >/dev/null
+          fi
+
+          refs="$RUNNER_TEMP/probe-branch-final.json"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$PROBE_BRANCH" \
+            > "$refs"
+          jq -e --arg ref "refs/heads/$PROBE_BRANCH" \
+            '[.[] | select(.ref == $ref)] | length == 0' \
+            "$refs" >/dev/null
+
+      - name: Record sanitised proof evidence
+        if: always()
+        env:
+          PROBE_BRANCH: ${{ steps.identity.outputs.branch }}
+          SENTINEL_PATH: ${{ steps.identity.outputs.sentinel }}
+          PROBE_HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          VALIDATION_RUN_ID: ${{ steps.validation.outputs.run_id }}
+          VALIDATION_STATUS: ${{ steps.validation.outputs.status }}
+          VALIDATION_CONCLUSION: ${{ steps.validation.outputs.conclusion }}
+          INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          CLEANUP_OUTCOME: ${{ steps.cleanup.outcome }}
+          CLEANUP_READBACK_OUTCOME: ${{ steps.cleanup_readback.outcome }}
+        run: |
+          {
+            echo "## Phase 14 App integration proof"
+            echo
+            echo "- main SHA: \`$EXPECTED_MAIN_SHA\`"
+            echo "- App id: \`$EXPECTED_APP_ID\`"
+            echo "- App slug: \`$APP_SLUG\`"
+            echo "- installation id: \`$INSTALLATION_ID\`"
+            echo "- probe branch: \`$PROBE_BRANCH\`"
+            echo "- sentinel path: \`$SENTINEL_PATH\`"
+            echo "- probe head SHA: \`$PROBE_HEAD_SHA\`"
+            echo "- probe PR: \`$PR_NUMBER\`"
+            echo "- validation run: \`$VALIDATION_RUN_ID\`"
+            echo "- validation status: \`$VALIDATION_STATUS\`"
+            echo "- validation conclusion: \`$VALIDATION_CONCLUSION\`"
+            echo "- cleanup step: \`$CLEANUP_OUTCOME\`"
+            echo "- cleanup readback: \`$CLEANUP_READBACK_OUTCOME\`"
+            echo "- activation at proof-job start: \`$ACTIVATION\`"
+            echo
+            echo "No private key, JWT or installation token is retained in this summary."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  final_readback:
+    name: Re-read post-cleanup governance boundary
+    needs: proof
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FRESH_ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
+      EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      PROBE_BRANCH: phase14/app-integration-proof-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Verify fresh activation, disposal, and immutable main
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$FRESH_ACTIVATION" = "disabled"
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          current_main="$(gh api "/repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          test "$current_main" = "$EXPECTED_MAIN_SHA"
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          prs="$RUNNER_TEMP/probe-pr-post-cleanup.json"
+          gh api \
+            --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=all \
+            -f head="$owner:$PROBE_BRANCH" \
+            -f base=main \
+            -f per_page=100 > "$prs"
+
+          pr_count="$(jq 'length' "$prs")"
+          if [[ "$pr_count" -gt 1 ]]; then
+            echo "Ambiguous disposable probe PR post-cleanup readback: found $pr_count PRs." >&2
+            exit 1
+          fi
+          if [[ "$pr_count" == "1" ]]; then
+            jq -e '.[0].state == "closed" and .[0].merged_at == null' "$prs" >/dev/null
+          fi
+
+          refs="$RUNNER_TEMP/probe-branch-post-cleanup.json"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$PROBE_BRANCH" \
+            > "$refs"
+          jq -e --arg ref "refs/heads/$PROBE_BRANCH" \
+            '[.[] | select(.ref == $ref)] | length == 0' \
+            "$refs" >/dev/null
+
+      - name: Record fresh post-cleanup readback
+        if: always()
+        run: |
+          {
+            echo
+            echo "## Phase 14 fresh post-cleanup governance readback"
+            echo
+            echo "- main SHA: \`$EXPECTED_MAIN_SHA\`"
+            echo "- probe branch: \`$PROBE_BRANCH\`"
+            echo "- fresh activation: \`$FRESH_ACTIVATION\`"
+            echo "- proof job outcome: \`${{ needs.proof.result }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
