@@ -1,8 +1,8 @@
 # Phase 14 — Deterministic site publication
 
-Status: promoted for delivery planning; implementation not yet authorised by this roadmap record.
+Status: complete at the safe inert control-plane boundary; operational activation deferred.
 
-This roadmap spec promotes the accepted `deterministic-site-publication/v3` design from #455 as the next bounded CryptoPulse successor direction after Phase 13. It restores recent deterministic report publication without changing `main` as the sole publication authority or widening the product into Phase 13 temporal public rendering.
+This roadmap spec promoted the accepted `deterministic-site-publication/v3` design from #455 as the bounded CryptoPulse successor direction after Phase 13. It delivered the reviewed deterministic publication control plane without changing `main` as the sole publication authority or widening the product into Phase 13 temporal public rendering. Operational automatic publication was deliberately not activated during Phase 14 close-out.
 
 ## Governance
 
@@ -14,7 +14,36 @@ Fresh substantive design approval: #455 comment 5307453436
 Owner successor/promotion authority: #455 comment 5307463217
 Roadmap-promotion issue: #456
 Trusted promotion baseline: 85f16d388c12669a0560844785f34bc68a67f033
+Parent delivery-control issue: #458
+Owner inert-boundary close-out decision: #458 comment 5361248316
+Deferred live-proof successor: #477
 ```
+
+## Close-out disposition
+
+Phase 14 closes as **completed delivery of the safe inert control plane**, not as completed operational rollout.
+
+Accepted evidence establishes the reviewed v3 implementation, dedicated repository-scoped publication App/protection boundary, non-merging App integration proof, immutable candidate attestation/head binding, ordinary-writer changed-head rejection, credential-free stale-current-main refusal coverage, and fail-closed behaviour during bounded live-race attempts.
+
+The real live stale-base race acceptance criterion was not achieved. Issue #472 was closed `not planned` / deferred after the V1–V13 owner-local timing-runner series ended fail-closed. That proof is not represented as successful and may be revisited only through #477 using a deterministic inert proof carrier rather than another timing-only V14+ attempt.
+
+The following original operational gates were therefore not performed as part of Phase 14 close-out:
+
+- successful real live stale-base race observation;
+- one live publication pilot through Pages/live verification;
+- recurring publication activation.
+
+Final close-out state:
+
+```text
+normal ingestion cadence: 17 * * * *
+publication activation: absent/disabled
+live pilot: not performed
+recurring activation: not enabled
+main publication authority: unchanged
+```
+
+No active successor phase is selected by this close-out.
 
 ## Problem statement
 
@@ -108,7 +137,7 @@ Deletion, expiry, ambiguity, duplicate expected artefacts, changed head, changed
 
 ## Publication App boundary
 
-Provisioning is a later separately authorised gate. The intended App is installed only on `8ft0-ai/crypto-pulse` with exactly:
+The dedicated App was separately provisioned under #461 and remains installed only on `8ft0-ai/crypto-pulse` with exactly:
 
 ```text
 Metadata:      read
@@ -122,15 +151,15 @@ The App private key belongs only in a dedicated protected environment restricted
 
 ## Trusted-main controls
 
-The existing active ruleset `20795849` remains the administrator-only trusted-main update boundary. Separately authorised provisioning may add exactly one publication-App integration with:
+The existing active ruleset `20795849` remains the administrator-only trusted-main update boundary. Provisioning added exactly one publication-App integration with:
 
 ```text
 bypass_mode: pull_request
 ```
 
-The App must not receive `always` bypass and cannot directly push to `main`.
+The App does not receive `always` bypass and cannot directly push to `main`.
 
-The existing classic `main` protection must separately require the actual PR-validation check context:
+The existing classic `main` protection separately requires the actual PR-validation check context:
 
 ```text
 Build site and check generated output
@@ -169,13 +198,13 @@ The gate reads exact candidate bytes through GitHub object/content APIs at the p
 
 No direct deployment is added to ingestion, generation or the merge gate.
 
-The existing `.github/workflows/pages.yml` remains the sole Pages deployer from `main`, building disposable `_site/` output after the publication merge. `Verify CryptoPulse Live Pages` remains the post-deployment verifier.
+The existing `.github/workflows/pages.yml` remains the sole Pages deployer from `main`, building disposable `_site/` output after a separately authorised future publication merge. `Verify CryptoPulse Live Pages` remains the post-deployment verifier.
 
-The bounded live pilot, if separately authorised later, must prove both the expected `main` merge commit and that the live latest report resolves to the newly merged deterministic report. A verification failure records failure only; it does not trigger rollback, fallback or another automatic merge.
+A bounded live pilot was not performed during Phase 14. If automatic deterministic publication is revisited, a future separately governed pilot must prove both the expected `main` merge commit and that the live latest report resolves to the newly merged deterministic report. A verification failure records failure only; it does not trigger rollback, fallback or another automatic merge.
 
 ## Delivery sequence and authority gates
 
-The accepted design requires this order:
+The accepted design originally required this order:
 
 1. roadmap promotion and delivery planning;
 2. credential-free implementation and negative-corpus proof with activation `disabled`;
@@ -188,23 +217,23 @@ The accepted design requires this order:
 9. fresh pilot adjudication proving merge -> existing Pages -> live identity;
 10. separate owner recurring-activation authority before `recurring`.
 
-No earlier gate grants authority for a later one.
+Gates 1–6 were completed. Gate 7 was attempted but the live criterion was not achieved and is deferred to #477. Gates 8–10 were intentionally not entered. No earlier gate grants authority for a later one.
 
-## Acceptance gates
+## Acceptance gates at close-out
 
-- [ ] Roadmap promotion lands as planning-only state with all v3 trust/product boundaries preserved.
-- [ ] A delivery-control issue freezes the exact implementation slices and credential-free proof matrix before implementation begins.
-- [ ] Implementation lands with activation `disabled` and cannot become operational merely by merge.
-- [ ] Trusted-generation attestation reconstruction proves exact run/attempt/base/PR/App/head/byte identity and fails closed after ordinary-writer head mutation.
-- [ ] PR validation remains credential-free and succeeds only for the exact current candidate head.
-- [ ] Metadata-only gate executes no PR code and rejects every identity/scope/quality/duplicate/check/base/head/activation mismatch.
-- [ ] Strict classic `main` protection and exact required-check source are proved by provisioning readback before operational use.
-- [ ] Stale-base race proof demonstrates that a concurrent `main` advance prevents automatic merge without rebase/update/regeneration.
-- [ ] Dedicated App remains repository-scoped and permission-minimal with only PR-only ruleset bypass.
-- [ ] At most one `valid-ok` publication is accepted per canonical observation hour; there is no stale-hour fallback.
-- [ ] Existing Pages/live-verification chain remains the sole deployment path and `_site/` remains generated-only.
-- [ ] Live pilot and recurring activation occur only after their separate owner gates and accepted evidence.
-- [ ] No model/provider, Phase 13 temporal public rendering, forecasting, sentiment, advice or broader product scope is introduced.
+- [x] Roadmap promotion landed as planning-only state with all v3 trust/product boundaries preserved.
+- [x] A delivery-control issue froze the implementation slices and credential-free proof matrix before implementation.
+- [x] Implementation landed with activation `disabled` and could not become operational merely by merge.
+- [x] Trusted-generation attestation reconstruction proved exact run/attempt/base/PR/App/head/byte identity and failed closed after ordinary-writer head mutation.
+- [x] PR validation remained credential-free and exact-head bound.
+- [x] Metadata-only gate executes no PR code and has credential-free coverage for identity/scope/quality/duplicate/check/base/head/activation mismatch.
+- [x] Strict classic `main` protection and exact required-check source were proved by provisioning readback.
+- [ ] Real stale-base race refusal after a concurrent `main` advance was not observed; deferred to #477 and must not be claimed as proven.
+- [x] Dedicated App remains repository-scoped and permission-minimal with PR-only ruleset bypass.
+- [x] The v3 implementation enforces at-most-one `valid-ok` publication per canonical observation hour and no stale-hour fallback; no live publication acceptance was exercised.
+- [x] Existing Pages/live-verification chain remains the sole deployment path and `_site/` remains generated-only.
+- [ ] Live pilot was not performed and recurring activation was not enabled; both are deferred future operationalisation decisions.
+- [x] No model/provider, Phase 13 temporal public rendering, forecasting, sentiment, advice or broader product scope was introduced.
 
 ## Non-goals
 
@@ -225,11 +254,11 @@ Phase 14 does not authorise or deliver:
 
 ### Risk: ordinary writers modify an App-authored publication branch
 
-Mitigation: the immutable trusted-generation attestation binds the exact trusted generation run/attempt and exact candidate head/bytes; any changed head or byte identity fails closed.
+Mitigation: the immutable trusted-generation attestation binds the exact trusted generation run/attempt and exact candidate head/bytes; any changed head or byte identity fails closed. The #465 proof exercised this control.
 
 ### Risk: `main` advances between the gate's last read and merge
 
-Mitigation: strict classic required-check protection requires the candidate branch to remain up to date at merge evaluation; a concurrent `main` advance makes the merge ineligible.
+Mitigation: strict classic required-check protection requires the candidate branch to remain up to date at merge evaluation; the policy/helper also rejects current `main` differing from the attested base. The real live race remains deferred to #477, so this control is not represented as live-race proven.
 
 ### Risk: the new App becomes a general bypass principal
 
@@ -239,6 +268,8 @@ Mitigation: one repository installation, minimal permissions, protected credenti
 
 Mitigation: automatic candidates are exactly one snapshot plus one existing deterministic Markdown report; Pages remains unchanged and Phase 13 temporal public rendering stays parked.
 
-## Definition of done
+## Original definition of done
 
-Phase 14 is complete only when the accepted v3 publication contract is implemented and independently reviewed, provisioning and stale-base controls are separately authorised and proved, one bounded live pilot is accepted end to end through the existing Pages/live-verification path, recurring activation is separately authorised, deterministic recent publication operates under the closed valid-ok/idempotent contract, close-out evidence is recorded, and generated `_site/` output remains uncommitted.
+The original operational definition of done required the accepted v3 publication contract to be implemented and independently reviewed, provisioning and stale-base controls to be separately authorised and proved, one bounded live pilot to be accepted end to end through the existing Pages/live-verification path, recurring activation to be separately authorised, deterministic recent publication to operate under the closed valid-ok/idempotent contract, close-out evidence to be recorded, and generated `_site/` output to remain uncommitted.
+
+That original operational definition was **not fully achieved**. The owner explicitly chose to close Phase 14 at the safe inert boundary in #458 comment `5361248316`, with the unresolved live stale-base race, live pilot and recurring activation deferred rather than manufactured as passes. The completed delivery state is recorded in `../delivery/phase-14-deterministic-site-publication.md`.

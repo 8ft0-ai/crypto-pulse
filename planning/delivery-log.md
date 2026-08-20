@@ -372,3 +372,47 @@ Delivery notes:
 - Frozen Phase 10/11/12 semantics, historical snapshots, acquisition/workflows/publication, selector/report/site/renderer, provider/model/credential behaviour and generated `_site/` remain unchanged.
 - The compact delivery graph records Phase 13 as an enduring evidence dependency while explicitly preserving the boundary that rendering/public-site integration requires separate future governance.
 - No successor phase is selected by this close-out.
+
+## Phase 14 — Deterministic site publication
+
+Status: complete at the safe inert control-plane boundary; operational activation deferred.
+
+Primary outcome: the reviewed `deterministic-site-publication/v3` control plane, dedicated repository-scoped publication App/protection boundary and candidate identity proof machinery are delivered, while automatic publication remains disabled and the unresolved live stale-base race, live pilot and recurring activation are explicitly deferred.
+
+```text
+Shaping issue: #455
+Roadmap promotion: #456 / PR #457
+Parent issue: #458
+Inert implementation: #459 / PR #460
+Inert implementation merge: 02f9ef75633a8bff4f84448d24e0f6167c610b73
+Inert implementation exact-head validation: 31978089661
+Provisioning/App protection: #461
+App integration carrier: #462 / PR #463
+App integration proof run: 31991433001
+Candidate attestation/head-change proof: #465
+Candidate proof carrier: PR #466
+Proofability remediation: PR #467
+Final candidate proof adjudication: #465 comment 5327452648
+Stale-base live proof: #472 — closed not planned / deferred
+Deferred live-proof successor: #477
+Cadence restoration: #473 / PR #476
+Close-out baseline: bf729ff61731ce515e48c9cd45ab7c1aa3266a5e
+Owner inert-boundary close-out decision: #458 comment 5361248316
+Delivery record: planning/delivery/phase-14-deterministic-site-publication.md
+Delivery graph update: N/A under compact causal graph rules — no newly operational live publication stage
+_site committed: no
+```
+
+Delivery notes:
+
+- PR #460 delivered immutable source-intent/candidate/attestation identity, credential-free exact-head validation, a metadata-only gate that executes no candidate code, closed `valid-ok`/scope/idempotency policy and fail-closed activation semantics.
+- #461 separately established the repository-scoped publication App, protected environment, strict required check bound to GitHub Actions app id `15368`, and PR-only publication-App ruleset bypass.
+- App integration run `31991433001` proved the bounded App token/PR path while activation remained disabled and cleaned up its disposable PR/branch unmerged.
+- #465 proved immutable attestation reconstruction and ordinary-writer changed-head rejection before the privileged merge boundary; final adjudication `5327452648` records proof success and cleanup complete.
+- The real stale-base race was not successfully observed. V1–V13 repeatedly failed closed under scheduler timing, with final V13 stopping because the first qualifying source had already completed before pilot-id binding. That criterion is not claimed as proven.
+- #472 was closed `not planned` / deferred and #477 now holds any future deterministic proof-carrier/operationalisation work. V1–V13 must not be revived and another timing-only V14+ runner is out of scope.
+- PR #476 restored normal hourly ingestion cadence `17 * * * *`; publication activation remains absent/`disabled`.
+- No Phase 14 live publication pilot, Phase 14 Pages/live identity proof or recurring activation occurred.
+- `planning/delivery/delivery.yaml` and generated `planning/delivery/graph.md` remain unchanged because Phase 14 closes inert and does not add a newly operational publication stage to the causal graph.
+- No model/provider, Phase 13 temporal public rendering, forecasting, sentiment, advice or broader product scope was introduced.
+- No active successor phase is selected by this close-out.

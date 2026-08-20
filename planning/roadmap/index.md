@@ -40,23 +40,25 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-Phase 14 — deterministic site publication — is the selected active successor direction under #455/#456 and `deterministic-site-publication/v3`. It is limited to restoring recent deterministic report freshness through immutable publication PRs into `main`, followed by the existing Pages/live-verification path. Implementation must remain inert with activation `disabled` until later separately authorised provisioning, pilot and recurring gates.
+Phase 14 — deterministic site publication — is complete at the safe inert control-plane boundary under #458 and `deterministic-site-publication/v3`. The reviewed control plane, publication-App/protection boundary, non-merging App integration proof and candidate attestation/head-change controls are delivered, but the real live stale-base race, live publication pilot and recurring activation were deliberately deferred rather than represented as complete.
 
-Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453. It delivers the separately versioned `phase13-observation-hour-adjacency/v1`, `crypto-observation-hour-comparison/v1` and `crypto-observation-hour-series/v1` evidence family over Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
+The deferred deterministic live stale-base proof/operationalisation path is parked in #477. It is backlog work, not an active successor phase. Publication activation remains absent/`disabled`, normal ingestion cadence is restored to hourly `17 * * * *`, and no automatic deterministic publication rollout is currently active.
+
+Phase 13 — deterministic observation-hour comparison and temporal evidence — remains complete under #446/#453. It delivers the separately versioned `phase13-observation-hour-adjacency/v1`, `crypto-observation-hour-comparison/v1` and `crypto-observation-hour-series/v1` evidence family over Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
 
 Phase 12 — canonical observation-hour evidence — remains complete under #436/#441 and `phase12-observation-hour/v1`. It gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
 
-Phase 13 proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Public/site rendering of that temporal evidence remains outside the completed phase and outside Phase 14.
+Phase 13 proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Public/site rendering of that temporal evidence remains outside the completed Phase 13 and Phase 14 scopes.
 
 The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`.
 
 ## Active roadmap direction
 
-Phase 14 — deterministic site publication — is promoted for delivery planning. The accepted design keeps `main` as sole publication authority and introduces only the minimum deterministic promotion boundary required for freshness: immutable trusted-generation attestation, exact-head credential-free PR validation, a metadata-only merge gate, strict stale-base refusal, and a separately provisioned repository-scoped publication App with PR-only trusted-main bypass.
+No successor phase is currently selected.
 
-Roadmap promotion does not provision the App, create secrets/environments, alter branch protection/rulesets, activate pilot/recurring publication or change production behaviour. Those remain separate gates in the Phase 14 roadmap.
+Issue #477 preserves the deferred deterministic publication live-proof/operationalisation problem without making it active delivery work. If operational automatic publication becomes valuable enough to revisit, shape a fresh successor from #477 with a deterministic proof carrier, a separately governed live pilot, Pages/live identity proof and any later recurring-activation decision.
 
-Public/site integration of Phase 11/13 temporal evidence remains parked and was not authorised by Phase 13 or Phase 14.
+Public/site integration of Phase 11/13 temporal evidence also remains parked and is not selected by the Phase 14 close-out.
 
 ## Completed roadmap directions
 
@@ -69,8 +71,9 @@ Public/site integration of Phase 11/13 temporal evidence remains parked and was 
 | Phase 11 — Deterministic temporal visualisation | Complete; offline deterministic temporal evidence/rendering proof | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) | [../delivery/phase-11-deterministic-temporal-visualisation.md](../delivery/phase-11-deterministic-temporal-visualisation.md) |
 | Phase 12 — Canonical observation-hour evidence | Complete; future snapshot cadence-bucket identity and enforcement | [phase-12-canonical-observation-hour-evidence.md](phase-12-canonical-observation-hour-evidence.md) | [../delivery/phase-12-canonical-observation-hour-evidence.md](../delivery/phase-12-canonical-observation-hour-evidence.md) |
 | Phase 13 — Deterministic observation-hour comparison and temporal evidence | Complete; adjacent-slot comparison and canonical temporal evidence proved offline | [phase-13-observation-hour-temporal-evidence.md](phase-13-observation-hour-temporal-evidence.md) | [../delivery/phase-13-observation-hour-temporal-evidence.md](../delivery/phase-13-observation-hour-temporal-evidence.md) |
+| Phase 14 — Deterministic site publication | Complete at safe inert control-plane boundary; operational activation deferred | [phase-14-deterministic-site-publication.md](phase-14-deterministic-site-publication.md) | [../delivery/phase-14-deterministic-site-publication.md](../delivery/phase-14-deterministic-site-publication.md) |
 
-Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged. Phase 14 adds a reviewed inert deterministic publication control plane and trusted App/protection boundary but deliberately stops before live operational publication.
 
 ## Superseded active direction
 
@@ -87,13 +90,13 @@ The chronology and lessons remain recorded in:
 
 ## Backlog
 
-Ideas that are useful but not part of the selected Phase 14 direction are parked in:
+Ideas that are useful but not part of a selected active phase are parked in:
 
 ```text
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without broadening Phase 14 into Phase 13 temporal public rendering, model work or another capability.
+Use the backlog to preserve follow-on ideas without turning deferred Phase 14 operationalisation, Phase 13 temporal public rendering, model work or another capability into implicit active delivery authority.
 
 ## Retrospective roadmap specs
 
