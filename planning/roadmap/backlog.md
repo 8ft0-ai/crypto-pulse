@@ -1,10 +1,8 @@
 # CryptoPulse roadmap backlog
 
-This backlog parks ideas that are useful but outside the completed Phase 14 safe inert-boundary delivery. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
+This backlog parks ideas that are useful but outside the completed Phase 14 safe inert-boundary delivery and the selected Phase 15 public deterministic temporal-evidence direction. Items here are not commitments. Promote an item into a phase spec only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. Phase 14 — deterministic site publication — is complete at the safe inert control-plane boundary under #458: the reviewed `deterministic-site-publication/v3` control plane and App/protection boundary are delivered, while the real live stale-base race, live pilot and recurring activation remain deliberately deferred. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is approved for operational use.
-
-No active successor phase is selected by the Phase 14 close-out.
+Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. Phase 14 — deterministic site publication — is complete at the safe inert control-plane boundary under #458: the reviewed `deterministic-site-publication/v3` control plane and App/protection boundary are delivered, while the real live stale-base race, live pilot and recurring activation remain deliberately deferred. Phase 15 — public deterministic temporal evidence — is selected under #479/#480 only for the bounded public integration of one validated `BTC.price_usd` 24-slot Phase 13 series. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is approved for operational use.
 
 ## Candidate future phases
 
@@ -44,7 +42,7 @@ Use validated `phase12-observation-hour/v1` identity to define an operational ca
 
 Status: complete. Delivered under Phase 13 as **deterministic observation-hour comparison and temporal evidence**. The accepted implementation provides exact adjacent observation-hour selection, explicit missing/duplicate/invalid evidence, immutable provenance, deterministic repository-bound comparison/series records, bounded 12-metric/8-source temporal vocabulary and closed offline proof while preserving frozen Phase 10/11 v1 semantics.
 
-See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. Public/site integration of that temporal evidence remains outside Phase 13 and separately parked below.
+See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. The bounded public integration of that evidence is now selected separately as Phase 15; broader temporal product expansion remains parked below.
 
 ### Deterministic report publication freshness — delivered at the Phase 14 inert boundary
 
@@ -56,15 +54,25 @@ Not delivered: the real live stale-base race, one live publication pilot, live P
 
 See `phase-14-deterministic-site-publication.md` and `../delivery/phase-14-deterministic-site-publication.md`.
 
-### Deterministic charts and visual market cards — offline foundation delivered in Phase 11
+### Public deterministic temporal evidence — promoted as Phase 15
 
-Generate deterministic temporal visual evidence from the frozen Phase 10 comparison boundary.
+Expose the already-proved Phase 13 observation-hour evidence on the public demo site without reopening frozen Phase 11/12/13 contracts or turning CryptoPulse into a market-product UX.
+
+Status: promoted under #479/#480 as **Phase 15 — public deterministic temporal evidence** with contract `phase15-public-temporal-evidence/v1`. The selected v1 surface is exactly one `metric` / `BTC.price_usd` series over 24 canonical observation-hour slots, one generated `temporal.html` page and one low-prominence homepage discovery link.
+
+The selected design inherits exact Phase 13 participation and malformed/unorderable-population semantics, uses the maximum canonical participating observation hour as the deterministic anchor, fails closed with no asserted page when participation is empty, preserves duplicate latest-hour ambiguity without fallback, validates the canonical Phase 13 record directly through a new narrow renderer boundary, and requires separately governed Phase-12-valid evidence on trusted `main` before site integration.
+
+This promotion does not activate Phase 14/#477, promote source evidence implicitly, render from a mutable rolling branch, backfill history, add narrative/forecast/advice, enable a model/provider path, or select broader visual market-card scope.
+
+### Deterministic charts and visual market cards — broader product scope still parked
+
+Generate additional deterministic temporal visual evidence and market-card product surfaces beyond the single Phase 15 BTC price proof.
 
 Status: the bounded offline rendering foundation is complete under Phase 11. `crypto-temporal-series/v1`, repository-bound replay validation, deterministic accessible HTML/SVG rendering and the closed repeatability proof corpus are delivered and recorded in `../delivery/phase-11-deterministic-temporal-visualisation.md`.
 
-Operational evidence prerequisites are also complete: Phase 12 provides future slot-ready observation-hour identity and Phase 13 provides the separately versioned observation-hour comparison/temporal consumer.
+Operational evidence prerequisites are also complete: Phase 12 provides future slot-ready observation-hour identity and Phase 13 provides the separately versioned observation-hour comparison/temporal consumer. Phase 15 now selects only the narrow public `BTC.price_usd` proof.
 
-Still parked: public-site integration of temporal evidence and broader visual market-card product work. Phase 14 did not select public use of the Phase 11 renderer or Phase 13 series.
+Still parked: additional metrics or source-status series, richer market-card UX, broader navigation/product treatment and any derived analytics. Those require separate product/evidence/governance decisions after Phase 15 rather than being implied by it.
 
 ### Technical-level calculation policy
 
@@ -88,7 +96,7 @@ Why parked: No model-authored operational narrative is currently enabled. Revisi
 
 Trigger governed LLM analysis automatically after a source snapshot PR merges, rather than requiring `workflow_dispatch`.
 
-Why parked: No model is currently selected or enabled. Phase 14 delivered only a deterministic publication control plane and did not authorise model generation, model scheduling or model credentials. Any future LLM automation requires a new separately governed model programme and completed validation evidence first.
+Why parked: No model is currently selected or enabled. Phase 14 delivered only a deterministic publication control plane and Phase 15 adds only deterministic historical temporal evidence; neither authorises model generation, model scheduling or model credentials. Any future LLM automation requires a new separately governed model programme and completed validation evidence first.
 
 ### Expanded approved prose slots in reports
 
@@ -116,14 +124,14 @@ Why parked: There is no active generated-narrative delivery path to optimise. Re
 
 ## Parking lot from the original analyst prompt
 
-These original prompt features remain parked after completion of the Phase 10–14 evidence/control-plane foundations. Each requires separate product, evidence and governance decisions before implementation:
+These original prompt features remain parked after completion of the Phase 10–14 evidence/control-plane foundations and selection of the narrow Phase 15 public temporal-evidence proof. Each requires separate product, evidence and governance decisions before implementation:
 
 - live or most-recent data collection by a model;
 - model-selected credible sources;
 - ongoing event summaries from news feeds;
 - whale, treasury or exchange-wallet movements;
 - ETF flow updates;
-- public/site chart integration beyond the delivered offline Phase 11 renderer and Phase 13 observation-hour evidence consumer;
+- public/site chart integration beyond the single Phase 15 `BTC.price_usd` 24-slot proof;
 - support and resistance levels;
 - trader watchlists;
 - causal claims about why price moved;
