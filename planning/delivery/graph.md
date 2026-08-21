@@ -54,6 +54,12 @@ flowchart LR
   pr_452["PR #452\nAdd Phase 13 observation-hour temporal proof corpus"]
   artifact_observation_hour_series["Artifact\nCanonical observation-hour temporal series"]
   boundary_phase13_public_integration["Boundary\nPublic temporal integration remains separately governed"]
+  phase_15["Phase\nPhase 15 — Public deterministic temporal evidence"]
+  issue_482["Issue #482\nPhase 15 delivery control — public deterministic temporal evidence"]
+  pr_490["PR #490\nIntegrate Phase 15 deterministic temporal evidence"]
+  run_32528437373["Workflow Run\nPublish Phase 15 temporal evidence to GitHub Pages"]
+  artifact_phase15_temporal_page["Artifact\nPublic deterministic temporal evidence page"]
+  boundary_phase15_narrow_public_evidence["Boundary\nPublic temporal evidence remains narrow and non-advisory"]
 
   pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
@@ -107,4 +113,12 @@ flowchart LR
   phase_13 -->|proved offline corpus| pr_452
   phase_13 -->|produced canonical series| artifact_observation_hour_series
   phase_13 -->|kept separate| boundary_phase13_public_integration
+  phase_13 -->|enabled governed public integration| phase_15
+  boundary_phase13_public_integration -->|resolved by separately governed Phase 15| phase_15
+  phase_15 -->|governed by| issue_482
+  phase_15 -->|proved public integration| pr_490
+  phase_15 -->|proved automatic Pages publication| run_32528437373
+  run_32528437373 -->|deployed exact temporal artifact| artifact_phase15_temporal_page
+  phase_15 -->|preserved narrow public boundary| boundary_phase15_narrow_public_evidence
+  phase_15 -->|preserved| boundary_no_committed_site
 ```

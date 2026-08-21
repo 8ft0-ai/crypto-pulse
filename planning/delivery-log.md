@@ -416,3 +416,45 @@ Delivery notes:
 - `planning/delivery/delivery.yaml` and generated `planning/delivery/graph.md` remain unchanged because Phase 14 closes inert and does not add a newly operational publication stage to the causal graph.
 - No model/provider, Phase 13 temporal public rendering, forecasting, sentiment, advice or broader product scope was introduced.
 - No active successor phase is selected by this close-out.
+
+## Phase 15 — Public deterministic temporal evidence
+
+Status: complete.
+
+Primary outcome: the validated Phase 13 observation-hour temporal evidence family is now exposed through one deterministic public `BTC.price_usd` 24-slot page plus one success-coupled low-prominence homepage discovery link, using the exact checked-out repository commit as evidence authority and preserving explicit gaps, provenance and demo/non-advice framing.
+
+```text
+Shaping issue: #479
+Roadmap promotion: #480 / PR #481
+Parent issue: #482
+Slice 1 proof: PR #483
+Slice 1 merge: 3f39a2857cd1ba6df91f64077b1dff67788fa2b5
+Slice 1 exact-head validation: 32451833403
+Slice 1 fresh approval: PR #483 comment 5365789771
+Trusted-main evidence prerequisite: #484 / PR #488
+Evidence merge: 0a119deb5f44babe4239e693ac82d648801a3772
+Evidence exact-head validation: 32484067027
+Evidence fresh approval: PR #488 comment 5370258468
+Site integration: #489 / PR #490
+Site integration merge: 99c4ced3001bb227d599173bb5a17011d23eea53
+Site exact-head validation: 32525071794
+Site fresh approval: PR #490 comment 5375474533
+Pages publication run: 32528437373 — success
+Pages/publication verification: #482 comment 5375652127
+Close-out issue: #491
+Contract: phase15-public-temporal-evidence/v1
+Delivery record: planning/delivery/phase-15-public-deterministic-temporal-evidence.md
+Delivery graph update: yes — closes the Phase 13 public-integration boundary with a narrow public evidence artifact
+_site committed: no
+```
+
+Delivery notes:
+
+- The selector reuses exact frozen Phase 13 participation semantics, fails malformed/unorderable and zero-participation populations closed, and anchors exactly 24 canonical UTC-hour slots at the maximum participating observation hour without duplicate-hour winner selection or older-slot fallback.
+- The public renderer directly validates the repository-bound Phase 13 record before output and preserves exact values, gaps, continuity, candidate identities, quality/warnings and provenance in deterministic semantic HTML, inline SVG and a complete evidence table.
+- The trusted-main prerequisite was satisfied by one additive reviewed Phase-12-valid snapshot at `data/crypto/hourly/2026/08/21/1549_AEST_source_snapshot.json`; no retained historical evidence was mutated or backfilled and the rolling branch never became public evidence authority.
+- PR #490 integrates only through the canonical site generator. `temporal.html` and exactly one homepage discovery link are emitted only together on success; stale output is removed on fail-closed paths.
+- Automatic Pages run `32528437373` built and deployed exact merge commit `99c4ced3001bb227d599173bb5a17011d23eea53` successfully. The exact deployed artifact contains the temporal page, expected commit identity, one homepage link, disclaimer-before-evidence ordering and all 24 evidence rows.
+- The close-out does not claim an independent CDN HTTP fetch that the execution environment could not perform; it records GitHub's successful deployment state plus exact deployed-artifact inspection.
+- Phase 14 publication activation/#477, broader temporal series/market cards, model/provider paths, narrative/forecast/advice and generated `_site/` remain outside Phase 15.
+- No active successor phase is selected by this close-out.

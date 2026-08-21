@@ -315,6 +315,46 @@ nodes:
     title: Public temporal integration remains separately governed
     summary: Phase 13 proves offline observation-hour comparison and series evidence but does not authorise renderer, report, site or publication integration.
 
+  - id: phase-15
+    type: phase
+    title: Phase 15 — Public deterministic temporal evidence
+    status: complete
+    summary: One repository-bound BTC.price_usd series over exactly 24 canonical observation-hour slots is now exposed through the existing public site pipeline with explicit gaps, provenance and demo/non-advice framing.
+    record: planning/delivery/phase-15-public-deterministic-temporal-evidence.md
+
+  - id: issue-482
+    type: issue
+    title: Phase 15 delivery control — public deterministic temporal evidence
+    number: 482
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/482
+    status: close-out-pending
+
+  - id: pr-490
+    type: pull_request
+    title: Integrate Phase 15 deterministic temporal evidence
+    number: 490
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/490
+    status: merged
+    merge_commit: 99c4ced3001bb227d599173bb5a17011d23eea53
+
+  - id: run-32528437373
+    type: workflow_run
+    title: Publish Phase 15 temporal evidence to GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/32528437373
+    conclusion: success
+
+  - id: artifact-phase15-temporal-page
+    type: artifact
+    title: Public deterministic temporal evidence page
+    path: _site/temporal.html
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: boundary-phase15-narrow-public-evidence
+    type: boundary
+    title: Public temporal evidence remains narrow and non-advisory
+    summary: The public Phase 15 contract remains metric / BTC.price_usd / 24 canonical UTC-hour slots from one checked-out repository commit; Phase 14 activation, broader series, market-card scope, narrative, forecast and advice remain separately governed.
+
 edges:
   - from: pre-phase-baseline
     to: phase-1
@@ -575,3 +615,43 @@ edges:
     to: boundary-phase13-public-integration
     type: preserved
     label: kept separate
+
+  - from: phase-13
+    to: phase-15
+    type: enabled
+    label: enabled governed public integration
+
+  - from: boundary-phase13-public-integration
+    to: phase-15
+    type: resolved_by
+    label: resolved by separately governed Phase 15
+
+  - from: phase-15
+    to: issue-482
+    type: depends_on
+    label: governed by
+
+  - from: phase-15
+    to: pr-490
+    type: proved_by
+    label: proved public integration
+
+  - from: phase-15
+    to: run-32528437373
+    type: proved_by
+    label: proved automatic Pages publication
+
+  - from: run-32528437373
+    to: artifact-phase15-temporal-page
+    type: produced
+    label: deployed exact temporal artifact
+
+  - from: phase-15
+    to: boundary-phase15-narrow-public-evidence
+    type: preserved
+    label: preserved narrow public boundary
+
+  - from: phase-15
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
