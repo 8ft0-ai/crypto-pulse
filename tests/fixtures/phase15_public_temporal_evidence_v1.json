@@ -1,0 +1,140 @@
+{
+  "case_order": [
+    "zero-population",
+    "deterministic-max-hour",
+    "duplicate-latest-hour",
+    "internal-gap",
+    "degraded-evidence",
+    "candidate-set-unorderable"
+  ],
+  "cases": {
+    "zero-population": {
+      "snapshots": [
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T04:34:00Z",
+          "legacy": true
+        }
+      ],
+      "expected": {
+        "asserted_series": false
+      }
+    },
+    "deterministic-max-hour": {
+      "snapshots": [
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T03:40:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T04:34:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T07:29:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T08:22:00Z"
+        }
+      ],
+      "expected": {
+        "anchor_utc": "2026-07-08T08:00:00Z",
+        "asserted_series": true
+      }
+    },
+    "duplicate-latest-hour": {
+      "snapshots": [
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T07:29:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T08:22:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T08:42:00Z",
+          "slot_override": "2026-07-08T08:00:00Z"
+        }
+      ],
+      "expected": {
+        "anchor_utc": "2026-07-08T08:00:00Z",
+        "asserted_series": true,
+        "latest_gap": "phase13-current-ambiguous"
+      }
+    },
+    "internal-gap": {
+      "snapshots": [
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T03:34:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T04:34:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T06:34:00Z"
+        },
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T07:34:00Z"
+        }
+      ],
+      "expected": {
+        "anchor_utc": "2026-07-08T07:00:00Z",
+        "asserted_series": true,
+        "contains_gap": "phase13-current-missing",
+        "gap_slot_utc": "2026-07-08T05:00:00Z"
+      }
+    },
+    "degraded-evidence": {
+      "snapshots": [
+        {
+          "fixture": "ok",
+          "generated_at_utc": "2026-07-08T07:29:00Z"
+        },
+        {
+          "fixture": "degraded",
+          "generated_at_utc": "2026-07-08T08:22:00Z"
+        }
+      ],
+      "expected": {
+        "anchor_utc": "2026-07-08T08:00:00Z",
+        "asserted_series": true,
+        "latest_current_quality": "valid-degraded"
+      }
+    },
+    "candidate-set-unorderable": {
+      "snapshots": [],
+      "malformed_asserted_candidate": true,
+      "expected": {
+        "error": "candidate-set-unorderable"
+      }
+    }
+  },
+  "contract": {
+    "contract_version": "phase15-public-temporal-evidence/v1",
+    "series_key": "BTC.price_usd",
+    "series_kind": "metric",
+    "slot_count": 24
+  },
+  "schema_version": "phase15-public-temporal-evidence-proof-corpus/v1",
+  "seed_commit": {
+    "author_date": "2026-08-21T00:00:00Z",
+    "author_email": "phase15-proof@example.invalid",
+    "author_name": "Phase 15 proof",
+    "committer_date": "2026-08-21T00:00:00Z",
+    "committer_email": "phase15-proof@example.invalid",
+    "committer_name": "Phase 15 proof",
+    "message": "Materialise Phase 15 public temporal evidence proof"
+  },
+  "source_fixtures": {
+    "degraded": "tests/fixtures/valid_degraded_optional_source_warning.json",
+    "ok": "tests/fixtures/valid_ok_snapshot.json"
+  }
+}

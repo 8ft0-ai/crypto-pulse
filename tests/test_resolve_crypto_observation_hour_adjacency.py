@@ -14,7 +14,12 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from resolve_crypto_observation_hour_adjacency import PINNED_REFS, resolve_observation_hour_adjacency
+from resolve_crypto_observation_hour_adjacency import (
+    PINNED_REFS,
+    ObservationHourPopulationError,
+    load_observation_hour_population,
+    resolve_observation_hour_adjacency,
+)
 
 FIXTURES = ROOT / "tests" / "fixtures"
 BASE = datetime(2026, 7, 8, 4, 34, 0, tzinfo=timezone.utc)
@@ -114,9 +119,44 @@ class ObservationHourAdjacencyTests(unittest.TestCase):
             _write(root, BASE - timedelta(minutes=54))
             _write(root, BASE)
             _write(root, BASE + timedelta(minutes=5), legacy=True)
-            result = resolve_observation_hour_adjacency(repo, _commit(repo), _slot(BASE))
+            commit = _commit(repo)
+            population = load_observation_hour_population(repo, commit)
+            result = resolve_observation_hour_adjacency(repo, commit, _slot(BASE))
             self.assertEqual(result["resolution_status"], "adjacency-resolved")
             self.assertEqual(len(result["current_candidates"]), 1)
+            self.assertEqual(len(population[_slot(BASE)]), 1)
+            self.assertEqual(
+                [item[0] for item in population[_slot(BASE)]],
+                [item["path"] for item in result["current_candidates"]],
+            )
+
+    def test_population_primitive_matches_adjacency_candidate_partition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, root = _repo(tmp)
+            predecessor = BASE - timedelta(minutes=54)
+            _write(root, predecessor)
+            _write(root, BASE)
+            _write(root, BASE + timedelta(minutes=10), slot_override=_slot(BASE))
+            commit = _commit(repo)
+            population = load_observation_hour_population(repo, commit)
+            result = resolve_observation_hour_adjacency(repo, commit, _slot(BASE))
+            self.assertEqual(result["resolution_status"], "current-ambiguous")
+            self.assertEqual(
+                [item[0] for item in population[_slot(BASE)]],
+                [item["path"] for item in result["current_candidates"]],
+            )
+            self.assertEqual(
+                [item[0] for item in population[_slot(predecessor)]],
+                [item["path"] for item in result["predecessor_candidates"]],
+            )
+
+    def test_population_requires_exact_immutable_commit_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, root = _repo(tmp)
+            _write(root, BASE)
+            _commit(repo)
+            with self.assertRaises(ObservationHourPopulationError):
+                load_observation_hour_population(repo, "HEAD")
 
     def test_current_missing_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -207,7 +247,10 @@ class ObservationHourAdjacencyTests(unittest.TestCase):
             _write(root, BASE - timedelta(minutes=54))
             _write(root, BASE)
             _write(root, BASE + timedelta(hours=2), slot_override="not-an-hour")
-            result = resolve_observation_hour_adjacency(repo, _commit(repo), _slot(BASE))
+            commit = _commit(repo)
+            with self.assertRaises(ObservationHourPopulationError):
+                load_observation_hour_population(repo, commit)
+            result = resolve_observation_hour_adjacency(repo, commit, _slot(BASE))
             self.assertEqual(result["resolution_status"], "candidate-set-unorderable")
 
     def test_dependency_drift_fails_contract(self) -> None:
