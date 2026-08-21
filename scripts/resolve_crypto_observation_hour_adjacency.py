@@ -51,6 +51,10 @@ PINNED_REFS = {
 }
 
 
+class ObservationHourPopulationError(ValueError):
+    """Raised when the immutable Phase 13 participating population is unorderable."""
+
+
 def _git_blob_sha(raw: bytes) -> str:
     return hashlib.sha1(f"blob {len(raw)}\0".encode("ascii") + raw).hexdigest()
 
@@ -220,6 +224,60 @@ def _canonical_slot(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def load_observation_hour_population(
+    repository_root: Path,
+    commit_sha: str,
+) -> dict[str, list[tuple[str, bytes, dict[str, Any]]]]:
+    """Enumerate the exact Phase 13 participating population from one Git commit.
+
+    Legacy snapshots without ``run.observation_hour_utc`` do not participate.
+    Any candidate that asserts an observation-hour marker but cannot be parsed
+    makes the whole population unorderable. Returned candidates retain their
+    immutable repository bytes so Phase 13 adjacency can consume this exact
+    primitive without changing its resolution semantics.
+    """
+
+    root = Path(repository_root)
+    if not isinstance(commit_sha, str) or GIT_SHA1_RE.fullmatch(commit_sha) is None:
+        raise ObservationHourPopulationError("commit must be an exact lower-case Git SHA-1")
+    try:
+        root = root.resolve(strict=True)
+        if Path(_git_text(root, "rev-parse", "--show-toplevel")).resolve(strict=True) != root:
+            raise ObservationHourPopulationError("repository root is not the Git toplevel")
+        resolved = _git_text(root, "rev-parse", "--verify", f"{commit_sha}^{{commit}}").lower()
+        if resolved != commit_sha:
+            raise ObservationHourPopulationError("commit does not resolve exactly")
+
+        indexed: dict[str, list[tuple[str, bytes, dict[str, Any]]]] = {}
+        for path in _candidate_paths(root, resolved):
+            raw = _bytes_at_commit(root, resolved, path)
+            payload = _parse_payload(raw)
+            if payload is None:
+                if b'"observation_hour_utc"' in raw:
+                    raise ObservationHourPopulationError(
+                        f"asserted observation-hour candidate is malformed: {path}"
+                    )
+                continue
+            run = payload.get("run")
+            if not isinstance(run, dict) or "observation_hour_utc" not in run:
+                continue
+            slot_value = run.get("observation_hour_utc")
+            try:
+                canonical = _canonical_slot(_parse_slot(slot_value))
+            except ValueError as exc:
+                raise ObservationHourPopulationError(
+                    f"asserted observation-hour candidate is unorderable: {path}"
+                ) from exc
+            indexed.setdefault(canonical, []).append((path, raw, payload))
+        return indexed
+    except ObservationHourPopulationError:
+        raise
+    except (OSError, RuntimeError, UnicodeDecodeError) as exc:
+        raise ObservationHourPopulationError(
+            "observation-hour candidate set could not be enumerated"
+        ) from exc
+
+
 def _parse_local_timestamp(value: Any) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError("run.generated_at_local must be a non-empty string")
@@ -324,26 +382,8 @@ def resolve_observation_hour_adjacency(
     assert isinstance(exact_commit, str)
 
     try:
-        indexed: dict[str, list[tuple[str, bytes, dict[str, Any]]]] = {}
-        for path in _candidate_paths(Path(repository_root), exact_commit):
-            raw = _bytes_at_commit(Path(repository_root), exact_commit, path)
-            payload = _parse_payload(raw)
-            if payload is None:
-                if b'"observation_hour_utc"' in raw:
-                    result["resolution_status"] = "candidate-set-unorderable"
-                    return result
-                continue
-            run = payload.get("run")
-            if not isinstance(run, dict) or "observation_hour_utc" not in run:
-                continue
-            slot_value = run.get("observation_hour_utc")
-            try:
-                _parse_slot(slot_value)
-            except ValueError:
-                result["resolution_status"] = "candidate-set-unorderable"
-                return result
-            indexed.setdefault(slot_value, []).append((path, raw, payload))
-    except (OSError, RuntimeError, UnicodeDecodeError):
+        indexed = load_observation_hour_population(Path(repository_root), exact_commit)
+    except ObservationHourPopulationError:
         result["resolution_status"] = "candidate-set-unorderable"
         return result
 
@@ -407,3 +447,14 @@ def resolve_observation_hour_adjacency(
     result["actual_elapsed_seconds"] = _elapsed_seconds(current_utc, predecessor_utc)
     result["resolution_status"] = "adjacency-resolved"
     return result
+
+
+__all__ = [
+    "ADJACENCY_POLICY_VERSION",
+    "OBSERVATION_HOUR_CONTRACT_VERSION",
+    "ObservationHourPopulationError",
+    "PINNED_REFS",
+    "SEMANTIC_CONTRACT_VERSION",
+    "load_observation_hour_population",
+    "resolve_observation_hour_adjacency",
+]
