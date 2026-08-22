@@ -11,7 +11,7 @@ Use this index to find documentation by what you are trying to achieve. Planning
 | New contributor | [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-cryptopulse-locally.md) |
 | Project operator | [Build the static site](how-to/build-the-static-site.md), [publish it](how-to/publish-the-static-site.md) or [verify the live site](how-to/verify-the-live-site.md) |
 | Contract reviewer | [Source snapshot quality](reference/source-snapshot-quality.md), [deterministic report schema](reference/deterministic-report-schema.md), [semantic claim-plan contract](reference/semantic-claim-plan-contract.md), [deterministic claim-candidate contract](reference/claim-candidate-contract.md), [deterministic candidate compilation](reference/claim-candidate-compilation.md), [reviewed claim-candidate gold corpus](reference/claim-candidate-gold-corpus.md), [deterministic candidate-ranking baseline](reference/deterministic-candidate-ranking-baseline.md), [bounded candidate-ID selection](reference/bounded-candidate-id-selection.md), [governed bounded-selector model comparison](reference/candidate-selection-model-comparison.md), [low-cost candidate-selector Stage 0](reference/low-cost-candidate-selector-stage-0.md) or [semantic claim-plan rendering](reference/semantic-claim-plan-rendering.md) |
-| Architect | [How CryptoPulse works](explanation/how-cryptopulse-works.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
+| Architect or product shaper | [Product positioning](explanation/product-positioning.md), [How CryptoPulse works](explanation/how-cryptopulse-works.md), [evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md) or [trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md) |
 | Contributor or coding agent | [Deliver a repository slice](how-to/deliver-a-repository-slice.md) and [choose an agent write strategy](how-to/choose-agent-write-strategy.md) |
 
 ## Start by task
@@ -22,7 +22,7 @@ Follow [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-crypt
 
 ### Understand the complete system
 
-Read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow source evidence through validation, deterministic or governed reporting, repository review, site generation, deployment and live verification.
+Read [Product positioning](explanation/product-positioning.md) for what CryptoPulse is today and why the evidence-first approach matters. Then read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow source evidence through validation, deterministic or governed reporting, repository review, site generation, deployment and live verification.
 
 ### Build, publish and verify the site
 
@@ -119,6 +119,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 
 ### Explanation
 
+- [Product positioning](explanation/product-positioning.md)
 - [How CryptoPulse works](explanation/how-cryptopulse-works.md)
 - [Deterministic site generation](explanation/deterministic-site-generation.md)
 - [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
