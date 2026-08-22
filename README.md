@@ -1,8 +1,12 @@
 # CryptoPulse
 
-CryptoPulse is an AI-generated crypto market report demo and archive. It stores report source content as Markdown and publishes a disposable static site through GitHub Pages.
+CryptoPulse is an evidence-first, AI-generated crypto market demo and archive. It is designed to make public market evidence inspectable: where deterministic evidence exists, the repository—not an opaque model response—carries the factual authority.
 
-The reports are demonstration content only. They may be inaccurate, incomplete, stale, misleading or hallucinated. They are not financial advice, investment research, recommendations or trading signals.
+Today the public experience combines an archive of AI-generated report examples with a bounded deterministic temporal-evidence view for one 24-slot `BTC.price_usd` series. Checked-in evidence and reviewed repository state are the traceable source boundary; generated HTML is disposable output, and gaps or degraded evidence are intended to remain visible rather than be silently filled.
+
+CryptoPulse is a demo, not a live market terminal or investment service. Reports may be inaccurate, incomplete, stale, misleading or hallucinated. Nothing here is financial advice, investment research, a recommendation or a trading signal, and it should not be relied on for trading, investing or risk decisions.
+
+The product principle is **evidence before intelligence**: use deterministic, reproducible evidence where possible, and keep AI-generated interpretation clearly subordinate to that evidence. Read [Product positioning](docs/explanation/product-positioning.md) for the current proposition, shipped capabilities and limits.
 
 ## Documentation
 
@@ -10,6 +14,7 @@ Start with the [CryptoPulse documentation index](docs/index.md).
 
 Common entry points:
 
+- [Product positioning](docs/explanation/product-positioning.md)
 - [Build and inspect CryptoPulse locally](docs/tutorials/build-and-inspect-cryptopulse-locally.md)
 - [Build the static site](docs/how-to/build-the-static-site.md)
 - [Validate a source snapshot](docs/how-to/validate-a-source-snapshot.md)
