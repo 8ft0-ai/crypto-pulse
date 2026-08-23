@@ -40,29 +40,35 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-Phase 15 — public deterministic temporal evidence — is complete under #482 and `phase15-public-temporal-evidence/v1`. It exposes exactly one validated Phase 13 `metric` / `BTC.price_usd` series over 24 canonical observation-hour slots through one generated temporal page plus one low-prominence homepage discovery link, using the exact checked-out repository commit as public evidence authority. The exact merged site state `99c4ced3001bb227d599173bb5a17011d23eea53` was automatically deployed by Pages run `32528437373`, and the exact deployed artifact was verified under #482 comment `5375652127`.
+Phase 16 — reader-facing evidence experience — is the selected active successor direction under #499 and `reader-facing-evidence-experience/v1`. It is limited to three reviewed combined slices: canonical reader authority plus Home / Most recent; temporal reader-state projection plus presentation over the existing Phase 15 record; and Archive reader model plus navigation integration. This roadmap selection is planning-only and does not itself authorise implementation. The Phase 16 parent delivery-control issue is created only after the roadmap-promotion candidate is freshly reviewed and separately authorised for merge.
 
-No active successor phase is selected by the Phase 15 close-out. Future work must be promoted from the backlog or a new shaping issue under separate owner authority.
+Phase 16 keeps canonical report chronology, `latest_report`, `current_observation` and the existing Phase 15 temporal series as distinct authorities; preserves fail-closed newest-observation semantics and exact source-snapshot relation; uses safe repository-recency language rather than claiming live/current freshness; retains the public AI-demo/non-advice boundary and exact provenance; and explicitly excludes #497 T2 source-evidence accumulation/promotion, Phase 14 activation and #477.
+
+Phase 15 — public deterministic temporal evidence — is complete under #482 and `phase15-public-temporal-evidence/v1`. It exposes exactly one validated Phase 13 `metric` / `BTC.price_usd` series over 24 canonical observation-hour slots through one generated temporal page plus one low-prominence homepage discovery link, using the exact checked-out repository commit as public evidence authority. The exact merged site state `99c4ced3001bb227d599173bb5a17011d23eea53` was automatically deployed by Pages run `32528437373`, and the exact deployed artifact was verified under #482 comment `5375652127`.
 
 Phase 14 — deterministic site publication — remains complete at the safe inert control-plane boundary under #458 and `deterministic-site-publication/v3`. The reviewed control plane, publication-App/protection boundary, non-merging App integration proof and candidate attestation/head-change controls are delivered, but the real live stale-base race, live publication pilot and recurring activation were deliberately deferred rather than represented as complete.
 
-The deferred deterministic live stale-base proof/operationalisation path remains parked in #477. It is backlog work, not an implicit successor to Phase 15. Publication activation remains absent/`disabled`, normal ingestion cadence is hourly `17 * * * *`, and no automatic deterministic publication rollout is active.
+The deferred deterministic live stale-base proof/operationalisation path remains parked in #477. It is backlog work and is not part of Phase 16. Publication activation remains absent/`disabled`, normal ingestion cadence is hourly `17 * * * *`, and no automatic deterministic publication rollout is active.
 
 Phase 13 — deterministic observation-hour comparison and temporal evidence — remains complete under #446/#453. It delivers the separately versioned `phase13-observation-hour-adjacency/v1`, `crypto-observation-hour-comparison/v1` and `crypto-observation-hour-series/v1` evidence family over Phase-12-ready snapshots without reinterpreting frozen Phase 10/11 v1 timing or temporal semantics.
 
 Phase 12 — canonical observation-hour evidence — remains complete under #436/#441 and `phase12-observation-hour/v1`. It gives future source snapshots a truthful canonical `run.observation_hour_utc` containing-hour identity while preserving actual `run.generated_at_utc`, source fetch timestamps, historical snapshots and the pinned Phase 10 validator/config identities. Rolling ingestion validates that identity before reviewer evidence or any publication mutation.
 
-Phase 13 proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Phase 15 consumed that evidence under separate governance and preserved the frozen semantics exactly.
+Phase 13 proves exact current/predecessor observation-hour adjacency, fail-closed missing/duplicate/invalid evidence, immutable identity/provenance, deterministic comparison/series records, the bounded 12-metric/8-source temporal vocabulary, and offline repeatability/tamper evidence. Phase 15 consumed that evidence under separate governance and preserved the frozen semantics exactly. Phase 16 changes reader projection and information hierarchy without widening those evidence contracts.
 
 The deterministic selector delivered in Phase 6 remains the sole active selector. Phase 9 remains closed with `no-stable-material-uplift`.
 
 ## Active roadmap direction
 
-No active successor phase is selected.
+Phase 16 — [Reader-facing evidence experience](phase-16-reader-facing-evidence-experience.md) — is selected as the active successor direction under #499 from the freshly approved reconciled `reader-facing-evidence-experience/v1` design.
 
-Phase 15 is complete and does not grant follow-on implementation authority. Candidate future work remains in `backlog.md` until a clear problem statement, acceptance gates, proof path, fresh review and separate owner promotion authority exist.
+The selected phase is bounded to:
 
-In particular, Phase 14/#477 operationalisation, broader deterministic temporal series or market-card product work, model/provider work, narrative/forecast/advice behaviour, and new external data acquisition remain parked rather than becoming the next phase implicitly.
+1. canonical reader authority + Home / Most recent;
+2. temporal reader-state projection + presentation over the unchanged Phase 15 `BTC.price_usd` 24-slot record;
+3. Archive reader model + navigation integration.
+
+The selection does not authorise implementation by itself. It also does not include #497 T2 evidence accumulation/promotion, Phase 14/#477 operationalisation, additional temporal series, model/provider work, forecasts, recommendations, personalised guidance, trading signals or new external data acquisition.
 
 ## Completed roadmap directions
 
@@ -78,7 +84,7 @@ In particular, Phase 14/#477 operationalisation, broader deterministic temporal 
 | Phase 14 — Deterministic site publication | Complete at safe inert control-plane boundary; operational activation deferred | [phase-14-deterministic-site-publication.md](phase-14-deterministic-site-publication.md) | [../delivery/phase-14-deterministic-site-publication.md](../delivery/phase-14-deterministic-site-publication.md) |
 | Phase 15 — Public deterministic temporal evidence | Complete; bounded repository-bound BTC temporal evidence published through the existing site pipeline | [phase-15-public-deterministic-temporal-evidence.md](phase-15-public-deterministic-temporal-evidence.md) | [../delivery/phase-15-public-deterministic-temporal-evidence.md](../delivery/phase-15-public-deterministic-temporal-evidence.md) |
 
-Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged. Phase 14 adds a reviewed inert deterministic publication control plane and trusted App/protection boundary but deliberately stops before live operational publication. Phase 15 separately exposes one narrow Phase 13 temporal-evidence consumer on the existing public site and leaves every broader direction unselected.
+Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged. Phase 14 adds a reviewed inert deterministic publication control plane and trusted App/protection boundary but deliberately stops before live operational publication. Phase 15 separately exposes one narrow Phase 13 temporal-evidence consumer on the existing public site. Phase 16 is the separately governed reader-facing successor over those existing evidence foundations.
 
 ## Superseded active direction
 
@@ -95,13 +101,13 @@ The chronology and lessons remain recorded in:
 
 ## Backlog
 
-Ideas that are useful but not part of a currently selected successor direction are parked in:
+Ideas that are useful but outside the selected Phase 16 direction remain parked in:
 
 ```text
 backlog.md
 ```
 
-Use the backlog to preserve follow-on ideas without turning completed Phase 15 into implicit authority for deferred Phase 14 operationalisation, additional temporal series/market-card product scope, model work or another capability.
+Use the backlog to preserve follow-on ideas without turning Phase 16 into implicit authority for #497 T2 evidence accumulation, deferred Phase 14 operationalisation, additional temporal series/derived analytics, model work or another capability.
 
 ## Retrospective roadmap specs
 
