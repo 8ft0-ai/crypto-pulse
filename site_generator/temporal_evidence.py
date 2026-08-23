@@ -1,10 +1,11 @@
-"""Canonical public-site integration for Phase 15 temporal evidence."""
+"Canonical public-site integration for Phase 15 temporal evidence."
 
 from __future__ import annotations
 
 import html
 import importlib
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ DISCOVERY_RE = re.compile(
     re.DOTALL,
 )
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+STYLE_NAME = "cryptopulse-temporal-evidence.css"
 
 
 class TemporalEvidenceIntegrationError(ValueError):
@@ -67,9 +69,28 @@ def _add_discovery_link(index_path: Path) -> None:
         '<section class="temporal-evidence-discovery" aria-label="Deterministic temporal evidence">'
         '<div class="eyebrow">Repository evidence</div>'
         '<p><a class="text-link" href="temporal.html">View deterministic temporal evidence →</a></p>'
-        '</section>\n'
+        "</section>\n"
     )
     index_path.write_text(source.replace(marker, discovery + marker, 1), encoding="utf-8")
+
+
+def _style_paths(base: Any) -> tuple[Path, Path]:
+    source = Path(base.SITE_SRC) / "assets" / STYLE_NAME
+    destination = Path(base.OUT) / "assets" / STYLE_NAME
+    return source, destination
+
+
+def _copy_style(base: Any) -> None:
+    source, destination = _style_paths(base)
+    if not source.exists():
+        raise TemporalEvidenceIntegrationError(f"missing Phase 16 temporal stylesheet: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(source, destination)
+
+
+def _remove_style(base: Any) -> None:
+    _, destination = _style_paths(base)
+    destination.unlink(missing_ok=True)
 
 
 def _page(base: Any, commit_sha: str, rendered_evidence: str) -> str:
@@ -81,6 +102,7 @@ def _page(base: Any, commit_sha: str, rendered_evidence: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Deterministic temporal evidence | {html.escape(base.SITE_NAME)}</title>
   <link rel="stylesheet" href="assets/cryptopulse.css">
+  <link rel="stylesheet" href="assets/{STYLE_NAME}">
 </head>
 <body>
   <main class="page">
@@ -97,7 +119,7 @@ def _page(base: Any, commit_sha: str, rendered_evidence: str) -> str:
         <div class="eyebrow">Historical demo evidence</div>
         <h2>Evidence, not a market call</h2>
         <p>This page is AI-demo infrastructure output built from historical repository evidence. It is not a forecast, investment research, recommendation, trading signal, market call, or financial advice.</p>
-        <p>No interpolation, aggregation, smoothing, backfill, inferred trend, generated narrative, or live-data fallback is introduced.</p>
+        <p>No interpolation, aggregation, smoothing, backfill, carry-forward, gap bridging, inferred trend, generated narrative, or live-data fallback is introduced.</p>
       </section>
       <section class="temporal-evidence-context" aria-label="Evidence authority">
         <div><span>Repository commit</span><strong><code>{escaped_commit}</code></strong></div>
@@ -124,6 +146,7 @@ def apply(base: Any) -> bool:
 
     temporal_path.unlink(missing_ok=True)
     _remove_discovery_link(index_path)
+    _remove_style(base)
     if not index_path.exists():
         return False
 
@@ -142,6 +165,7 @@ def apply(base: Any) -> bool:
 
         phase13.validate_observation_hour_series(root, record)
         rendered = renderer.render_observation_hour_series(root, record)
+        _copy_style(base)
         page = _page(base, commit_sha, rendered)
 
         temporal_path.write_text(page, encoding="utf-8")
@@ -155,4 +179,5 @@ def apply(base: Any) -> bool:
     ):
         temporal_path.unlink(missing_ok=True)
         _remove_discovery_link(index_path)
+        _remove_style(base)
         return False
