@@ -1,6 +1,6 @@
 # Phase 16 — Reader-facing evidence experience
 
-Status: selected roadmap direction; implementation not yet authorised.
+Status: complete.
 
 This forward-looking roadmap spec promotes the freshly approved reconciled `reader-facing-evidence-experience/v1` design from #498/#497 as the bounded CryptoPulse successor direction after Phase 15. It improves how readers understand existing repository-owned evidence without changing the frozen Phase 13/15 evidence contracts, activating Phase 14 publication, promoting #477, or introducing new model/provider or trading-oriented behaviour.
 
@@ -319,31 +319,31 @@ Phase 16 does not authorise:
 
 Phase 16 implementation is complete only when all applicable gates are proved through exact-head validation and fresh independent review:
 
-- [ ] Every report-recency consumer uses one canonical report chronology resolver.
-- [ ] Deterministic report chronology validates `generated_at_utc` and consistency evidence and never repairs contradictory metadata from filenames.
-- [ ] Legacy chronology prefers validated front-matter timestamp, uses recognised fallback only when allowed, and fails closed on conflicts/unorderable retained reports.
-- [ ] Duplicate exact canonical report instants fail closed.
-- [ ] The normative `1742_AEST.md` / `2031_AEST.md` regression selects and displays `2031_AEST.md` first at 20:31 AEST.
-- [ ] Home and `latest.html` consume one shared reader-evidence context and cannot independently elect different observations.
-- [ ] `current_observation` is anchored at the maximum canonical Phase 13 participating observation hour in the exact checked-out commit.
-- [ ] Malformed/ambiguous/invalid newest participating observation fails closed with no older-observation fallback.
-- [ ] Point-observation validity remains distinct from predecessor/temporal-comparison availability.
-- [ ] A deterministic mismatch fixture where `latest_report != current_observation` proves values/timestamp/status/provenance remain observation-bound and title/headline/body/citations/link remain report-bound.
-- [ ] A matching fixture proves report/observation association only by exact governed `source_snapshot` path equality.
-- [ ] A no-usable-observation + existing-report fixture shows report-only fallback without deterministic observation cards.
-- [ ] Exact evidence timestamp and pre-claim demo/non-advice framing appear before primary market values.
-- [ ] Report citations and underlying data provenance remain visibly distinct.
-- [ ] Archive uses canonical reverse chronology and reports actual retained coverage/discontinuity rather than implying continuous hourly coverage.
-- [ ] Archive filters/classifications are deterministic and do not infer asset membership from free text.
-- [ ] Phase 15 temporal authority remains one same-commit `BTC.price_usd` 24-slot record and one conditional low-prominence discovery link.
-- [ ] Temporal projection proves truthful `value_count`, gap reasons, degradation and continuity counts.
-- [ ] `value_count == 0` emits no chart and no synthetic zero extrema.
-- [ ] A line chart is emitted only with at least one exact continuous pair; no gap is bridged.
-- [ ] No interpolation, smoothing, aggregation, backfill, carry-forward or trend inference is introduced.
-- [ ] Zero Phase 15 participation still removes both `temporal.html` and its Home link.
-- [ ] #497 T2, Phase 14 activation and #477 remain untouched.
-- [ ] Generated `_site/` remains disposable and uncommitted.
-- [ ] Same repository input produces deterministic generated output under the existing build contract.
+- [x] Every report-recency consumer uses one canonical report chronology resolver.
+- [x] Deterministic report chronology validates `generated_at_utc` and consistency evidence and never repairs contradictory metadata from filenames.
+- [x] Legacy chronology prefers validated front-matter timestamp, uses recognised fallback only when allowed, and fails closed on conflicts/unorderable retained reports.
+- [x] Duplicate exact canonical report instants fail closed.
+- [x] The normative `1742_AEST.md` / `2031_AEST.md` regression selects and displays `2031_AEST.md` first at 20:31 AEST.
+- [x] Home and `latest.html` consume one shared reader-evidence context and cannot independently elect different observations.
+- [x] `current_observation` is anchored at the maximum canonical Phase 13 participating observation hour in the exact checked-out commit.
+- [x] Malformed/ambiguous/invalid newest participating observation fails closed with no older-observation fallback.
+- [x] Point-observation validity remains distinct from predecessor/temporal-comparison availability.
+- [x] A deterministic mismatch fixture where `latest_report != current_observation` proves values/timestamp/status/provenance remain observation-bound and title/headline/body/citations/link remain report-bound.
+- [x] A matching fixture proves report/observation association only by exact governed `source_snapshot` path equality.
+- [x] A no-usable-observation + existing-report fixture shows report-only fallback without deterministic observation cards.
+- [x] Exact evidence timestamp and pre-claim demo/non-advice framing appear before primary market values.
+- [x] Report citations and underlying data provenance remain visibly distinct.
+- [x] Archive uses canonical reverse chronology and reports actual retained coverage/discontinuity rather than implying continuous hourly coverage.
+- [x] Archive filters/classifications are deterministic and do not infer asset membership from free text.
+- [x] Phase 15 temporal authority remains one same-commit `BTC.price_usd` 24-slot record and one conditional low-prominence discovery link.
+- [x] Temporal projection proves truthful `value_count`, gap reasons, degradation and continuity counts.
+- [x] `value_count == 0` emits no chart and no synthetic zero extrema.
+- [x] A line chart is emitted only with at least one exact continuous pair; no gap is bridged.
+- [x] No interpolation, smoothing, aggregation, backfill, carry-forward or trend inference is introduced.
+- [x] Zero Phase 15 participation still removes both `temporal.html` and its Home link.
+- [x] #497 T2, Phase 14 activation and #477 remain untouched.
+- [x] Generated `_site/` remains disposable and uncommitted.
+- [x] Same repository input produces deterministic generated output under the existing build contract.
 
 ## Risks and mitigations
 
@@ -379,15 +379,23 @@ Mitigation: Phase 14/#477 and #497 T2 are explicit non-goals; no mutable branch,
 
 The phase is complete when:
 
-- [ ] the parent Phase 16 issue and linked issues for the three combined slices exist after roadmap promotion is merged;
-- [ ] each implementation candidate receives exact-head repository validation and genuinely fresh independent substantive review before merge;
-- [ ] the three combined slices are delivered in the approved dependency order or an independently reviewed equivalent preserves all authority boundaries;
-- [ ] user-facing and repository acceptance fixtures prove chronology, authority separation, temporal sparse-data semantics, safety and provenance boundaries;
-- [ ] the public Pages result is verified after the final authorised site-affecting merge using exact merged/deployed identity evidence;
-- [ ] `planning/delivery/phase-16-reader-facing-evidence-experience.md` records what actually shipped and what remains excluded;
-- [ ] `planning/delivery-log.md`, `planning/delivery/delivery.yaml` and regenerated `planning/delivery/graph.md` are updated at close-out as applicable;
-- [ ] roadmap state is updated at close-out without implicitly selecting another successor;
-- [ ] generated `_site/` output is not committed.
+- [x] the parent Phase 16 issue and linked issues for the three combined slices exist after roadmap promotion is merged;
+- [x] each implementation candidate receives exact-head repository validation and genuinely fresh independent substantive review before merge;
+- [x] the three combined slices are delivered in the approved dependency order or an independently reviewed equivalent preserves all authority boundaries;
+- [x] user-facing and repository acceptance fixtures prove chronology, authority separation, temporal sparse-data semantics, safety and provenance boundaries;
+- [x] the public Pages result is verified after the final authorised site-affecting merge using exact merged/deployed identity evidence;
+- [x] `planning/delivery/phase-16-reader-facing-evidence-experience.md` records what actually shipped and what remains excluded;
+- [x] `planning/delivery-log.md`, `planning/delivery/delivery.yaml` and regenerated `planning/delivery/graph.md` are updated at close-out as applicable;
+- [x] roadmap state is updated at close-out without implicitly selecting another successor;
+- [x] generated `_site/` output is not committed.
+
+## Delivery close-out evidence
+
+Phase 16 shipped through PRs #505, #506 and #507 in the approved dependency order. Their merge commits are respectively `9d37798b391b3cf37e76d0d234ad5cb0738df449`, `546927212c831bd0bfa124db86d0d68f05a7d61f` and `ee46ae895036b60bccfab99e4f462bf5f53c15cd`.
+
+The exact final merged state was built and deployed successfully by `Publish CryptoPulse Pages` run `32633849094`. Its `github-pages` artifact `9491771705` has digest `sha256:1f105dd2979dd6e793e939ad9f18dfcd840a9866d8eda956227625b5c906e9c0`. Direct live checks then matched the exact deployed artifact byte-for-byte for Home, `latest.html`, Archive and `temporal.html`.
+
+The completed delivery record is `planning/delivery/phase-16-reader-facing-evidence-experience.md`. Completion does not select a successor or un-park #497 T2, Phase 14/#477, broader temporal analytics, model/provider work or trading-oriented capability.
 
 ## Follow-on delivery record
 

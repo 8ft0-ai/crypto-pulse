@@ -40,7 +40,7 @@ A new roadmap phase spec should stay forward-looking. At close-out, put complete
 
 ## Current roadmap position
 
-Phase 16 — reader-facing evidence experience — is the selected active successor direction under #499 and `reader-facing-evidence-experience/v1`. It is limited to three reviewed combined slices: canonical reader authority plus Home / Most recent; temporal reader-state projection plus presentation over the existing Phase 15 record; and Archive reader model plus navigation integration. This roadmap selection is planning-only and does not itself authorise implementation. The Phase 16 parent delivery-control issue is created only after the roadmap-promotion candidate is freshly reviewed and separately authorised for merge.
+Phase 16 — reader-facing evidence experience — is complete under #501 and `reader-facing-evidence-experience/v1`. Its three reviewed combined slices delivered canonical reader authority plus Home / Most recent, temporal reader-state projection over the unchanged Phase 15 record, and Archive reader model plus navigation integration. The exact final merge `ee46ae895036b60bccfab99e4f462bf5f53c15cd` was built and deployed by Pages run `32633849094`, and the required live Home, latest, Archive and temporal surfaces matched the deployed artifact byte-for-byte.
 
 Phase 16 keeps canonical report chronology, `latest_report`, `current_observation` and the existing Phase 15 temporal series as distinct authorities; preserves fail-closed newest-observation semantics and exact source-snapshot relation; uses safe repository-recency language rather than claiming live/current freshness; retains the public AI-demo/non-advice boundary and exact provenance; and explicitly excludes #497 T2 source-evidence accumulation/promotion, Phase 14 activation and #477.
 
@@ -60,15 +60,9 @@ The deterministic selector delivered in Phase 6 remains the sole active selector
 
 ## Active roadmap direction
 
-Phase 16 — [Reader-facing evidence experience](phase-16-reader-facing-evidence-experience.md) — is selected as the active successor direction under #499 from the freshly approved reconciled `reader-facing-evidence-experience/v1` design.
+No active successor phase is selected.
 
-The selected phase is bounded to:
-
-1. canonical reader authority + Home / Most recent;
-2. temporal reader-state projection + presentation over the unchanged Phase 15 `BTC.price_usd` 24-slot record;
-3. Archive reader model + navigation integration.
-
-The selection does not authorise implementation by itself. It also does not include #497 T2 evidence accumulation/promotion, Phase 14/#477 operationalisation, additional temporal series, model/provider work, forecasts, recommendations, personalised guidance, trading signals or new external data acquisition.
+Phase 16 is complete. Any next phase must return through normal shaping, fresh substantive review and separate owner promotion/delivery authority. #497 T2 evidence accumulation, Phase 14/#477 operationalisation, broader temporal analytics, model/provider work and trading-oriented features remain parked rather than inheriting Phase 16 authority.
 
 ## Completed roadmap directions
 
@@ -83,6 +77,7 @@ The selection does not authorise implementation by itself. It also does not incl
 | Phase 13 — Deterministic observation-hour comparison and temporal evidence | Complete; adjacent-slot comparison and canonical temporal evidence proved offline | [phase-13-observation-hour-temporal-evidence.md](phase-13-observation-hour-temporal-evidence.md) | [../delivery/phase-13-observation-hour-temporal-evidence.md](../delivery/phase-13-observation-hour-temporal-evidence.md) |
 | Phase 14 — Deterministic site publication | Complete at safe inert control-plane boundary; operational activation deferred | [phase-14-deterministic-site-publication.md](phase-14-deterministic-site-publication.md) | [../delivery/phase-14-deterministic-site-publication.md](../delivery/phase-14-deterministic-site-publication.md) |
 | Phase 15 — Public deterministic temporal evidence | Complete; bounded repository-bound BTC temporal evidence published through the existing site pipeline | [phase-15-public-deterministic-temporal-evidence.md](phase-15-public-deterministic-temporal-evidence.md) | [../delivery/phase-15-public-deterministic-temporal-evidence.md](../delivery/phase-15-public-deterministic-temporal-evidence.md) |
+| Phase 16 — Reader-facing evidence experience | Complete; coherent reader-facing evidence surfaces with authority separation and exact public proof | [phase-16-reader-facing-evidence-experience.md](phase-16-reader-facing-evidence-experience.md) | [../delivery/phase-16-reader-facing-evidence-experience.md](../delivery/phase-16-reader-facing-evidence-experience.md) |
 
 Phase 10 compares one current repository-owned snapshot with its uniquely resolved immediate predecessor under the frozen exact `3,600`-second, no-skip/no-fallback contract. Phase 11 consumes that evidence offline to produce canonical temporal history and deterministic reviewer-visible rendering. Phase 12 extends the active source-evidence spine with a separate observation-hour identity. Phase 13 consumes that identity under its separately versioned exact adjacent-slot comparison/series contracts while leaving Phase 10/11 v1 unchanged. Phase 14 adds a reviewed inert deterministic publication control plane and trusted App/protection boundary but deliberately stops before live operational publication. Phase 15 separately exposes one narrow Phase 13 temporal-evidence consumer on the existing public site. Phase 16 is the separately governed reader-facing successor over those existing evidence foundations.
 
