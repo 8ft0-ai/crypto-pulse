@@ -19,6 +19,7 @@ from site_generator import (
     archive_cards,
     homepage_hierarchy,
     homepage_summary,
+    reader_evidence,
     report_provenance,
     temporal_evidence,
 )
@@ -115,11 +116,12 @@ def build() -> None:
     add_brief_and_sources(brief)
     report_provenance.apply(base)
     homepage_hierarchy.apply(base)
+    reader_evidence.apply(base)
     add_archive_filters(filters)
     temporal_evidence.apply(base)
     add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, search, data-quality, mobile UX, brief, source-card, archive-filter, deterministic temporal evidence, and accessibility enhancements.")
+    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, reader-facing evidence authority, search, data-quality, mobile UX, brief, source-card, archive-filter, deterministic temporal evidence, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
