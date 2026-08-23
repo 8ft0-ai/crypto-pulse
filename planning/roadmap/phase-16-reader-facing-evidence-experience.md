@@ -87,7 +87,7 @@ Across the successfully resolved chronology population:
 latest_report = maximum unique report_time_utc
 ```
 
-Duplicate exact canonical report instants fail closed rather than electing a lexical/path winner.
+Duplicate exact canonical report instants fail closed except for a proven retained-legacy alias set where every member independently validates to the same instant and the complete set is equivalent outside the bounded `timestamp` / `data_cutoff` representation. Such a proven alias set resolves as one logical chronology event with deterministic representative selection; all other duplicate instants fail closed.
 
 The supplied current-corpus regression is normative: with the retained `1742_AEST.md` and `2031_AEST.md` front-matter/path shapes, `2031_AEST.md` must sort first, become `latest_report`, and display the 20:31 AEST instant rather than a date-only fallback.
 
@@ -322,7 +322,7 @@ Phase 16 implementation is complete only when all applicable gates are proved th
 - [x] Every report-recency consumer uses one canonical report chronology resolver.
 - [x] Deterministic report chronology validates `generated_at_utc` and consistency evidence and never repairs contradictory metadata from filenames.
 - [x] Legacy chronology prefers validated front-matter timestamp, uses recognised fallback only when allowed, and fails closed on conflicts/unorderable retained reports.
-- [x] Duplicate exact canonical report instants fail closed.
+- [x] Duplicate exact canonical report instants fail closed except for proven equivalent retained-legacy alias sets, which resolve as one logical chronology event; all non-alias duplicates fail closed.
 - [x] The normative `1742_AEST.md` / `2031_AEST.md` regression selects and displays `2031_AEST.md` first at 20:31 AEST.
 - [x] Home and `latest.html` consume one shared reader-evidence context and cannot independently elect different observations.
 - [x] `current_observation` is anchored at the maximum canonical Phase 13 participating observation hour in the exact checked-out commit.
