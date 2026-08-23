@@ -458,3 +458,30 @@ Delivery notes:
 - The close-out does not claim an independent CDN HTTP fetch that the execution environment could not perform; it records GitHub's successful deployment state plus exact deployed-artifact inspection.
 - Phase 14 publication activation/#477, broader temporal series/market cards, model/provider paths, narrative/forecast/advice and generated `_site/` remain outside Phase 15.
 - No active successor phase is selected by this close-out.
+
+## Phase 16 — Reader-facing evidence experience
+
+Status: complete.
+
+Primary outcome: one coherent reader-facing Home / Most recent / Temporal evidence / Archive experience now consumes the existing repository-owned evidence authorities without conflating report chronology, current observation, archived report content or the frozen Phase 15 temporal record.
+
+```text
+Parent issue: #501
+Slice issues: #502, #503, #504
+Implementation PRs: #505, #506, #507
+Slice merge commits: 9d37798b391b3cf37e76d0d234ad5cb0738df449, 546927212c831bd0bfa124db86d0d68f05a7d61f, ee46ae895036b60bccfab99e4f462bf5f53c15cd
+Final Pages run: 32633849094
+Final deployed commit: ee46ae895036b60bccfab99e4f462bf5f53c15cd
+Delivery record: planning/delivery/phase-16-reader-facing-evidence-experience.md
+_site committed: no
+```
+
+Delivery notes:
+
+- One canonical report chronology now governs report-recency consumers, including the corrected `2031_AEST` > `1742_AEST` behaviour.
+- Home and `latest.html` share one exact-checkout reader context while deterministic observation values/provenance and archived report content/citations remain separate authorities.
+- The existing Phase 15 `BTC.price_usd` 24-slot evidence remains unchanged in authority; Phase 16 adds truthful sparse reader projection only.
+- Archive reports actual retained discontinuity, separates generation type from governed evidence state, avoids heuristic legacy metric normalisation and supports bounded repository-backed progressive filtering.
+- The exact final merge was automatically built and deployed by Pages run `32633849094`; the required live Home, latest, Archive and temporal pages matched the deployed artifact byte-for-byte.
+- #497 T2, Phase 14/#477 operationalisation, additional temporal series/analytics, providers/models, forecasts/recommendations/signals and committed `_site/` remain outside scope.
+- No successor phase is selected by this close-out.

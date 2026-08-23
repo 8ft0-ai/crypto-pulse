@@ -60,6 +60,12 @@ flowchart LR
   run_32528437373["Workflow Run\nPublish Phase 15 temporal evidence to GitHub Pages"]
   artifact_phase15_temporal_page["Artifact\nPublic deterministic temporal evidence page"]
   boundary_phase15_narrow_public_evidence["Boundary\nPublic temporal evidence remains narrow and non-advisory"]
+  phase_16["Phase\nPhase 16 — Reader-facing evidence experience"]
+  issue_501["Issue #501\nPhase 16 delivery control — reader-facing evidence experience"]
+  pr_507["PR #507\nPhase 16 Slice 3: add Archive reader model"]
+  run_32633849094["Workflow Run\nPublish Phase 16 reader experience to GitHub Pages"]
+  artifact_phase16_reader_site["Artifact\nPublic Phase 16 reader-facing evidence surfaces"]
+  boundary_phase16_authority_separation["Boundary\nReader presentation preserves evidence authority separation"]
 
   pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
@@ -121,4 +127,11 @@ flowchart LR
   run_32528437373 -->|deployed exact temporal artifact| artifact_phase15_temporal_page
   phase_15 -->|preserved narrow public boundary| boundary_phase15_narrow_public_evidence
   phase_15 -->|preserved| boundary_no_committed_site
+  phase_15 -->|enabled bounded reader projection| phase_16
+  phase_16 -->|governed by| issue_501
+  phase_16 -->|proved final reader integration| pr_507
+  pr_507 -->|deployed by exact-commit Pages run| run_32633849094
+  run_32633849094 -->|deployed exact reader surfaces| artifact_phase16_reader_site
+  phase_16 -->|preserved authority separation| boundary_phase16_authority_separation
+  phase_16 -->|preserved| boundary_no_committed_site
 ```

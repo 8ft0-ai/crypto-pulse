@@ -355,6 +355,46 @@ nodes:
     title: Public temporal evidence remains narrow and non-advisory
     summary: The public Phase 15 contract remains metric / BTC.price_usd / 24 canonical UTC-hour slots from one checked-out repository commit; Phase 14 activation, broader series, market-card scope, narrative, forecast and advice remain separately governed.
 
+  - id: phase-16
+    type: phase
+    title: Phase 16 — Reader-facing evidence experience
+    status: complete
+    summary: Home, Most recent, Temporal evidence and Archive now present one coherent reader experience over distinct repository-owned report, observation and temporal authorities with explicit sparse evidence and demo/non-advice framing.
+    record: planning/delivery/phase-16-reader-facing-evidence-experience.md
+
+  - id: issue-501
+    type: issue
+    title: Phase 16 delivery control — reader-facing evidence experience
+    number: 501
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/501
+    status: close-out-pending
+
+  - id: pr-507
+    type: pull_request
+    title: "Phase 16 Slice 3: add Archive reader model"
+    number: 507
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/507
+    status: merged
+    merge_commit: ee46ae895036b60bccfab99e4f462bf5f53c15cd
+
+  - id: run-32633849094
+    type: workflow_run
+    title: Publish Phase 16 reader experience to GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/32633849094
+    conclusion: success
+
+  - id: artifact-phase16-reader-site
+    type: artifact
+    title: Public Phase 16 reader-facing evidence surfaces
+    path: _site/
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: boundary-phase16-authority-separation
+    type: boundary
+    title: Reader presentation preserves evidence authority separation
+    summary: Report chronology, current deterministic observation, archived report content and the Phase 15 temporal record remain distinct; Phase 16 adds no evidence accumulation, publication activation, model authority, advice or committed generated site output.
+
 edges:
   - from: pre-phase-baseline
     to: phase-1
@@ -652,6 +692,41 @@ edges:
     label: preserved narrow public boundary
 
   - from: phase-15
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-15
+    to: phase-16
+    type: enabled
+    label: enabled bounded reader projection
+
+  - from: phase-16
+    to: issue-501
+    type: depends_on
+    label: governed by
+
+  - from: phase-16
+    to: pr-507
+    type: proved_by
+    label: proved final reader integration
+
+  - from: pr-507
+    to: run-32633849094
+    type: validated_by
+    label: deployed by exact-commit Pages run
+
+  - from: run-32633849094
+    to: artifact-phase16-reader-site
+    type: produced
+    label: deployed exact reader surfaces
+
+  - from: phase-16
+    to: boundary-phase16-authority-separation
+    type: preserved
+    label: preserved authority separation
+
+  - from: phase-16
     to: boundary-no-committed-site
     type: preserved
     label: preserved
