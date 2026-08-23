@@ -1,0 +1,86 @@
+"""Trusted-runtime identity and protected-main provenance checks."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+import tomllib
+
+from .github_read import GitHubReader, GitHubReadError, REPOSITORY
+from .process import ProcessRunner
+
+
+class RuntimeErrorBase(RuntimeError):
+    pass
+
+
+class RuntimeIdentityError(RuntimeErrorBase):
+    pass
+
+
+@dataclass(frozen=True)
+class RuntimeCheck:
+    identity: dict[str, Any]
+    complete: bool
+    trusted: bool
+    reason: str | None = None
+
+
+def runtime_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _git_value(runner: ProcessRunner, root: Path, args: list[str], label: str) -> str:
+    result = runner.git(["-C", str(root), *args])
+    if result.returncode != 0:
+        raise RuntimeIdentityError(f"unable to establish {label}")
+    return result.stdout.strip()
+
+
+def inspect_runtime(runner: ProcessRunner, github: GitHubReader, *, root: Path | None = None) -> RuntimeCheck:
+    root = (root or runtime_root()).resolve()
+    top = Path(_git_value(runner, root, ["rev-parse", "--show-toplevel"], "runtime root")).resolve()
+    if top != root:
+        raise RuntimeIdentityError("runtime root is not the repository toplevel")
+    dirty = bool(_git_value(runner, root, ["status", "--porcelain=v1", "--untracked-files=all"], "runtime cleanliness"))
+    commit_sha = _git_value(runner, root, ["rev-parse", "HEAD"], "runtime commit")
+    tree_sha = _git_value(runner, root, ["rev-parse", "HEAD^{tree}"], "runtime tree")
+    launcher = _git_value(runner, root, ["rev-parse", "HEAD:tools/operator/cp"], "launcher blob")
+    config = _git_value(runner, root, ["rev-parse", "HEAD:tools/operator/operator.toml"], "config blob")
+    package = _git_value(runner, root, ["rev-parse", "HEAD:tools/operator/cryptopulse_operator"], "package tree")
+    try:
+        config_data = tomllib.loads((root / "tools/operator/operator.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise RuntimeIdentityError("unable to read trusted operator configuration") from exc
+    expected_config = {
+        "contract": "operator-toolkit/v1",
+        "repository": REPOSITORY,
+        "github_host": "github.com",
+        "default_branch": "main",
+        "minimum_python": "3.12",
+    }
+    if any(config_data.get(key) != value for key, value in expected_config.items()):
+        raise RuntimeIdentityError("trusted operator configuration does not match v1 bootstrap expectations")
+    identity: dict[str, Any] = {
+        "repository": REPOSITORY,
+        "commit_sha": commit_sha,
+        "tree_sha": tree_sha,
+        "toolkit_identity": {"launcher_blob": launcher, "package_tree": package},
+        "config_identity": config,
+        "clean": not dirty,
+        "provenance": None,
+    }
+    if dirty:
+        return RuntimeCheck(identity, complete=True, trusted=False, reason="dirty-runtime")
+    try:
+        main = github.main_branch()
+        if not main["protected"]:
+            identity["provenance"] = "main-not-protected"
+            return RuntimeCheck(identity, complete=True, trusted=False, reason="main-not-protected")
+        provenance = github.runtime_provenance(commit_sha, main["sha"])
+    except GitHubReadError:
+        return RuntimeCheck(identity, complete=False, trusted=False, reason="protected-main-provenance-unavailable")
+    identity["provenance"] = provenance
+    trusted = provenance in {"current-main", "ancestor-of-current-main"}
+    return RuntimeCheck(identity, complete=True, trusted=trusted, reason=None if trusted else "runtime-not-on-protected-main-history")

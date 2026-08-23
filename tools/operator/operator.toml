@@ -1,0 +1,7 @@
+contract = "operator-toolkit/v1"
+repository = "8ft0-ai/crypto-pulse"
+github_host = "github.com"
+default_branch = "main"
+minimum_python = "3.12"
+required_check = "Build site and check generated output"
+required_check_app_id = 15368

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+case "$0" in
+  */*) SCRIPT_DIR=$(CDPATH= cd -- "${0%/*}" && pwd -P) ;;
+  *) echo "cp: launcher must be invoked by path" >&2; exit 4 ;;
+esac
+
+PYTHON=$(command -v python3 || true)
+if [ -z "$PYTHON" ]; then
+  echo "cp: python3 >= 3.12 is required" >&2
+  exit 4
+fi
+
+export PYTHONNOUSERSITE=1
+unset PYTHONPATH PYTHONHOME
+
+exec "$PYTHON" -I -c '
+import runpy, sys
+root = sys.argv[1]
+sys.path[:] = [root] + [p for p in sys.path if p and p != "."]
+sys.argv = [root + "/cryptopulse_operator/cli.py"] + sys.argv[2:]
+runpy.run_module("cryptopulse_operator.cli", run_name="__main__")
+' "$SCRIPT_DIR" "$@"
