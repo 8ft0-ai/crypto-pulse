@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta, timezone
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -77,15 +77,14 @@ def _parse_aware_iso(value: Any, field: str) -> datetime:
     return parsed
 
 
-def _legacy_timestamp(value: Any) -> tuple[datetime, str, str]:
+def _legacy_time(value: Any, field: str) -> tuple[datetime, str]:
     if isinstance(value, datetime):
         parsed = value
         if parsed.tzinfo is None or parsed.utcoffset() is None:
-            raise ReportChronologyError("legacy timestamp must include an explicit timezone")
-        abbreviation = parsed.tzname() or "UTC"
-        return parsed.astimezone(timezone.utc), parsed.strftime("%Y-%m-%d %H:%M"), abbreviation
+            raise ReportChronologyError(f"{field} must include an explicit timezone")
+        return parsed.astimezone(timezone.utc), parsed.tzname() or "UTC"
     if not isinstance(value, str) or not value.strip():
-        raise ReportChronologyError("legacy timestamp must be a non-empty string")
+        raise ReportChronologyError(f"{field} must be a non-empty string")
     text = value.strip()
     match = LEGACY_TIMESTAMP_RE.fullmatch(text)
     if match:
@@ -97,12 +96,17 @@ def _legacy_timestamp(value: Any) -> tuple[datetime, str, str]:
                 "%Y-%m-%d %H:%M",
             ).replace(tzinfo=tzinfo)
         except ValueError as exc:
-            raise ReportChronologyError("legacy timestamp is invalid") from exc
-        return local.astimezone(timezone.utc), local.strftime("%Y-%m-%d %H:%M"), abbreviation
+            raise ReportChronologyError(f"{field} is invalid") from exc
+        return local.astimezone(timezone.utc), abbreviation
 
-    parsed = _parse_aware_iso(text, "legacy timestamp")
-    abbreviation = parsed.tzname() or "UTC"
-    return parsed.astimezone(timezone.utc), parsed.strftime("%Y-%m-%d %H:%M"), abbreviation
+    parsed = _parse_aware_iso(text, field)
+    return parsed.astimezone(timezone.utc), parsed.tzname() or "UTC"
+
+
+def _legacy_timestamp(value: Any) -> tuple[datetime, str, str]:
+    canonical_utc, abbreviation = _legacy_time(value, "legacy timestamp")
+    parsed = canonical_utc.astimezone(FIXED_OFFSETS.get(abbreviation, timezone.utc))
+    return canonical_utc, parsed.strftime("%Y-%m-%d %H:%M"), abbreviation
 
 
 def _path_local(date_text: str, hhmm: str, abbreviation: str) -> datetime:
@@ -187,10 +191,75 @@ def _legacy_identity(report: Any) -> tuple[datetime, str, str, str]:
     return canonical_utc, display, path_local.strftime("%H:%M"), path_tz
 
 
+def _canonical_text(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _normalised_legacy_alias_metadata(report: Any, canonical_utc: datetime) -> dict[str, Any]:
+    metadata = dict(_metadata(report))
+    if metadata.get("timestamp") is None:
+        raise ReportChronologyError("legacy alias timestamp is required")
+    timestamp_utc, _timestamp_tz = _legacy_time(metadata["timestamp"], "legacy alias timestamp")
+    if timestamp_utc != canonical_utc:
+        raise ReportChronologyError("legacy alias timestamp contradicts canonical report instant")
+    metadata["timestamp"] = _canonical_text(timestamp_utc)
+
+    if "data_cutoff" in metadata:
+        cutoff_utc, _cutoff_tz = _legacy_time(metadata["data_cutoff"], "legacy alias data_cutoff")
+        if cutoff_utc != canonical_utc:
+            raise ReportChronologyError("legacy alias data_cutoff contradicts canonical report instant")
+        metadata["data_cutoff"] = _canonical_text(cutoff_utc)
+    return metadata
+
+
+def _archived_body_bytes(report: Any) -> bytes:
+    source_path = getattr(report, "source_path", None)
+    if not isinstance(source_path, Path):
+        raise ReportChronologyError("legacy alias source file is unavailable")
+    try:
+        raw = source_path.read_bytes()
+    except OSError as exc:
+        raise ReportChronologyError("legacy alias source file is unreadable") from exc
+    if not raw.startswith(b"---\n"):
+        raise ReportChronologyError("legacy alias source file lacks front matter")
+    parts = raw.split(b"---\n", 2)
+    if len(parts) != 3:
+        raise ReportChronologyError("legacy alias source file front matter is malformed")
+    return parts[2]
+
+
+def _legacy_alias_representative(
+    canonical_utc: datetime, entries: list[tuple[Any, str]]
+) -> Any:
+    if any(kind != "legacy" for _report, kind in entries):
+        raise ReportChronologyError("duplicate canonical report instant includes a non-legacy report")
+
+    reference_metadata: dict[str, Any] | None = None
+    reference_body: bytes | None = None
+    for report, _kind in entries:
+        normalised_metadata = _normalised_legacy_alias_metadata(report, canonical_utc)
+        body = _archived_body_bytes(report)
+        if reference_metadata is None:
+            reference_metadata = normalised_metadata
+            reference_body = body
+            continue
+        if normalised_metadata != reference_metadata:
+            raise ReportChronologyError("same-instant legacy reports differ outside time representation")
+        if body != reference_body:
+            raise ReportChronologyError("same-instant legacy report bodies differ")
+
+    ordered = sorted((report for report, _kind in entries), key=_source_rel)
+    representative = ordered[0]
+    aliases = tuple(ordered[1:])
+    representative.chronology_aliases = aliases
+    for alias in aliases:
+        alias.chronology_alias_of = _source_rel(representative)
+    return representative
+
+
 def canonicalise_reports(reports: Iterable[Any]) -> list[Any]:
     """Return retained reports in one fail-closed reverse UTC chronology."""
-    resolved: list[tuple[datetime, Any]] = []
-    seen: dict[datetime, str] = {}
+    grouped: dict[datetime, list[tuple[Any, str]]] = {}
 
     for report in reports:
         metadata = _metadata(report)
@@ -201,19 +270,22 @@ def canonicalise_reports(reports: Iterable[Any]) -> list[Any]:
             canonical_utc, display, time_label, abbreviation = _legacy_identity(report)
             kind = "legacy"
 
-        if canonical_utc in seen:
-            raise ReportChronologyError(
-                f"duplicate canonical report instant: {seen[canonical_utc]} and {_source_rel(report)}"
-            )
-        seen[canonical_utc] = _source_rel(report)
-
         report.timestamp = display
-        report.sort_key = canonical_utc.isoformat().replace("+00:00", "Z")
+        report.sort_key = _canonical_text(canonical_utc)
         report.time_label = time_label
         report.tz = abbreviation
-        report.report_time_utc = canonical_utc.isoformat().replace("+00:00", "Z")
+        report.report_time_utc = _canonical_text(canonical_utc)
         report.chronology_kind = kind
-        resolved.append((canonical_utc, report))
+        report.chronology_aliases = ()
+        grouped.setdefault(canonical_utc, []).append((report, kind))
+
+    resolved: list[tuple[datetime, Any]] = []
+    for canonical_utc, entries in grouped.items():
+        if len(entries) == 1:
+            representative = entries[0][0]
+        else:
+            representative = _legacy_alias_representative(canonical_utc, entries)
+        resolved.append((canonical_utc, representative))
 
     resolved.sort(key=lambda item: item[0], reverse=True)
     return [report for _, report in resolved]

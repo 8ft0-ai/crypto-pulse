@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from site_generator import report_chronology
+from site_generator import pipeline, report_chronology
 
 
 def _load_builder():
@@ -26,14 +26,41 @@ def _load_builder():
     return module
 
 
-def _report(path: str, metadata: dict) -> SimpleNamespace:
+def _report(path: str, metadata: dict, source_path: Path | None = None) -> SimpleNamespace:
     return SimpleNamespace(
+        source_path=source_path,
         source_rel=path,
         metadata=metadata,
         timestamp="legacy",
         sort_key="legacy",
         time_label="",
         tz="",
+    )
+
+
+def _legacy_alias_report(
+    root: Path,
+    path: str,
+    timestamp: str,
+    data_cutoff: str,
+    body: bytes = b"IDENTICAL LEGACY BODY\n",
+    **metadata: object,
+) -> SimpleNamespace:
+    source_path = root / path
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"---\nplaceholder: true\n---\n" + body)
+    return _report(
+        path,
+        {
+            "report_type": "hourly_crypto_market_intelligence",
+            "timestamp": timestamp,
+            "data_cutoff": data_cutoff,
+            "live_data_status": "partial",
+            "primary_assets": ["BTC", "ETH", "SOL", "XRP", "BNB"],
+            "tags": ["crypto", "hourly-report", "market-intelligence", "trading"],
+            **metadata,
+        },
+        source_path,
     )
 
 
@@ -67,7 +94,6 @@ class Phase16ReportChronologyTests(unittest.TestCase):
         self.assertEqual(later.time_label, "20:31")
         self.assertEqual(later.report_time_utc, "2026-07-08T10:31:48Z")
 
-
     def test_deterministic_path_can_supply_display_zone_when_optional_local_metadata_absent(self) -> None:
         report = _report(
             "reports/crypto/hourly/2026/07/08/2031_AEST.md",
@@ -78,7 +104,6 @@ class Phase16ReportChronologyTests(unittest.TestCase):
         )
         ordered = report_chronology.canonicalise_reports([report])
         self.assertEqual(ordered[0].timestamp, "2026-07-08 20:31 AEST")
-
 
     def test_canonical_order_flows_to_latest_archive_feed_manifest_and_search_index(self) -> None:
         builder = _load_builder()
@@ -182,7 +207,7 @@ class Phase16ReportChronologyTests(unittest.TestCase):
         with self.assertRaises(report_chronology.ReportChronologyError):
             report_chronology.canonicalise_reports([report])
 
-    def test_duplicate_canonical_instant_fails_closed(self) -> None:
+    def test_unproven_duplicate_canonical_instant_fails_closed(self) -> None:
         first = _report(
             "reports/crypto/hourly/2026/05/09/1848_AEST_crypto_market_intelligence.md",
             {"timestamp": "2026-05-09 18:48 AEST"},
@@ -193,6 +218,133 @@ class Phase16ReportChronologyTests(unittest.TestCase):
         )
         with self.assertRaises(report_chronology.ReportChronologyError):
             report_chronology.canonicalise_reports([first, second])
+
+    def test_proven_retained_legacy_alias_pair_is_one_logical_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            utc = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/0158_UTC_crypto_market_intelligence.md",
+                "2026-05-10 01:58 UTC",
+                "2026-05-10 01:58 UTC",
+            )
+            aest = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/1158_AEST_crypto_market_intelligence.md",
+                "2026-05-10 11:58 AEST",
+                "2026-05-10 11:58 AEST",
+            )
+
+            ordered = report_chronology.canonicalise_reports([aest, utc])
+
+            self.assertEqual(len(ordered), 1)
+            self.assertIs(ordered[0], utc)
+            self.assertEqual(utc.report_time_utc, "2026-05-10T01:58:00Z")
+            self.assertEqual(tuple(alias.source_rel for alias in utc.chronology_aliases), (aest.source_rel,))
+            self.assertEqual(aest.chronology_alias_of, utc.source_rel)
+
+            repeated = report_chronology.canonicalise_reports([utc, aest])
+            self.assertIs(repeated[0], utc)
+
+    def test_legacy_alias_body_difference_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            utc = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/0158_UTC_crypto_market_intelligence.md",
+                "2026-05-10 01:58 UTC",
+                "2026-05-10 01:58 UTC",
+                body=b"BODY A\n",
+            )
+            aest = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/1158_AEST_crypto_market_intelligence.md",
+                "2026-05-10 11:58 AEST",
+                "2026-05-10 11:58 AEST",
+                body=b"BODY B\n",
+            )
+            with self.assertRaises(report_chronology.ReportChronologyError):
+                report_chronology.canonicalise_reports([utc, aest])
+
+    def test_legacy_alias_non_time_metadata_difference_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            utc = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/0158_UTC_crypto_market_intelligence.md",
+                "2026-05-10 01:58 UTC",
+                "2026-05-10 01:58 UTC",
+            )
+            aest = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/1158_AEST_crypto_market_intelligence.md",
+                "2026-05-10 11:58 AEST",
+                "2026-05-10 11:58 AEST",
+                live_data_status="different",
+            )
+            with self.assertRaises(report_chronology.ReportChronologyError):
+                report_chronology.canonicalise_reports([utc, aest])
+
+    def test_legacy_alias_data_cutoff_contradiction_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            utc = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/0158_UTC_crypto_market_intelligence.md",
+                "2026-05-10 01:58 UTC",
+                "2026-05-10 01:58 UTC",
+            )
+            aest = _legacy_alias_report(
+                root,
+                "reports/crypto/hourly/2026/05/10/1158_AEST_crypto_market_intelligence.md",
+                "2026-05-10 11:58 AEST",
+                "2026-05-10 11:57 AEST",
+            )
+            with self.assertRaises(report_chronology.ReportChronologyError):
+                report_chronology.canonicalise_reports([utc, aest])
+
+    def test_deterministic_legacy_same_instant_fails_closed(self) -> None:
+        deterministic = _report(
+            "reports/crypto/hourly/2026/05/10/0158_UTC.md",
+            {
+                "schema_version": "deterministic-crypto-report/v1",
+                "generated_at_utc": "2026-05-10T01:58:00Z",
+            },
+        )
+        legacy = _report(
+            "reports/crypto/hourly/2026/05/10/0158_UTC_crypto_market_intelligence.md",
+            {"timestamp": "2026-05-10 01:58 UTC"},
+        )
+        with self.assertRaises(report_chronology.ReportChronologyError):
+            report_chronology.canonicalise_reports([deterministic, legacy])
+
+    def test_alias_direct_route_is_rendered_without_reentering_logical_chronology(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            representative_path = root / "archive" / "0158_UTC.html"
+            alias_path = root / "archive" / "1158_AEST.html"
+            alias = SimpleNamespace(output_path=alias_path, source_rel="alias")
+            representative = SimpleNamespace(
+                output_path=representative_path,
+                source_rel="representative",
+                chronology_aliases=(alias,),
+            )
+
+            def build() -> None:
+                representative_path.parent.mkdir(parents=True, exist_ok=True)
+                representative_path.write_text("representative", encoding="utf-8")
+
+            base = SimpleNamespace(
+                build=build,
+                collect_reports=lambda: [representative],
+                asset_prefix_for=lambda _path: "",
+                html_page=lambda report, _prefix, _previous, _next: f"rendered:{report.source_rel}",
+            )
+            pipeline.build_base_site(base)
+
+            self.assertEqual(representative_path.read_text(encoding="utf-8"), "representative")
+            self.assertEqual(alias_path.read_text(encoding="utf-8"), "rendered:alias")
+            self.assertEqual(len(base.collect_reports()), 1)
 
     def test_unsupported_retained_report_is_not_silently_skipped(self) -> None:
         report = _report("reports/crypto/hourly/2026/05/09/report.md", {})

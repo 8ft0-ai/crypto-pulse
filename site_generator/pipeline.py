@@ -41,9 +41,29 @@ def stage(name: str) -> ModuleType:
     return importlib.import_module(name)
 
 
+def render_chronology_alias_routes(base: Any) -> None:
+    """Preserve direct pages for proven legacy aliases outside logical chronology."""
+    reports = base.collect_reports()
+    for index, report in enumerate(reports):
+        previous_report = reports[index + 1] if index + 1 < len(reports) else None
+        next_report = reports[index - 1] if index > 0 else None
+        for alias in getattr(report, "chronology_aliases", ()):
+            alias.output_path.parent.mkdir(parents=True, exist_ok=True)
+            alias.output_path.write_text(
+                base.html_page(
+                    alias,
+                    base.asset_prefix_for(alias.output_path),
+                    previous_report,
+                    next_report,
+                ),
+                encoding="utf-8",
+            )
+
+
 def build_base_site(base: Any) -> None:
     """Generate the core home, latest, archive, report, RSS, and index files."""
     base.build()
+    render_chronology_alias_routes(base)
 
 
 def add_search_and_quality(base: Any, search: Any) -> None:
