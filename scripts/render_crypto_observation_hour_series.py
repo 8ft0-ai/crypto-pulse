@@ -59,6 +59,10 @@ def _number(value: Any) -> Decimal:
         raise Phase15PublicTemporalEvidenceError("validated metric datum must be numeric") from exc
     if not result.is_finite():
         raise Phase15PublicTemporalEvidenceError("validated metric datum must be finite")
+    if result <= 0:
+        raise Phase15PublicTemporalEvidenceError(
+            f"validated {PUBLIC_SERIES_KEY} datum must be strictly positive"
+        )
     return result
 
 
@@ -90,7 +94,7 @@ def _is_degraded(entry: dict[str, Any]) -> bool:
 
 
 def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
-    """Connect numeric points only where Phase 13 records exact continuity."""
+    """Group asserted values without ever bridging a gap or discontinuity."""
     output: list[list[int]] = []
     current: list[int] = []
     for index, entry in enumerate(entries):
@@ -113,10 +117,74 @@ def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
     return output
 
 
-def _metric_svg(record: dict[str, Any]) -> str:
+def _reader_projection(record: dict[str, Any]) -> dict[str, Any]:
+    """Project reader summary state from the already validated 24-slot record."""
     entries = record["entries"]
-    values = [_number(entry["value"]["datum"]) for entry in entries if isinstance(entry.get("value"), dict)]
-    lo, hi = (min(values), max(values)) if values else (Decimal(0), Decimal(0))
+    value_count = 0
+    degraded_value_count = 0
+    continuous_pair_count = 0
+    longest_continuous_run = 0
+    current_run = 0
+    gap_reasons: dict[str, int] = {}
+
+    for index, entry in enumerate(entries):
+        value = entry.get("value")
+        if isinstance(value, dict):
+            _number(value.get("datum"))
+            value_count += 1
+            if _is_degraded(entry):
+                degraded_value_count += 1
+
+            previous_is_value = (
+                index > 0 and isinstance(entries[index - 1].get("value"), dict)
+            )
+            if (
+                previous_is_value
+                and entry.get("continuity", {}).get("status") == "continuous"
+            ):
+                continuous_pair_count += 1
+                current_run = current_run + 1 if current_run else 2
+            else:
+                current_run = 1
+            longest_continuous_run = max(longest_continuous_run, current_run)
+            continue
+
+        gap = entry.get("gap")
+        reason = gap.get("reason") if isinstance(gap, dict) else None
+        if not isinstance(reason, str) or not reason:
+            raise Phase15PublicTemporalEvidenceError(
+                "validated gap must retain an exact reason"
+            )
+        gap_reasons[reason] = gap_reasons.get(reason, 0) + 1
+        current_run = 0
+
+    gap_count = PUBLIC_SLOT_COUNT - value_count
+    if gap_count != sum(gap_reasons.values()):
+        raise Phase15PublicTemporalEvidenceError(
+            "reader projection gap count does not match retained evidence"
+        )
+
+    return {
+        "value_count": value_count,
+        "gap_count": gap_count,
+        "gap_reasons": dict(sorted(gap_reasons.items())),
+        "degraded_value_count": degraded_value_count,
+        "continuous_pair_count": continuous_pair_count,
+        "longest_continuous_run": longest_continuous_run,
+    }
+
+
+def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
+    entries = record["entries"]
+    values = [
+        _number(entry["value"]["datum"])
+        for entry in entries
+        if isinstance(entry.get("value"), dict)
+    ]
+    if not values:
+        return ""
+
+    lo, hi = min(values), max(values)
 
     def y(value: Decimal) -> Decimal:
         if hi == lo:
@@ -126,10 +194,13 @@ def _metric_svg(record: dict[str, Any]) -> str:
     title_id = f"phase15-title-{record['series_id'][:12]}"
     desc_id = f"phase15-desc-{record['series_id'][:12]}"
     segments = _segments(entries)
-    segment_for = {index: number for number, segment in enumerate(segments) for index in segment}
+    segment_for = {
+        index: number for number, segment in enumerate(segments) for index in segment
+    }
+    visual_mode = "line" if projection["continuous_pair_count"] > 0 else "points"
 
     parts = [
-        f'<svg width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-labelledby="{title_id} {desc_id}" data-visual-mode="numeric" data-segment-count="{len(segments)}">',
+        f'<svg width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-labelledby="{title_id} {desc_id}" data-visual-mode="{visual_mode}" data-segment-count="{len(segments)}">',
         f'<title id="{title_id}">{_esc(PUBLIC_SERIES_KEY)} public temporal evidence</title>',
         f'<desc id="{desc_id}">Twenty-four canonical UTC-hour slots from validated Phase 13 repository evidence. Dashed markers are explicit gaps, squares are degraded-backed values, and lines join only exact Phase 13 continuity.</desc>',
         '<line x1="80" y1="330" x2="930" y2="330" stroke="currentColor"/>',
@@ -141,8 +212,13 @@ def _metric_svg(record: dict[str, Any]) -> str:
     for segment_number, segment in enumerate(segments):
         parts.append(f'<g class="metric-segment" data-segment="{segment_number}">')
         if len(segment) > 1:
-            points = [f'{_coord(_x(index, len(entries)))} {_coord(y(_number(entries[index]["value"]["datum"])))}' for index in segment]
-            parts.append(f'<path class="metric-line" d="M {" L ".join(points)}" fill="none" stroke="currentColor"/>')
+            points = [
+                f'{_coord(_x(index, len(entries)))} {_coord(y(_number(entries[index]["value"]["datum"])))}'
+                for index in segment
+            ]
+            parts.append(
+                f'<path class="metric-line" d="M {" L ".join(points)}" fill="none" stroke="currentColor"/>'
+            )
         parts.append("</g>")
 
     for index, entry in enumerate(entries):
@@ -159,17 +235,77 @@ def _metric_svg(record: dict[str, Any]) -> str:
             continue
         value = entry["value"]
         ypos = y(_number(value["datum"]))
-        title = f'{entry["slot_utc"]}: {_display(value["datum"])}; continuity={entry["continuity"]["status"]}; ' + ("degraded-backed" if _is_degraded(entry) else "validated")
+        title = (
+            f'{entry["slot_utc"]}: {_display(value["datum"])}; '
+            f'continuity={entry["continuity"]["status"]}; '
+            + ("degraded-backed" if _is_degraded(entry) else "validated")
+        )
         if _is_degraded(entry):
             parts.append(
-                f'<rect class="metric-point degraded" data-slot-index="{index}" data-segment="{segment_for[index]}" x="{_coord(xpos - 4)}" y="{_coord(ypos - 4)}" width="8" height="8"><title>{_esc(title)}</title></rect>'
+                f'<rect class="metric-point degraded" data-slot-index="{index}" '
+                f'data-segment="{segment_for[index]}" x="{_coord(xpos - 4)}" '
+                f'y="{_coord(ypos - 4)}" width="8" height="8">'
+                f'<title>{_esc(title)}</title></rect>'
             )
         else:
             parts.append(
-                f'<circle class="metric-point" data-slot-index="{index}" data-segment="{segment_for[index]}" cx="{xtext}" cy="{_coord(ypos)}" r="4"><title>{_esc(title)}</title></circle>'
+                f'<circle class="metric-point" data-slot-index="{index}" '
+                f'data-segment="{segment_for[index]}" cx="{xtext}" '
+                f'cy="{_coord(ypos)}" r="4"><title>{_esc(title)}</title></circle>'
             )
     parts.append("</svg>")
     return "".join(parts)
+
+
+def _reader_summary(projection: dict[str, Any]) -> str:
+    gap_reasons = projection["gap_reasons"]
+    if gap_reasons:
+        gap_html = "".join(
+            f'<li data-gap-reason="{_esc(reason)}"><code>{_esc(reason)}</code><span>{count}</span></li>'
+            for reason, count in gap_reasons.items()
+        )
+    else:
+        gap_html = "<li><span>No retained gaps in this window.</span></li>"
+
+    if projection["value_count"] == 0:
+        chart_note = (
+            "No asserted BTC.price_usd values exist in this 24-slot record, "
+            "so no chart or numeric extrema are rendered."
+        )
+    elif projection["continuous_pair_count"] == 0:
+        chart_note = (
+            "Asserted values are isolated by retained continuity evidence; "
+            "points may be shown, but no connecting line is rendered."
+        )
+    else:
+        chart_note = (
+            "Lines are drawn only across exact adjacent asserted values whose "
+            "retained continuity status is continuous."
+        )
+
+    return f"""
+<div class="temporal-reader-summary" aria-label="Temporal evidence reader summary"
+     data-value-count="{projection["value_count"]}"
+     data-gap-count="{projection["gap_count"]}"
+     data-degraded-value-count="{projection["degraded_value_count"]}"
+     data-continuous-pair-count="{projection["continuous_pair_count"]}"
+     data-longest-continuous-run="{projection["longest_continuous_run"]}">
+  <div class="eyebrow">24-slot evidence coverage</div>
+  <h2>What this repository window contains</h2>
+  <dl class="temporal-reader-metrics">
+    <div><dt>Asserted values</dt><dd>{projection["value_count"]}</dd></div>
+    <div><dt>Explicit gaps</dt><dd>{projection["gap_count"]}</dd></div>
+    <div><dt>Degraded-backed values</dt><dd>{projection["degraded_value_count"]}</dd></div>
+    <div><dt>Continuous pairs</dt><dd>{projection["continuous_pair_count"]}</dd></div>
+    <div><dt>Longest continuous run</dt><dd>{projection["longest_continuous_run"]}</dd></div>
+  </dl>
+  <div class="temporal-gap-summary">
+    <h3>Exact retained gap reasons</h3>
+    <ul>{gap_html}</ul>
+  </div>
+  <p class="temporal-chart-note">{_esc(chart_note)}</p>
+</div>
+"""
 
 
 def _evidence_table(record: dict[str, Any]) -> str:
@@ -207,31 +343,64 @@ def _evidence_table(record: dict[str, Any]) -> str:
             _json(comparison.get("predecessor")),
             _json(metric_evidence),
         )
-        rows.append(f'<tr data-slot-utc="{_esc(entry["slot_utc"])}"><th scope="row">{_esc(cells[0])}</th>' + "".join(f"<td>{_esc(cell)}</td>" for cell in cells[1:]) + "</tr>")
+        rows.append(
+            f'<tr data-slot-utc="{_esc(entry["slot_utc"])}"><th scope="row">{_esc(cells[0])}</th>'
+            + "".join(f"<td>{_esc(cell)}</td>" for cell in cells[1:])
+            + "</tr>"
+        )
     return (
+        '<div class="temporal-evidence-table-wrap">'
         '<table class="temporal-evidence-table">'
         f"<caption>Complete {PUBLIC_SLOT_COUNT}-slot repository evidence for {_esc(PUBLIC_SERIES_KEY)}</caption>"
         "<thead><tr>"
         + "".join(f'<th scope="col">{_esc(heading)}</th>' for heading in headings)
         + "</tr></thead><tbody>"
         + "".join(rows)
-        + "</tbody></table>"
+        + "</tbody></table></div>"
     )
 
 
 def _render_validated_public_series(record: dict[str, Any]) -> str:
     """Pure deterministic renderer for an already validated Phase 15-shaped record."""
-    svg = _metric_svg(record)
+    projection = _reader_projection(record)
+    svg = _metric_svg(record, projection)
     caption = (
-        f'Deterministic repository-bound temporal evidence for {PUBLIC_SERIES_KEY}, from {record["window"]["start_utc"]} through {record["window"]["end_utc"]}. '
-        "Every value and gap is reproduced from the validated Phase 13 record. No interpolation, aggregation, smoothing, backfill, inferred trend or generated narrative is introduced."
+        f'Deterministic repository-bound temporal evidence for {PUBLIC_SERIES_KEY}, '
+        f'from {record["window"]["start_utc"]} through {record["window"]["end_utc"]}. '
+        "Every value and gap is reproduced from the validated Phase 13 record. "
+        "No interpolation, aggregation, smoothing, backfill, carry-forward, gap bridging, "
+        "inferred trend or generated narrative is introduced."
     )
-    return (
-        f'<section class="phase15-public-temporal-evidence" data-contract-version="phase15-public-temporal-evidence/v1" data-schema-version="{_esc(record["schema_version"])}" data-series-kind="{_esc(record["series_kind"])}" data-series-key="{_esc(record["series_key"])}" data-series-id="{_esc(record["series_id"])}">'
-        "<figure>"
+    figure = (
+        '<figure class="temporal-evidence-visual">'
         + svg
         + f"<figcaption>{_esc(caption)}</figcaption></figure>"
+        if svg
+        else ""
+    )
+    empty_state = (
+        '<div class="temporal-empty-state" role="status">'
+        "No asserted BTC.price_usd values are available in this validated 24-slot repository window. "
+        "All retained gap evidence remains inspectable below."
+        "</div>"
+        if projection["value_count"] == 0
+        else ""
+    )
+    return (
+        f'<section class="phase15-public-temporal-evidence" '
+        f'data-contract-version="phase15-public-temporal-evidence/v1" '
+        f'data-schema-version="{_esc(record["schema_version"])}" '
+        f'data-series-kind="{_esc(record["series_kind"])}" '
+        f'data-series-key="{_esc(record["series_key"])}" '
+        f'data-series-id="{_esc(record["series_id"])}">'
+        + _reader_summary(projection)
+        + empty_state
+        + figure
+        + '<section class="temporal-evidence-inspect" aria-label="Inspect the temporal evidence">'
+        + "<h2>Inspect the evidence</h2>"
+        + "<p>The complete validated 24-slot record remains available below, including exact gaps, continuity and repository evidence identities.</p>"
         + _evidence_table(record)
+        + "</section>"
         + "</section>\n"
     )
 
