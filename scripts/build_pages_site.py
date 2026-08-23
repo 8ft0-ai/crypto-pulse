@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -588,8 +589,12 @@ def collect_reports() -> list[Report]:
         source_rel = source_path.relative_to(ROOT).as_posix()
         year, month, day, time_label, tz = path_parts(source_path)
         reports.append(Report(source_path, output_path, relative_url(output_path), title, timestamp, make_sort_key(source_path, timestamp), headline, body_html, metadata, source_rel, toc_html, source_items, year, month, day, time_label, tz))
-    reports.sort(key=lambda report: report.sort_key, reverse=True)
-    return reports
+    root_path = str(ROOT)
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
+    from site_generator import report_chronology
+
+    return report_chronology.canonicalise_reports(reports)
 
 
 def write_report_pages(reports: list[Report]) -> None:

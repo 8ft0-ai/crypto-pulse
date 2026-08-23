@@ -19,6 +19,7 @@ from site_generator import (
     archive_cards,
     homepage_hierarchy,
     homepage_summary,
+    reader_evidence,
     report_provenance,
     temporal_evidence,
 )
@@ -40,9 +41,29 @@ def stage(name: str) -> ModuleType:
     return importlib.import_module(name)
 
 
+def render_chronology_alias_routes(base: Any) -> None:
+    """Preserve direct pages for proven legacy aliases outside logical chronology."""
+    reports = base.collect_reports()
+    for index, report in enumerate(reports):
+        previous_report = reports[index + 1] if index + 1 < len(reports) else None
+        next_report = reports[index - 1] if index > 0 else None
+        for alias in getattr(report, "chronology_aliases", ()):
+            alias.output_path.parent.mkdir(parents=True, exist_ok=True)
+            alias.output_path.write_text(
+                base.html_page(
+                    alias,
+                    base.asset_prefix_for(alias.output_path),
+                    previous_report,
+                    next_report,
+                ),
+                encoding="utf-8",
+            )
+
+
 def build_base_site(base: Any) -> None:
     """Generate the core home, latest, archive, report, RSS, and index files."""
     base.build()
+    render_chronology_alias_routes(base)
 
 
 def add_search_and_quality(base: Any, search: Any) -> None:
@@ -115,11 +136,12 @@ def build() -> None:
     add_brief_and_sources(brief)
     report_provenance.apply(base)
     homepage_hierarchy.apply(base)
+    reader_evidence.apply(base)
     add_archive_filters(filters)
     temporal_evidence.apply(base)
     add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, search, data-quality, mobile UX, brief, source-card, archive-filter, deterministic temporal evidence, and accessibility enhancements.")
+    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, reader-facing evidence authority, search, data-quality, mobile UX, brief, source-card, archive-filter, deterministic temporal evidence, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
