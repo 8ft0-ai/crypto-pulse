@@ -1,0 +1,118 @@
+.archive-reader-safety,
+.archive-reader-taxonomy,
+.archive-reader-controls,
+.archive-reader-developer,
+.archive-reader-noscript {
+  margin: 1.25rem 0;
+}
+
+.archive-reader-safety,
+.archive-reader-taxonomy,
+.archive-reader-controls {
+  padding: 1rem 1.1rem;
+  border: 1px solid currentColor;
+  border-radius: .9rem;
+}
+
+.archive-reader-safety p:last-child,
+.archive-reader-taxonomy p:last-child,
+.archive-reader-controls p:last-child {
+  margin-bottom: 0;
+}
+
+.archive-reader-controls[hidden] {
+  display: none;
+}
+
+.archive-reader-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  margin-top: 1rem;
+}
+
+.archive-reader-filter-grid label {
+  display: grid;
+  gap: .35rem;
+  font-weight: 650;
+}
+
+.archive-reader-filter-grid select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .55rem .65rem;
+  font: inherit;
+  color: inherit;
+  background: inherit;
+  border: 1px solid currentColor;
+  border-radius: .6rem;
+}
+
+.archive-reader-filter-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.archive-reader-filter-status p {
+  margin: 0;
+}
+
+.archive-reader-developer {
+  padding: .75rem 0;
+}
+
+.archive-reader-developer summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.archive-reader-developer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem 1rem;
+  padding-left: 1.25rem;
+}
+
+.archive-reader-stats {
+  margin-top: 1rem;
+}
+
+.archive-card[hidden],
+.archive-day[hidden],
+.archive-month[hidden],
+.archive-year[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .archive-reader-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .archive-reader-filter-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .archive-reader-filter-status .secondary-button {
+    width: 100%;
+  }
+}
+
+@media print {
+  .archive-reader-controls,
+  .archive-reader-developer,
+  .archive-reader-noscript {
+    display: none !important;
+  }
+
+  .archive-card[hidden],
+  .archive-day[hidden],
+  .archive-month[hidden],
+  .archive-year[hidden] {
+    display: block !important;
+  }
+}

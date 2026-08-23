@@ -1,3 +1,5 @@
+import tempfile
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -6,132 +8,147 @@ from site_generator import archive_cards, homepage_summary
 
 class BaseStub:
     @staticmethod
-    def split_front_matter(text: str):
-        return ({"live_data_status": "partial"}, text)
-
-    @staticmethod
-    def strip_chatgpt_citations(text: str):
-        return text
-
-    @staticmethod
     def month_name(month: str):
-        return "July" if month == "07" else month
+        return "July" if month == "07" else "May" if month == "05" else month
 
 
-def report(tmp_path: Path, body: str, *, filename: str = "report.md", headline: str = "Evidence summary"):
+def report(
+    tmp_path: Path,
+    body: str = "",
+    *,
+    filename: str = "report.md",
+    headline: str = "Evidence summary",
+    schema_version: str | None = "deterministic-crypto-report/v1",
+    quality_status: str | None = "valid-ok",
+    chronology_kind: str | None = None,
+    month: str = "07",
+    day: str = "10",
+):
     source = tmp_path / filename
     source.write_text(body, encoding="utf-8")
+    metadata = {}
+    if schema_version is not None:
+        metadata["schema_version"] = schema_version
+    if quality_status is not None:
+        metadata["quality_status"] = quality_status
+    if chronology_kind is None:
+        chronology_kind = (
+            "deterministic"
+            if schema_version == "deterministic-crypto-report/v1"
+            else "legacy"
+        )
     return SimpleNamespace(
         source_path=source,
         year="2026",
-        month="07",
-        day="10",
+        month=month,
+        day=day,
         time_label="09:00" if filename == "report.md" else "",
         tz="AEST" if filename == "report.md" else "",
-        timestamp="2026-07-10 09:00 AEST",
+        timestamp=f"2026-{month}-{day} 09:00 AEST",
         title="Hourly report",
         headline=headline,
-        url="archive/2026/07/10/report.html",
-        source_items=["CoinGecko"],
+        url=f"archive/2026/{month}/{day}/{filename.replace('.md', '.html')}",
+        metadata=metadata,
+        chronology_kind=chronology_kind,
     )
 
 
-def test_archive_card_shows_time_metrics_and_data_status(tmp_path):
-    item = report(tmp_path, """
-| Asset | Price | 1h | 24h | Note |
-| --- | --- | --- | --- | --- |
-| BTC | 1 | +0.4% | -1.2% | mixed |
-| ETH | 1 | -0.2% | +2.1% | firm |
-""")
-    html = archive_cards.recent_report_cards([item], BaseStub)
-    assert "2026-07-10 · 09:00 AEST" in html
-    assert "BTC 24h" in html and "-1.2%" in html
-    assert "ETH 24h" in html and "+2.1%" in html
-    assert "Data" in html and "partial" in html
-    assert html.index("BTC 24h") < html.index("ETH 24h") < html.index("Data")
+class ArchiveCardTests(unittest.TestCase):
+    def test_deterministic_card_uses_repository_backed_taxonomy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(Path(tmp))
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertIn("Deterministic evidence", html)
+        self.assertIn("Validated source evidence", html)
+        self.assertIn('data-archive-generation="deterministic"', html)
+        self.assertIn(
+            'data-archive-evidence-state="validated-source-evidence"',
+            html,
+        )
+        self.assertIn('data-archive-month="2026-07"', html)
 
+    def test_degraded_deterministic_card_keeps_generation_and_quality_separate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(Path(tmp), quality_status="valid-degraded")
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertIn("Deterministic evidence", html)
+        self.assertIn("Degraded / partial evidence", html)
 
-def test_time_falls_back_to_short_report_filename(tmp_path):
-    item = report(tmp_path, "No metric table is present.", filename="1742_AEST.md")
-    html = archive_cards.recent_report_cards([item], BaseStub)
-    assert "2026-07-10 · 17:42 AEST" in html
+    def test_legacy_card_does_not_normalise_metrics_from_report_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(
+                Path(tmp),
+                """
+| Asset | Price | 1h | 24h |
+| --- | --- | --- | --- |
+| BTC | 1 | +0.4% | -1.2% |
+| ETH | 1 | -0.2% | +2.1% |
+""",
+                schema_version=None,
+                quality_status=None,
+                chronology_kind="legacy",
+            )
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertIn("AI-generated historical report", html)
+        self.assertIn("Legacy evidence format", html)
+        self.assertNotIn("BTC 24h", html)
+        self.assertNotIn("ETH 24h", html)
+        self.assertNotIn("-1.2%", html)
+        self.assertNotIn("+2.1%", html)
 
+    def test_unknown_deterministic_evidence_state_is_omitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(Path(tmp), quality_status=None)
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertIn("Deterministic evidence", html)
+        self.assertNotIn("Validated source evidence", html)
+        self.assertNotIn("Degraded / partial evidence", html)
+        self.assertIn('data-archive-evidence-state=""', html)
 
-def test_missing_metrics_are_omitted_without_placeholder_text(tmp_path):
-    item = report(tmp_path, "No metric table is present.")
-    html = archive_cards.recent_report_cards([item], BaseStub)
-    assert "BTC 24h" not in html
-    assert "ETH 24h" not in html
-    assert "not specified" not in html.lower()
-    assert "partial" in html
+    def test_time_falls_back_to_short_report_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(Path(tmp), filename="1742_AEST.md")
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertIn("2026-07-10 · 17:42 AEST", html)
 
+    def test_disclaimer_headline_is_not_rendered_on_archive_card(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            item = report(
+                Path(tmp),
+                headline=(
+                    "This report is deterministic demonstration content. "
+                    "It is not financial advice."
+                ),
+            )
+            html = archive_cards.recent_report_cards([item], BaseStub)
+        self.assertNotIn("not financial advice", html.lower())
 
-def test_legacy_category_text_is_not_rendered_as_eth_change(tmp_path):
-    item = report(tmp_path, """
-| Metric | BTC | ETH |
-| --- | --- | --- |
-| 1h | -0.10% | -0.20% |
-| 24h | -0.17% | ETH, L2s, DeFi majors |
-""")
-    html = archive_cards.recent_report_cards([item], BaseStub)
-    assert "BTC 24h" in html and "-0.17%" in html
-    assert "ETH, L2s, DeFi majors" not in html
-    assert "ETH 24h" not in html
-
-
-def test_plausible_metric_values_preserve_valid_legacy_formats():
-    for value in (
-        "+1.9%",
-        "-0.17%",
-        "~+2–3%",
-        "~US$81,100–81,600",
-        "Flat to +4.9%",
-        "+0.9% CG / +0.53% CMC",
-    ):
-        assert archive_cards.plausible_metric_value(value)
-
-    for value in (
-        "ETH, L2s, DeFi majors",
-        "selective altcoin leadership",
-        "not specified",
-        "unavailable",
-    ):
-        assert not archive_cards.plausible_metric_value(value)
-
-
-def test_disclaimer_headline_is_not_rendered_on_archive_card(tmp_path):
-    item = report(
-        tmp_path,
-        "No metric table is present.",
-        headline="This report is deterministic demonstration content. It is not financial advice.",
-    )
-    html = archive_cards.recent_report_cards([item], BaseStub)
-    assert "not financial advice" not in html.lower()
-
-
-def test_safe_headline_skips_disclaimer_and_uses_first_evidence_line():
-    body = """
+    def test_safe_headline_skips_disclaimer_and_uses_first_evidence_line(self):
+        body = """
 This report is deterministic demonstration content generated from one validated source snapshot. It is not financial advice.
 
 Source-provided market fields are listed without interpretation.
 """
-    value = homepage_summary.safe_headline(body, body.splitlines()[1])
-    assert value == "Source-provided market fields are listed without interpretation."
+        value = homepage_summary.safe_headline(body, body.splitlines()[1])
+        self.assertEqual(
+            value,
+            "Source-provided market fields are listed without interpretation.",
+        )
+
+    def test_grouped_archive_preserves_canonical_input_group_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            first = report(path, filename="first.md", month="05", day="16")
+            second = report(path, filename="second.md", month="07", day="08")
+            html = archive_cards.grouped_archive([first, second], BaseStub)
+        self.assertLess(html.index(">May <"), html.index(">July <"))
+
+    def test_configure_replaces_both_archive_renderers(self):
+        base = SimpleNamespace(recent_report_cards=None, grouped_archive=None)
+        archive_cards.configure(base)
+        self.assertTrue(callable(base.recent_report_cards))
+        self.assertTrue(callable(base.grouped_archive))
 
 
-def test_non_colour_status_signals_are_rendered():
-    html = archive_cards.metric_html([
-        ("BTC 24h", "+1.0%", "up"),
-        ("ETH 24h", "-2.0%", "down"),
-        ("Data", "partial", "status"),
-    ])
-    assert "archive-metric-up" in html
-    assert "archive-metric-down" in html
-    assert "archive-metric-status" in html
-
-
-def test_configure_replaces_both_archive_renderers():
-    base = SimpleNamespace(recent_report_cards=None, grouped_archive=None)
-    archive_cards.configure(base)
-    assert callable(base.recent_report_cards)
-    assert callable(base.grouped_archive)
+if __name__ == "__main__":
+    unittest.main()

@@ -17,6 +17,7 @@ from typing import Any
 from site_generator import (
     accessibility,
     archive_cards,
+    archive_reader,
     homepage_hierarchy,
     homepage_summary,
     reader_evidence,
@@ -72,8 +73,8 @@ def add_search_and_quality(base: Any, search: Any) -> None:
     (base.OUT / "search.html").write_text(search.search_page(), encoding="utf-8")
     search.latest_market_read_panel = lambda report: homepage_summary.latest_market_read_panel(report, search, base)
     search.add_latest_market_read_to_homepage()
-    # Archive cards now own their stable metric vocabulary. The older metadata-chip
-    # post-processor is intentionally not run because it duplicated the same slots.
+    # Archive cards now own reader-safe taxonomy. The older metadata-chip
+    # post-processor is intentionally not run because it would reintroduce heuristic report-derived slots.
     search.add_data_quality_panels_to_report_pages()
     search.add_search_link_to_existing_pages()
     search.add_enhancement_stylesheet_links()
@@ -139,9 +140,10 @@ def build() -> None:
     reader_evidence.apply(base)
     add_archive_filters(filters)
     temporal_evidence.apply(base)
+    archive_reader.apply(base)
     add_accessibility_polish(base)
 
-    print("Built CryptoPulse site with safe summary headlines, stable hourly archive cards, provenance-first report pages, hierarchy-led homepage, reader-facing evidence authority, search, data-quality, mobile UX, brief, source-card, archive-filter, deterministic temporal evidence, and accessibility enhancements.")
+    print("Built CryptoPulse site with safe summary headlines, reader-safe archive cards, provenance-first report pages, hierarchy-led homepage, reader-facing evidence authority, search, data-quality, mobile UX, brief, source-card, search filters, deterministic temporal evidence, reader-first Archive coverage/taxonomy/navigation, and accessibility enhancements.")
 
 
 if __name__ == "__main__":
