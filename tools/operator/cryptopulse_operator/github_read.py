@@ -183,7 +183,10 @@ class GitHubReader:
     def check_runs(self, sha: str) -> list[Any]:
         if not isinstance(sha, str) or len(sha) != 40 or any(ch not in "0123456789abcdefABCDEF" for ch in sha):
             raise GitHubReadError("check-run SHA is invalid")
-        return self.keyed_collection(f"repos/{REPOSITORY}/commits/{sha}/check-runs", item_key="check_runs")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/commits/{sha}/check-runs?filter=all",
+            item_key="check_runs",
+        )
 
     def pull_reviews(self, pr_number: int) -> list[Any]:
         _positive_int(pr_number, "PR number")
