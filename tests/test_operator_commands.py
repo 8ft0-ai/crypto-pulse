@@ -74,6 +74,17 @@ class CommandSubstrateTests(unittest.TestCase):
         self.assertEqual(runner.argv[0][0], "/usr/bin/git"); self.assertEqual(runner.argv[1][0], "/usr/bin/gh")
         with self.assertRaises(ProcessError): ProcessRunner().run(["git", "rev-parse", "HEAD"])
 
+    def test_process_resolver_ignores_malicious_path_for_git_and_gh(self):
+        shadow = Path(tempfile.mkdtemp()); self.addCleanup(shutil.rmtree, shadow)
+        for name in ("git", "gh"):
+            fake = shadow / name; fake.write_text("#!/bin/sh\nexit 77\n", encoding="utf-8"); fake.chmod(0o755)
+        runner = ProcessRunner(env={"PATH": str(shadow)})
+        for name in ("git", "gh"):
+            resolved = runner.executable(name)
+            self.assertNotEqual(resolved, str(shadow / name))
+            if resolved is not None:
+                self.assertTrue(Path(resolved).is_absolute())
+
     def test_launcher_ignores_path_and_pythonpath_shadowing(self):
         td, root, launcher = make_launcher_repo()
         self.addCleanup(td.cleanup)

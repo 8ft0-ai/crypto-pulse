@@ -22,6 +22,11 @@ class FakeRunner:
         if "ls-files -v" in joined:
             flag = "h" if self.mismatch=="hidden" else "H"
             return ProcessResult(0, f"{flag} tools/operator/cp\nH tools/operator/operator.toml\nH tools/operator/cryptopulse_operator/runtime.py\n", "")
+        if "ls-tree -r HEAD" in joined:
+            return ProcessResult(0, "100755 blob " + "3"*40 + "\ttools/operator/cp\n100644 blob " + "4"*40 + "\ttools/operator/operator.toml\n100644 blob " + "6"*40 + "\ttools/operator/cryptopulse_operator/runtime.py\n", "")
+        if "hash-object --no-filters" in joined:
+            path=args[-1]; expected={"tools/operator/cp":"3"*40,"tools/operator/operator.toml":"4"*40,"tools/operator/cryptopulse_operator/runtime.py":"6"*40}[path]
+            return ProcessResult(0, (("7"*40) if self.mismatch=="hash" and path.endswith("runtime.py") else expected)+"\n", "")
         if "ls-files --others" in joined: return ProcessResult(0, "tools/operator/evil.py\n" if self.mismatch=="untracked" else "", "")
         if args[-1]=="HEAD": value="1"*40
         elif args[-1]=="HEAD^{tree}": value="2"*40
@@ -51,7 +56,7 @@ class RuntimeTests(unittest.TestCase):
     def test_dirty_runtime_is_error_precondition(self):
         result=inspect_runtime(FakeRunner(self.root,dirty=True),FakeGitHub(),root=self.root); self.assertTrue(result.complete); self.assertFalse(result.trusted); self.assertEqual(result.reason,"dirty-runtime")
     def test_runtime_object_mismatch_is_error_precondition(self):
-        for mismatch in ("index","worktree","hidden","untracked"):
+        for mismatch in ("index","worktree","hidden","hash","untracked"):
             with self.subTest(mismatch=mismatch):
                 result=inspect_runtime(FakeRunner(self.root,mismatch=mismatch),FakeGitHub(),root=self.root); self.assertTrue(result.complete); self.assertFalse(result.trusted); self.assertEqual(result.reason,"runtime-object-mismatch")
     def test_runtime_not_on_main_history_is_rejected(self):

@@ -73,6 +73,34 @@ if [ "$BAD_FLAGS" -ne 0 ]; then
   echo "cp: trusted runtime contains hidden index state" >&2
   exit 4
 fi
+if ! TREE_ENTRIES=$("$GIT" -C "$ROOT_DIR" ls-tree -r HEAD -- $RUNTIME_PATHS); then
+  echo "cp: unable to enumerate committed runtime blobs" >&2
+  exit 4
+fi
+if [ -z "$TREE_ENTRIES" ]; then
+  echo "cp: trusted runtime object set is empty" >&2
+  exit 4
+fi
+BYTE_MISMATCH=0
+while read -r mode type expected path; do
+  if [ "$type" != "blob" ] || [ -z "$path" ]; then
+    BYTE_MISMATCH=1
+    continue
+  fi
+  if ! actual=$("$GIT" -C "$ROOT_DIR" hash-object --no-filters "$path"); then
+    BYTE_MISMATCH=1
+    continue
+  fi
+  if [ "$actual" != "$expected" ]; then
+    BYTE_MISMATCH=1
+  fi
+done <<EOF_TREE
+$TREE_ENTRIES
+EOF_TREE
+if [ "$BYTE_MISMATCH" -ne 0 ]; then
+  echo "cp: trusted runtime bytes differ from HEAD" >&2
+  exit 4
+fi
 
 export PYTHONNOUSERSITE=1
 export PYTHONDONTWRITEBYTECODE=1

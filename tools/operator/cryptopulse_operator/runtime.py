@@ -69,6 +69,26 @@ def _runtime_matches_head(runner: ProcessRunner, root: Path) -> tuple[bool, str 
     if not tracked or any(not line.startswith("H ") for line in tracked):
         return False, "runtime-object-mismatch"
 
+    tree = runner.git(["-C", str(root), "ls-tree", "-r", "HEAD", "--", *_RUNTIME_PATHS])
+    if tree.returncode != 0:
+        raise RuntimeIdentityError("unable to enumerate committed runtime blobs")
+    entries = [line for line in tree.stdout.splitlines() if line]
+    if not entries:
+        return False, "runtime-object-mismatch"
+    for entry in entries:
+        try:
+            metadata, path = entry.split("\t", 1)
+            _mode, object_type, expected_blob = metadata.split(" ", 2)
+        except ValueError as exc:
+            raise RuntimeIdentityError("malformed committed runtime tree entry") from exc
+        if object_type != "blob":
+            return False, "runtime-object-mismatch"
+        actual = runner.git(["-C", str(root), "hash-object", "--no-filters", path])
+        if actual.returncode != 0:
+            raise RuntimeIdentityError("unable to hash runtime file bytes")
+        if actual.stdout.strip() != expected_blob:
+            return False, "runtime-object-mismatch"
+
     untracked = runner.git(["-C", str(root), "ls-files", "--others", "--", "tools/operator"])
     if untracked.returncode != 0:
         raise RuntimeIdentityError("unable to inspect untracked runtime files")
