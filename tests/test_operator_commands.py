@@ -89,16 +89,17 @@ class CommandSubstrateTests(unittest.TestCase):
             def git(self, args, cwd=None):
                 joined = " ".join(args)
                 if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "main\n", "")
                 if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
                 if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
                 if "remote get-url origin" in joined: return ProcessResult(0, remote + "\n", "")
                 if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
-                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "main\n", "")
                 raise AssertionError(args)
 
         observed = observe_repository(Path("/tmp/repo"), CredentialRemoteRunner())
         self.assertIsNone(observed["origin_repository"])
         self.assertFalse(observed["origin_matches"])
+        self.assertEqual(observed["branch"], "main")
         self.assertNotIn(secret, repr(observed))
 
     def test_paginated_pages_exhaust_and_verify_total(self):
@@ -218,12 +219,12 @@ class CommandSubstrateTests(unittest.TestCase):
             def git(self, args, cwd=None):
                 joined = " ".join(args)
                 if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if "symbolic-ref --quiet --short HEAD" in joined:
+                    return ProcessResult(1, "", "") if self.detached else ProcessResult(0, "main\n", "")
                 if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
                 if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
                 if "remote get-url origin" in joined: return ProcessResult(0, "https://github.com/8ft0-ai/crypto-pulse.git\n", "")
                 if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
-                if "symbolic-ref --quiet --short HEAD" in joined:
-                    return ProcessResult(1, "", "") if self.detached else ProcessResult(0, "main\n", "")
                 raise AssertionError(args)
         clean = observe_repository(Path("/tmp/repo"), StateRunner(False))
         detached = observe_repository(Path("/tmp/repo"), StateRunner(True))
@@ -236,16 +237,17 @@ class CommandSubstrateTests(unittest.TestCase):
             def git(self, args, cwd=None):
                 joined = " ".join(args)
                 if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "feature\n", "")
                 if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
                 if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
                 if "remote get-url origin" in joined: return ProcessResult(0, "https://github.com/8ft0-ai/crypto-pulse.git\n", "")
                 if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
-                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "feature\n", "")
                 raise AssertionError(args)
         with patch.object(snapshot_command, "inspect_runtime", return_value=trusted_runtime()):
             evidence = snapshot_command.run(Path("/tmp/repo"), IdentityRunner(), SnapshotGitHub())
         self.assertEqual(evidence.status, Status.PASS)
         self.assertEqual(evidence.local["head_sha"], "1" * 40)
+        self.assertEqual(evidence.local["branch"], "feature")
         self.assertEqual(evidence.remote["sha"], "9" * 40)
         self.assertNotEqual(evidence.local["head_sha"], evidence.remote["sha"])
 
