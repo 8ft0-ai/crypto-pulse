@@ -11,6 +11,7 @@ on:
       - "site/**"
       - "site_generator/**"
       - "scripts/**"
+      - "tools/**"
       - ".github/workflows/**"
       - ".github/issueops-workflow-dispatch.yml"
       - "docs/**"
