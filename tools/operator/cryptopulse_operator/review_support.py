@@ -549,7 +549,10 @@ def review_pack_snapshot(pr_number: int, github: GitHubReader) -> tuple[SupportR
         status = Status.FAIL if candidate.complete else Status.INCOMPLETE
         return SupportResult(data, complete=candidate.complete, findings=tuple(findings)), status, tuple(assertions)
 
-    current_base = candidate.data["base"]["sha"] == _str(main.get("sha"), "main SHA")
+    current_base = (
+        candidate.data["base"]["ref"] == "main"
+        and candidate.data["base"]["sha"] == _str(main.get("sha"), "main SHA")
+    )
     assertions.append({"name": "candidate-base-is-current-main", "holds": current_base})
     if not current_base:
         findings.append({"code": "candidate-base-not-current-main"})

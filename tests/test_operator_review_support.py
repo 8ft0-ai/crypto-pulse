@@ -67,13 +67,13 @@ class NoProcessRunner:
         return ProcessResult(0, "", "")
 
 
-def pr_payload(*, base=BASE, head=HEAD, state="open", mergeable=True):
+def pr_payload(*, base=BASE, base_ref="main", head=HEAD, state="open", mergeable=True):
     return {
         "state": state,
         "draft": False,
         "mergeable": mergeable,
         "merged": False,
-        "base": {"ref": "main", "sha": base},
+        "base": {"ref": base_ref, "sha": base},
         "head": {"ref": "issue-509-slice-b", "sha": head},
         "commits": 1,
         "changed_files": 1,
@@ -173,6 +173,7 @@ class ReviewGitHub:
         self,
         *,
         base=BASE,
+        base_ref="main",
         head=HEAD,
         mergeable=True,
         check_status="completed",
@@ -194,6 +195,7 @@ class ReviewGitHub:
         thread_outdated=False,
     ):
         self.base = base
+        self.base_ref = base_ref
         self.head = head
         self.mergeable = mergeable
         self.check_status = check_status
@@ -218,7 +220,7 @@ class ReviewGitHub:
         return True
 
     def pull_request(self, pr_number):
-        return pr_payload(base=self.base, head=self.head, mergeable=self.mergeable)
+        return pr_payload(base=self.base, base_ref=self.base_ref, head=self.head, mergeable=self.mergeable)
 
     def commit(self, sha):
         data = head_commit_payload()
@@ -570,6 +572,14 @@ class ReviewPackTests(unittest.TestCase):
         self.assertTrue(states["required-ci-success"])
         self.assertTrue(states["required-check-ci-conclusion-consistent"])
         self.assertEqual(result.data["ci"]["run_id"], RUN_ID)
+
+    def test_non_main_base_ref_at_current_main_sha_is_incomplete(self):
+        result, status, assertions = review_pack_snapshot(512, ReviewGitHub(base_ref="release"))
+        self.assertEqual(status, Status.INCOMPLETE)
+        self.assertFalse(result.complete)
+        states = {item["name"]: item["holds"] for item in assertions}
+        self.assertFalse(states["candidate-base-is-current-main"])
+        self.assertTrue(any(item["code"] == "candidate-base-not-current-main" for item in result.findings))
 
     def test_multiple_required_context_app_matches_are_incomplete(self):
         class DuplicateCheckGitHub(ReviewGitHub):
