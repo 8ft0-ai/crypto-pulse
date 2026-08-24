@@ -106,7 +106,7 @@ export PYTHONNOUSERSITE=1
 export PYTHONDONTWRITEBYTECODE=1
 unset PYTHONPATH PYTHONHOME CDPATH ENV BASH_ENV DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH LD_PRELOAD LD_LIBRARY_PATH
 
-exec "$PYTHON" -I -c '
+exec "$PYTHON" -I -B -c '
 import runpy, sys
 root = sys.argv[1]
 sys.path[:] = [root] + [p for p in sys.path if p and p != "."]

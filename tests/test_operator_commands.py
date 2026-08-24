@@ -137,6 +137,21 @@ class CommandSubstrateTests(unittest.TestCase):
         proc = subprocess.run([str(launcher), "--help"], cwd=shadow, env=env, capture_output=True, text=True, check=False)
         self.assertEqual(proc.returncode, 0, proc.stderr); self.assertFalse(marker.exists()); self.assertIn("CryptoPulse read-only operator evidence toolkit", proc.stdout)
 
+    def test_launcher_does_not_create_untracked_operator_files(self):
+        td, root, launcher = make_launcher_repo()
+        self.addCleanup(td.cleanup)
+        for _ in range(2):
+            proc = subprocess.run([str(launcher), "--help"], cwd=root, capture_output=True, text=True, check=False)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            untracked = subprocess.run(
+                ["/usr/bin/git", "ls-files", "--others", "--", "tools/operator"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(untracked.stdout, "")
+
     def test_snapshot_treats_candidate_operator_config_and_scripts_as_data_only(self):
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         candidate = Path(td.name).resolve()
