@@ -1,1 +1,1 @@
-"""Slice A operator commands."""
+"""Slice A and Slice B operator commands."""
