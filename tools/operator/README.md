@@ -28,9 +28,9 @@ git -C "$RUNTIME_ROOT" status --porcelain=v1 --untracked-files=all
 "$RUNTIME_ROOT/tools/operator/cp" doctor --evidence
 ```
 
-The final `git status` must be empty. The toolkit independently binds its commit/tree/launcher/config/package identities and verifies through read-only GitHub evidence that the runtime commit is identical to, or an ancestor of, current protected `main`. A dirty runtime is an `ERROR`; unavailable or ambiguous protected-main provenance is `INCOMPLETE`, never `PASS`.
+The final `git status` must be empty. The launcher and runtime checks also compare the operator index/worktree with `HEAD`, reject untracked operator files and reject hidden index states such as `assume-unchanged`/`skip-worktree`; the recorded launcher/config/package identities are therefore not accepted merely because ordinary status output is empty. The toolkit then verifies through read-only GitHub evidence that the runtime commit is identical to, or an ancestor of, current protected `main`. A dirty or object-mismatched runtime is an `ERROR`; unavailable or ambiguous protected-main provenance is `INCOMPLETE`, never `PASS`.
 
-Do not place candidate directories on `PYTHONPATH`, source candidate shell files, or run a candidate copy of the launcher. The launcher uses Python isolated mode and clears ambient Python path variables; package/config resolution is rooted at the trusted launcher directory.
+Do not place candidate directories on `PYTHONPATH`, source candidate shell files, or run a candidate copy of the launcher. The launcher uses Python isolated mode, clears ambient Python path variables and ignores ambient `PATH` for interpreter/Git selection. Supported macOS executable locations are the fixed system/Homebrew paths encoded by the launcher/process adapter (`/usr/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, plus the Python.org `.../Versions/Current/bin/python3` location). Python must be >= 3.12. `gh` must resolve from one of those approved absolute system/Homebrew locations; candidate/current-directory executables are not selected.
 
 ## Output and exit contract
 

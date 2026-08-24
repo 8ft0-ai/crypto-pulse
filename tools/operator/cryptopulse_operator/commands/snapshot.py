@@ -15,6 +15,26 @@ from ..runtime import inspect_runtime, RuntimeIdentityError
 def run(repo: Path, runner: ProcessRunner, github: GitHubReader) -> Evidence:
     findings: list[dict[str, Any]] = []
     assertions: list[dict[str, Any]] = []
+    tools = {name: runner.has_executable(name) for name in ("git", "gh")}
+    auth_ok = tools["gh"] and github.auth_ok()
+    if not all(tools.values()) or not auth_ok:
+        assertions.extend([
+            {"name": "git-present", "holds": tools["git"]},
+            {"name": "gh-present", "holds": tools["gh"]},
+            {"name": "gh-authenticated-read", "holds": bool(auth_ok)},
+        ])
+        return Evidence(
+            command="snapshot",
+            repository=REPOSITORY,
+            invocation_target={"kind": "repository", "path": str(repo.resolve())},
+            runtime={"repository": REPOSITORY, "clean": False, "provenance": None},
+            remote={},
+            local={"tools": tools, "authenticated": bool(auth_ok)},
+            status=Status.ERROR,
+            completeness={"complete": False, "runtime": False, "remote": False, "local": False},
+            assertions=tuple(assertions),
+            findings=({"code": "prerequisite-or-authentication-failure"},),
+        )
     try:
         runtime = inspect_runtime(runner, github)
         runtime_identity = runtime.identity
