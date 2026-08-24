@@ -4,11 +4,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1] / "tools" / "operator"
 sys.path.insert(0, str(ROOT))
 
+from cryptopulse_operator.commands import snapshot as snapshot_command
 from cryptopulse_operator.commands.doctor import python_supported, run as doctor_run
 from cryptopulse_operator.commands.snapshot import run as snapshot_run
 from cryptopulse_operator.evidence import Status
@@ -36,6 +39,21 @@ class AuthOnlyGitHub:
     def auth_ok(self): return self.ok
 
 
+class SnapshotGitHub:
+    def auth_ok(self): return True
+    def main_branch(self):
+        return {"sha": "9" * 40, "tree_sha": "8" * 40, "protected": True, "required_checks": []}
+
+
+def trusted_runtime():
+    return SimpleNamespace(
+        identity={"repository": "8ft0-ai/crypto-pulse", "clean": True, "provenance": "current-main"},
+        complete=True,
+        trusted=True,
+        reason=None,
+    )
+
+
 def make_launcher_repo(*, python_candidates=None):
     td = tempfile.TemporaryDirectory()
     root = Path(td.name)
@@ -61,6 +79,27 @@ class CommandSubstrateTests(unittest.TestCase):
         self.assertEqual(normalise_remote("https://github.com/8ft0-ai/crypto-pulse.git"), "8ft0-ai/crypto-pulse")
         self.assertEqual(normalise_remote("git@github.com:8ft0-ai/crypto-pulse.git"), "8ft0-ai/crypto-pulse")
         self.assertIsNone(normalise_remote("https://example.invalid/8ft0-ai/crypto-pulse.git"))
+
+    def test_credential_bearing_remote_is_rejected_without_retaining_secret(self):
+        secret = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+        remote = f"https://x-access-token:{secret}@github.com/8ft0-ai/crypto-pulse.git"
+        self.assertIsNone(normalise_remote(remote))
+
+        class CredentialRemoteRunner:
+            def git(self, args, cwd=None):
+                joined = " ".join(args)
+                if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
+                if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
+                if "remote get-url origin" in joined: return ProcessResult(0, remote + "\n", "")
+                if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
+                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "main\n", "")
+                raise AssertionError(args)
+
+        observed = observe_repository(Path("/tmp/repo"), CredentialRemoteRunner())
+        self.assertIsNone(observed["origin_repository"])
+        self.assertFalse(observed["origin_matches"])
+        self.assertNotIn(secret, repr(observed))
 
     def test_paginated_pages_exhaust_and_verify_total(self):
         self.assertEqual(flatten_pages([[1, 2], [3]], expected_total=3), [1, 2, 3])
@@ -96,6 +135,38 @@ class CommandSubstrateTests(unittest.TestCase):
         env = dict(os.environ); env["PATH"] = str(shadow); env["PYTHONPATH"] = str(shadow)
         proc = subprocess.run([str(launcher), "--help"], cwd=shadow, env=env, capture_output=True, text=True, check=False)
         self.assertEqual(proc.returncode, 0, proc.stderr); self.assertFalse(marker.exists()); self.assertIn("CryptoPulse read-only operator evidence toolkit", proc.stdout)
+
+    def test_snapshot_treats_candidate_operator_config_and_scripts_as_data_only(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        candidate = Path(td.name).resolve()
+        marker = candidate / "executed"
+        operator = candidate / "tools" / "operator"
+        package = operator / "cryptopulse_operator"
+        scripts = candidate / "scripts"
+        package.mkdir(parents=True); scripts.mkdir()
+        launcher = operator / "cp"
+        launcher.write_text(f"#!/bin/sh\necho launcher > '{marker}'\nexit 77\n", encoding="utf-8"); launcher.chmod(0o755)
+        (operator / "operator.toml").write_text("this is deliberately invalid candidate toml\n", encoding="utf-8")
+        (package / "__init__.py").write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('module')\n", encoding="utf-8")
+        (scripts / "candidate_probe.py").write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('script')\n", encoding="utf-8")
+        subprocess.run(["/usr/bin/git", "init", "-q"], cwd=candidate, check=True)
+        subprocess.run(["/usr/bin/git", "config", "user.email", "test@example.com"], cwd=candidate, check=True)
+        subprocess.run(["/usr/bin/git", "config", "user.name", "test"], cwd=candidate, check=True)
+        subprocess.run(["/usr/bin/git", "remote", "add", "origin", "https://github.com/8ft0-ai/crypto-pulse.git"], cwd=candidate, check=True)
+        subprocess.run(["/usr/bin/git", "add", "."], cwd=candidate, check=True)
+        subprocess.run(["/usr/bin/git", "commit", "-qm", "malicious candidate fixture"], cwd=candidate, check=True)
+
+        class TargetRunner:
+            def has_executable(self, name): return name in {"git", "gh"}
+            def git(self, args, cwd=None):
+                proc = subprocess.run(["/usr/bin/git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+                return ProcessResult(proc.returncode, proc.stdout, proc.stderr)
+
+        with patch.object(snapshot_command, "inspect_runtime", return_value=trusted_runtime()):
+            evidence = snapshot_command.run(candidate, TargetRunner(), SnapshotGitHub())
+        self.assertEqual(evidence.status, Status.PASS)
+        self.assertFalse(marker.exists())
+        self.assertEqual(evidence.local["origin_repository"], "8ft0-ai/crypto-pulse")
 
     def test_launcher_fails_closed_when_python_missing_or_old(self):
         td, _, launcher = make_launcher_repo(python_candidates="/definitely/missing/python3")
@@ -140,6 +211,43 @@ class CommandSubstrateTests(unittest.TestCase):
                 else: raise AssertionError(args)
                 return ProcessResult(0,value+"\n","")
         observed=observe_repository(Path("/tmp/repo"),LocalRunner()); self.assertTrue(observed["dirty"]); self.assertFalse(observed["origin_matches"]); self.assertEqual(observed["branch"],"feature")
+
+    def test_local_snapshot_reports_clean_and_detached_states_truthfully(self):
+        class StateRunner:
+            def __init__(self, detached): self.detached = detached
+            def git(self, args, cwd=None):
+                joined = " ".join(args)
+                if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
+                if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
+                if "remote get-url origin" in joined: return ProcessResult(0, "https://github.com/8ft0-ai/crypto-pulse.git\n", "")
+                if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
+                if "symbolic-ref --quiet --short HEAD" in joined:
+                    return ProcessResult(1, "", "") if self.detached else ProcessResult(0, "main\n", "")
+                raise AssertionError(args)
+        clean = observe_repository(Path("/tmp/repo"), StateRunner(False))
+        detached = observe_repository(Path("/tmp/repo"), StateRunner(True))
+        self.assertFalse(clean["dirty"]); self.assertTrue(clean["origin_matches"]); self.assertEqual(clean["branch"], "main")
+        self.assertFalse(detached["dirty"]); self.assertTrue(detached["origin_matches"]); self.assertIsNone(detached["branch"])
+
+    def test_snapshot_keeps_local_and_remote_identities_distinct(self):
+        class IdentityRunner:
+            def has_executable(self, name): return name in {"git", "gh"}
+            def git(self, args, cwd=None):
+                joined = " ".join(args)
+                if "--show-toplevel" in args: return ProcessResult(0, "/tmp/repo\n", "")
+                if args[-1] == "HEAD": return ProcessResult(0, "1" * 40 + "\n", "")
+                if args[-1] == "HEAD^{tree}": return ProcessResult(0, "2" * 40 + "\n", "")
+                if "remote get-url origin" in joined: return ProcessResult(0, "https://github.com/8ft0-ai/crypto-pulse.git\n", "")
+                if "status --porcelain=v1" in joined: return ProcessResult(0, "", "")
+                if "symbolic-ref --quiet --short HEAD" in joined: return ProcessResult(0, "feature\n", "")
+                raise AssertionError(args)
+        with patch.object(snapshot_command, "inspect_runtime", return_value=trusted_runtime()):
+            evidence = snapshot_command.run(Path("/tmp/repo"), IdentityRunner(), SnapshotGitHub())
+        self.assertEqual(evidence.status, Status.PASS)
+        self.assertEqual(evidence.local["head_sha"], "1" * 40)
+        self.assertEqual(evidence.remote["sha"], "9" * 40)
+        self.assertNotEqual(evidence.local["head_sha"], evidence.remote["sha"])
 
 
 if __name__ == "__main__": unittest.main()
