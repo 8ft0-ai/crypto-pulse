@@ -67,11 +67,11 @@ class NoProcessRunner:
         return ProcessResult(0, "", "")
 
 
-def pr_payload(*, base=BASE, head=HEAD, state="open"):
+def pr_payload(*, base=BASE, head=HEAD, state="open", mergeable=True):
     return {
         "state": state,
         "draft": False,
-        "mergeable": True,
+        "mergeable": mergeable,
         "merged": False,
         "base": {"ref": "main", "sha": base},
         "head": {"ref": "issue-509-slice-b", "sha": head},
@@ -174,6 +174,7 @@ class ReviewGitHub:
         *,
         base=BASE,
         head=HEAD,
+        mergeable=True,
         check_status="completed",
         check_conclusion="success",
         check_app=APP_ID,
@@ -190,9 +191,11 @@ class ReviewGitHub:
         comment_body="APPROVED",
         required_checks=None,
         thread_rest_id=301,
+        thread_outdated=False,
     ):
         self.base = base
         self.head = head
+        self.mergeable = mergeable
         self.check_status = check_status
         self.check_conclusion = check_conclusion
         self.check_app = check_app
@@ -209,12 +212,13 @@ class ReviewGitHub:
         self.comment_body = comment_body
         self.required_checks = required_checks
         self.thread_rest_id = thread_rest_id
+        self.thread_outdated = thread_outdated
 
     def auth_ok(self):
         return True
 
     def pull_request(self, pr_number):
-        return pr_payload(base=self.base, head=self.head)
+        return pr_payload(base=self.base, head=self.head, mergeable=self.mergeable)
 
     def commit(self, sha):
         data = head_commit_payload()
@@ -289,6 +293,7 @@ class ReviewGitHub:
             {
                 "id": "PRRT_thread",
                 "isResolved": True,
+                "isOutdated": self.thread_outdated,
                 "comments": {
                     "totalCount": 1,
                     "nodes": [{"id": "PRRC_node", "databaseId": 301}],
@@ -342,6 +347,34 @@ class GitHubReaderPaginationTests(unittest.TestCase):
         self.assertIn("--paginate", runner.calls[0])
         self.assertIn("--slurp", runner.calls[0])
 
+    def test_check_runs_explicitly_requests_complete_all_filter(self):
+        runner = PageRunner(
+            [
+                (
+                    0,
+                    [
+                        {
+                            "total_count": 2,
+                            "check_runs": [{"id": 1}, {"id": 2}],
+                        }
+                    ],
+                )
+            ]
+        )
+        items = GitHubReader(runner).check_runs(HEAD)
+        self.assertEqual([item["id"] for item in items], [1, 2])
+        self.assertEqual(
+            runner.calls[0],
+            (
+                "api",
+                "--method",
+                "GET",
+                "--paginate",
+                "--slurp",
+                f"repos/8ft0-ai/crypto-pulse/commits/{HEAD}/check-runs?filter=all",
+            ),
+        )
+
     def test_keyed_collection_count_mismatch_and_malformed_page_fail_closed(self):
         mismatch = PageRunner([(0, [{"total_count": 2, "jobs": [{"id": 1}]}])])
         with self.assertRaises(GitHubReadError):
@@ -366,6 +399,7 @@ class GitHubReaderPaginationTests(unittest.TestCase):
                                 {
                                     "id": "T1",
                                     "isResolved": False,
+                                    "isOutdated": False,
                                     "comments": {
                                         "totalCount": 1,
                                         "nodes": [{"id": "C1", "databaseId": 11}],
@@ -389,6 +423,7 @@ class GitHubReaderPaginationTests(unittest.TestCase):
                                 {
                                     "id": "T2",
                                     "isResolved": True,
+                                    "isOutdated": True,
                                     "comments": {
                                         "totalCount": 1,
                                         "nodes": [{"id": "C2", "databaseId": 12}],
@@ -405,7 +440,10 @@ class GitHubReaderPaginationTests(unittest.TestCase):
         runner = PageRunner([(0, first), (0, second)])
         threads = GitHubReader(runner).review_threads(512)
         self.assertEqual([item["id"] for item in threads], ["T1", "T2"])
+        self.assertFalse(threads[0]["isOutdated"])
+        self.assertTrue(threads[1]["isOutdated"])
         self.assertIn("cursor=CURSOR-1", runner.calls[1])
+        self.assertIn("isOutdated", " ".join(runner.calls[0]))
         for call in runner.calls:
             joined = " ".join(call)
             self.assertNotIn("tools/operator", joined)
@@ -422,6 +460,7 @@ class GitHubReaderPaginationTests(unittest.TestCase):
                                 {
                                     "id": "T1",
                                     "isResolved": False,
+                                    "isOutdated": False,
                                     "comments": {
                                         "totalCount": 101,
                                         "nodes": [{"id": "C1", "databaseId": 11}],
@@ -447,11 +486,31 @@ class ReviewSupportExtractionTests(unittest.TestCase):
         self.assertEqual(result.data["head"]["sha"], HEAD)
         self.assertEqual(result.data["head_commit"]["tree_sha"], TREE)
         self.assertEqual(result.data["head_commit"]["parents"], [PARENT])
+        self.assertEqual(result.data["protected_main"]["sha"], BASE)
+        self.assertTrue(result.data["protected_main"]["protected"])
+        self.assertEqual(
+            result.data["protected_main"]["required_checks"],
+            [{"context": "Build site and check generated output", "app_id": APP_ID}],
+        )
         self.assertEqual(result.data["commits"][0]["sha"], HEAD)
         self.assertTrue(result.data["files"][0]["patch_available"])
         self.assertEqual(result.data["checks"][0]["app_id"], APP_ID)
         self.assertTrue(result.data["review_threads"][0]["resolved"])
-        self.assertFalse(result.data["review_threads"][0]["comments"][0]["outdated"])
+        self.assertFalse(result.data["review_threads"][0]["outdated"])
+
+    def test_candidate_uses_authoritative_thread_outdated_state(self):
+        result = candidate_snapshot(512, ReviewGitHub(thread_outdated=True))
+        self.assertTrue(result.complete)
+        self.assertTrue(result.data["review_threads"][0]["outdated"])
+        self.assertEqual(result.data["review_comments"][0]["position"], 10)
+        self.assertNotIn("outdated", result.data["review_comments"][0])
+        self.assertNotIn("outdated", result.data["review_threads"][0]["comments"][0])
+
+    def test_pending_mergeability_is_incomplete(self):
+        result = candidate_snapshot(512, ReviewGitHub(mergeable=None))
+        self.assertFalse(result.complete)
+        self.assertIsNone(result.data["mergeable"])
+        self.assertTrue(any(item["code"] == "pull-request-mergeability-pending" for item in result.findings))
 
     def test_candidate_reports_binary_or_unavailable_patch_without_guessing(self):
         class BinaryGitHub(ReviewGitHub):
@@ -511,6 +570,19 @@ class ReviewPackTests(unittest.TestCase):
         self.assertTrue(states["required-ci-success"])
         self.assertTrue(states["required-check-ci-conclusion-consistent"])
         self.assertEqual(result.data["ci"]["run_id"], RUN_ID)
+
+    def test_multiple_required_context_app_matches_are_incomplete(self):
+        class DuplicateCheckGitHub(ReviewGitHub):
+            def check_runs(self, sha):
+                first = super().check_runs(sha)[0]
+                return [first, dict(first, id=78)]
+
+        result, status, assertions = review_pack_snapshot(512, DuplicateCheckGitHub())
+        self.assertEqual(status, Status.INCOMPLETE)
+        self.assertFalse(result.complete)
+        states = {item["name"]: item["holds"] for item in assertions}
+        self.assertFalse(states["required-check-context-app-bound"])
+        self.assertTrue(any(item["code"] == "required-check-missing-or-ambiguous" for item in result.findings))
 
     def test_missing_pending_or_wrong_app_required_check_is_incomplete(self):
         missing, status, _ = review_pack_snapshot(
@@ -638,9 +710,11 @@ class CommandBoundaryTests(unittest.TestCase):
 
     def test_candidate_changes_to_launcher_config_workflow_or_scripts_remain_data_only(self):
         marker = "scripts/exfiltrate-credential.sh"
+
         class MaliciousGitHub(ReviewGitHub):
             def pull_files(self, pr_number, expected_total):
                 return file_list(filename=marker)
+
             def issue_comments(self, issue_number):
                 return [
                     {

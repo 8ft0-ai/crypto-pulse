@@ -119,6 +119,26 @@ def _body_record(budget: TextBudget, item: dict[str, Any], *, kind: str) -> dict
     return {"body": body, "body_state": state}
 
 
+def _protected_main(value: Any) -> dict[str, Any]:
+    main = _dict(value, "main branch")
+    required_checks_raw = _list(main.get("required_checks"), "main required checks")
+    required_checks: list[dict[str, Any]] = []
+    for index, item in enumerate(required_checks_raw):
+        check = _dict(item, f"main required check {index}")
+        required_checks.append(
+            {
+                "context": _str(check.get("context"), f"main required check {index} context"),
+                "app_id": _int(check.get("app_id"), f"main required check {index} app id", allow_none=True),
+            }
+        )
+    return {
+        "sha": _str(main.get("sha"), "main SHA"),
+        "tree_sha": _str(main.get("tree_sha"), "main tree SHA"),
+        "protected": _bool(main.get("protected"), "main protected"),
+        "required_checks": required_checks,
+    }
+
+
 def runtime_gate(runner: ProcessRunner, github: GitHubReader) -> RuntimeGate:
     assertions: list[dict[str, Any]] = []
     tools = {name: runner.has_executable(name) for name in ("git", "gh")}
@@ -178,6 +198,10 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
     head_sha = _str(head.get("sha"), "head SHA")
     commits_total = _int(pr.get("commits"), "pull request commit count")
     files_total = _int(pr.get("changed_files"), "pull request changed-file count")
+    mergeable = _optional_bool(pr.get("mergeable"), "pull request mergeable state")
+    if mergeable is None:
+        findings.append({"code": "pull-request-mergeability-pending"})
+    protected_main = _protected_main(github.main_branch())
 
     head_commit = _dict(github.commit(head_sha), "head commit")
     head_git_commit = _dict(head_commit.get("commit"), "head Git commit")
@@ -303,7 +327,6 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
         user = comment.get("user")
         user_data = user if isinstance(user, dict) else {}
         comment_id = _int(comment.get("id"), f"review comment {index} id")
-        position = _int(comment.get("position"), f"review comment {index} position", allow_none=True)
         record = {
             "id": comment_id,
             "user": _str(user_data.get("login"), f"review comment {index} user", allow_none=True),
@@ -314,13 +337,12 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
             "line": _int(comment.get("line"), f"review comment {index} line", allow_none=True),
             "start_line": _int(comment.get("start_line"), f"review comment {index} start line", allow_none=True),
             "side": _str(comment.get("side"), f"review comment {index} side", allow_none=True),
-            "position": position,
+            "position": _int(comment.get("position"), f"review comment {index} position", allow_none=True),
             "original_position": _int(
                 comment.get("original_position"),
                 f"review comment {index} original position",
                 allow_none=True,
             ),
-            "outdated": position is None,
             "created_at": _str(comment.get("created_at"), f"review comment {index} created_at", allow_none=True),
             "updated_at": _str(comment.get("updated_at"), f"review comment {index} updated_at", allow_none=True),
         }
@@ -338,20 +360,19 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
         for comment_index, comment_value in enumerate(thread_comments):
             comment = _dict(comment_value, f"review thread {index} comment {comment_index}")
             database_id = _int(comment.get("databaseId"), f"review thread {index} comment database id")
-            rest_comment = review_comment_by_id.get(database_id)
-            if rest_comment is None:
+            if database_id not in review_comment_by_id:
                 findings.append({"code": "review-thread-comment-not-in-rest", "id": database_id})
             comments.append(
                 {
                     "node_id": _str(comment.get("id"), f"review thread {index} comment node id"),
                     "database_id": database_id,
-                    "outdated": rest_comment.get("outdated") if rest_comment else None,
                 }
             )
         threads.append(
             {
                 "id": _str(thread.get("id"), f"review thread {index} id"),
                 "resolved": _bool(thread.get("isResolved"), f"review thread {index} resolved"),
+                "outdated": _bool(thread.get("isOutdated"), f"review thread {index} outdated"),
                 "comments": comments,
             }
         )
@@ -362,7 +383,7 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
         "pr_number": pr_number,
         "state": _str(pr.get("state"), "pull request state"),
         "draft": _bool(pr.get("draft"), "pull request draft state"),
-        "mergeable": _optional_bool(pr.get("mergeable"), "pull request mergeable state"),
+        "mergeable": mergeable,
         "merged": _bool(pr.get("merged"), "pull request merged state"),
         "base": {"ref": _str(base.get("ref"), "base ref"), "sha": base_sha},
         "head": {"ref": _str(head.get("ref"), "head ref"), "sha": head_sha},
@@ -374,6 +395,7 @@ def candidate_snapshot(pr_number: int, github: GitHubReader) -> SupportResult:
                 for parent in parents
             ],
         },
+        "protected_main": protected_main,
         "commits": commits,
         "files": files,
         "checks": checks,
@@ -519,7 +541,7 @@ def review_pack_snapshot(pr_number: int, github: GitHubReader) -> tuple[SupportR
     findings = list(candidate.findings)
     assertions: list[dict[str, Any]] = []
 
-    main = _dict(github.main_branch(), "main branch")
+    main = _dict(candidate.data.get("protected_main"), "candidate protected main")
     protected = _bool(main.get("protected"), "main protected")
     assertions.append({"name": "main-protected", "holds": protected})
     if not protected:

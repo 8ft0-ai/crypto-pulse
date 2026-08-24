@@ -20,6 +20,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
         nodes {
           id
           isResolved
+          isOutdated
           comments(first:100) {
             totalCount
             nodes {
