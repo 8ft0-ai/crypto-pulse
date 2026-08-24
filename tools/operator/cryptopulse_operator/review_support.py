@@ -564,11 +564,13 @@ def review_pack_snapshot(pr_number: int, github: GitHubReader) -> tuple[SupportR
         data = {"candidate": candidate.data, "main": main, "required_check": check, "ci": None}
         return SupportResult(data, complete=False, findings=tuple(findings)), Status.INCOMPLETE, tuple(assertions)
 
-    check_success = check.get("conclusion") == "success"
-    assertions.append({"name": "required-check-success", "holds": check_success})
-    if not check_success:
+    check_conclusion = check.get("conclusion")
+    if check_conclusion is None:
+        findings.append({"code": "required-check-conclusion-missing"})
         data = {"candidate": candidate.data, "main": main, "required_check": check, "ci": None}
-        return SupportResult(data, complete=candidate.complete, findings=tuple(findings)), Status.FAIL, tuple(assertions)
+        return SupportResult(data, complete=False, findings=tuple(findings)), Status.INCOMPLETE, tuple(assertions)
+    check_success = check_conclusion == "success"
+    assertions.append({"name": "required-check-success", "holds": check_success})
 
     run_id = actions_run_id(check.get("details_url"))
     if run_id is None:
@@ -621,10 +623,17 @@ def review_pack_snapshot(pr_number: int, github: GitHubReader) -> tuple[SupportR
         data = {"candidate": candidate.data, "main": main, "required_check": check, "ci": ci.data}
         return SupportResult(data, complete=False, findings=tuple(findings)), Status.INCOMPLETE, tuple(assertions)
 
-    ci_success = ci.data["conclusion"] == "success"
+    ci_conclusion = ci.data["conclusion"]
+    ci_success = ci_conclusion == "success"
     assertions.append({"name": "required-ci-success", "holds": ci_success})
+    conclusions_consistent = check_conclusion == ci_conclusion
+    assertions.append({"name": "required-check-ci-conclusion-consistent", "holds": conclusions_consistent})
     data = {"candidate": candidate.data, "main": main, "required_check": check, "ci": ci.data}
-    if not ci_success:
+    if not conclusions_consistent:
+        findings.append({"code": "required-check-ci-conclusion-mismatch"})
+        return SupportResult(data, complete=False, findings=tuple(findings)), Status.INCOMPLETE, tuple(assertions)
+
+    if not check_success:
         return SupportResult(data, complete=candidate.complete and ci.complete, findings=tuple(findings)), Status.FAIL, tuple(assertions)
 
     complete = candidate.complete and ci.complete and not findings

@@ -509,6 +509,7 @@ class ReviewPackTests(unittest.TestCase):
         self.assertTrue(states["required-ci-pull-request-event"])
         self.assertTrue(states["required-ci-pr-base-head-bound"])
         self.assertTrue(states["required-ci-success"])
+        self.assertTrue(states["required-check-ci-conclusion-consistent"])
         self.assertEqual(result.data["ci"]["run_id"], RUN_ID)
 
     def test_missing_pending_or_wrong_app_required_check_is_incomplete(self):
@@ -522,33 +523,58 @@ class ReviewPackTests(unittest.TestCase):
         self.assertEqual(status, Status.INCOMPLETE)
         self.assertFalse(pending.complete)
 
+        missing_conclusion, status, _ = review_pack_snapshot(512, ReviewGitHub(check_conclusion=None))
+        self.assertEqual(status, Status.INCOMPLETE)
+        self.assertFalse(missing_conclusion.complete)
+
         wrong_app, status, _ = review_pack_snapshot(512, ReviewGitHub(check_app=999))
         self.assertEqual(status, Status.INCOMPLETE)
         self.assertFalse(wrong_app.complete)
 
+    def test_missing_stale_or_non_pr_ci_binding_is_incomplete_for_success_and_failure(self):
+        for conclusion in ("success", "failure"):
+            kwargs = {"check_conclusion": conclusion, "run_conclusion": conclusion}
 
-    def test_missing_stale_or_non_pr_ci_binding_is_incomplete(self):
-        missing, status, assertions = review_pack_snapshot(512, ReviewGitHub(include_run_pr=False))
-        self.assertEqual(status, Status.INCOMPLETE)
-        self.assertFalse(missing.complete)
-        self.assertFalse({item["name"]: item["holds"] for item in assertions}["required-ci-pr-base-head-bound"])
+            missing, status, assertions = review_pack_snapshot(
+                512, ReviewGitHub(include_run_pr=False, **kwargs)
+            )
+            self.assertEqual(status, Status.INCOMPLETE)
+            self.assertFalse(missing.complete)
+            self.assertFalse(
+                {item["name"]: item["holds"] for item in assertions}["required-ci-pr-base-head-bound"]
+            )
 
-        stale, status, _ = review_pack_snapshot(512, ReviewGitHub(run_pr_base="a" * 40))
-        self.assertEqual(status, Status.INCOMPLETE)
-        self.assertFalse(stale.complete)
+            stale_base, status, _ = review_pack_snapshot(
+                512, ReviewGitHub(run_pr_base="a" * 40, **kwargs)
+            )
+            self.assertEqual(status, Status.INCOMPLETE)
+            self.assertFalse(stale_base.complete)
 
-        wrong_event, status, _ = review_pack_snapshot(512, ReviewGitHub(run_event="workflow_dispatch"))
-        self.assertEqual(status, Status.INCOMPLETE)
-        self.assertFalse(wrong_event.complete)
+            stale_head, status, _ = review_pack_snapshot(
+                512, ReviewGitHub(run_pr_head="a" * 40, **kwargs)
+            )
+            self.assertEqual(status, Status.INCOMPLETE)
+            self.assertFalse(stale_head.complete)
 
-    def test_completed_failed_required_check_is_fail(self):
+            wrong_event, status, _ = review_pack_snapshot(
+                512, ReviewGitHub(run_event="workflow_dispatch", **kwargs)
+            )
+            self.assertEqual(status, Status.INCOMPLETE)
+            self.assertFalse(wrong_event.complete)
+
+    def test_completed_failed_required_check_is_fail_only_after_bound_failing_ci(self):
         result, status, assertions = review_pack_snapshot(
-            512, ReviewGitHub(check_conclusion="failure")
+            512, ReviewGitHub(check_conclusion="failure", run_conclusion="failure")
         )
         self.assertEqual(status, Status.FAIL)
         self.assertTrue(result.complete)
         states = {item["name"]: item["holds"] for item in assertions}
         self.assertFalse(states["required-check-success"])
+        self.assertFalse(states["required-ci-success"])
+        self.assertTrue(states["required-check-ci-conclusion-consistent"])
+        self.assertTrue(states["required-ci-pr-base-head-bound"])
+        self.assertEqual(result.data["ci"]["run_id"], RUN_ID)
+        self.assertEqual(result.data["ci"]["failure_context"][0]["conclusion"], "failure")
 
     def test_stale_base_or_wrong_run_head_is_incomplete_not_timestamp_inferred(self):
         stale, status, _ = review_pack_snapshot(512, ReviewGitHub(base="0" * 40))
@@ -559,14 +585,17 @@ class ReviewPackTests(unittest.TestCase):
         self.assertEqual(status, Status.INCOMPLETE)
         self.assertFalse(wrong_head.complete)
 
-    def test_failed_bound_ci_run_is_fail(self):
-        result, status, assertions = review_pack_snapshot(
-            512, ReviewGitHub(run_conclusion="failure")
-        )
-        self.assertEqual(status, Status.FAIL)
-        states = {item["name"]: item["holds"] for item in assertions}
-        self.assertFalse(states["required-ci-success"])
-        self.assertEqual(result.data["ci"]["failure_context"][0]["conclusion"], "failure")
+    def test_check_and_bound_ci_conclusion_mismatch_is_incomplete(self):
+        for check_conclusion, run_conclusion in (("failure", "success"), ("success", "failure")):
+            result, status, assertions = review_pack_snapshot(
+                512,
+                ReviewGitHub(check_conclusion=check_conclusion, run_conclusion=run_conclusion),
+            )
+            self.assertEqual(status, Status.INCOMPLETE)
+            self.assertFalse(result.complete)
+            states = {item["name"]: item["holds"] for item in assertions}
+            self.assertFalse(states["required-check-ci-conclusion-consistent"])
+            self.assertTrue(any(item["code"] == "required-check-ci-conclusion-mismatch" for item in result.findings))
 
 
 class CommandBoundaryTests(unittest.TestCase):
