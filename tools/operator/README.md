@@ -1,6 +1,6 @@
 # CryptoPulse operator toolkit
 
-This directory contains the read-only `operator-toolkit/v1` foundation approved under issue #509.
+This directory contains the read-only `operator-toolkit/v1` approved under issue #509.
 It is an evidence and diagnostics interface, not a workflow engine and not a repository administration surface.
 
 ## Slice A commands
@@ -11,6 +11,20 @@ It is an evidence and diagnostics interface, not a workflow engine and not a rep
 ```
 
 `doctor` checks the local prerequisites and authenticated read capability. `snapshot` records bounded local repository observations together with authoritative remote `main` identity/protection information when GitHub exposes it. Neither command pushes, mutates refs, dispatches workflows, changes settings, deploys, publishes or reads secret values.
+
+## Slice B review-support commands
+
+```bash
+<trusted-runtime-root>/tools/operator/cp candidate <PR> [--json|--evidence]
+<trusted-runtime-root>/tools/operator/cp ci <run-id> [--json|--evidence]
+<trusted-runtime-root>/tools/operator/cp review-pack <PR> [--json|--evidence]
+```
+
+`candidate` reconstructs the authoritative PR base/head/tree/parent identities together with complete commit, changed-file, check, review, issue-comment, review-comment and review-thread state. `ci` reconstructs one exact GitHub Actions run and its attempt-specific jobs and steps. `review-pack` aggregates a current PR candidate with the required exact-head Actions evidence needed for review.
+
+Slice B is evidence-only. Candidate-controlled repository content is data and is never checked out, imported, sourced, built, tested or otherwise executed. In particular, `review-pack` does not run candidate validation locally and does not create a candidate worktree for execution. If current protected-main/base binding, required-check context plus App binding, exact-head Actions provenance, complete pagination or safe bounded representation cannot be proved, the command returns `INCOMPLETE` rather than falling back to local execution. A completed required check or bound required run that conclusively fails is reported as `FAIL`.
+
+Review/comment bodies are included only within fixed trusted-code size budgets and only when the defensive evidence sanitizer accepts them. A body that cannot be represented safely is omitted with bounded identity metadata and makes the affected evidence incomplete. Workflow logs are not emitted or persisted; failure context is restricted to bounded job/step metadata.
 
 ## Trusted runtime requirement
 
@@ -44,4 +58,4 @@ Exit codes:
 - `4` — expected invocation/prerequisite/authentication `ERROR`
 - `5` — unexpected internal `ERROR`
 
-Raw API payloads, headers, subprocess environments and credential values are not emitted as governed evidence.
+Raw API payloads, headers, subprocess environments, workflow logs and credential values are not emitted as governed evidence.
