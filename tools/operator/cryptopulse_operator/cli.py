@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from .commands import candidate, ci, doctor, review_pack, snapshot
+from .commands import auth, candidate, ci, doctor, environment, protection, publication, review_pack, snapshot
 from .evidence import EXIT_CODE, Evidence
 from .github_read import GitHubReader
 from .process import ProcessRunner
@@ -20,6 +20,12 @@ def positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return parsed
+
+
+def environment_name(value: str) -> str:
+    if not value or any(ord(ch) < 32 for ch in value):
+        raise argparse.ArgumentTypeError("must be a non-empty printable environment name")
+    return value
 
 
 def _output_options(command: argparse.ArgumentParser) -> None:
@@ -51,6 +57,19 @@ def parser() -> argparse.ArgumentParser:
     review_pack_command.add_argument("pr", type=positive_int)
     _output_options(review_pack_command)
 
+    auth_command = sub.add_parser("auth")
+    _output_options(auth_command)
+
+    protection_command = sub.add_parser("protection")
+    _output_options(protection_command)
+
+    environment_command = sub.add_parser("environment")
+    environment_command.add_argument("name", type=environment_name)
+    _output_options(environment_command)
+
+    publication_command = sub.add_parser("publication")
+    _output_options(publication_command)
+
     return result
 
 
@@ -77,8 +96,16 @@ def main(argv: list[str] | None = None) -> int:
         evidence = candidate.run(args.pr, runner, github)
     elif args.command == "ci":
         evidence = ci.run(args.run_id, runner, github)
-    else:
+    elif args.command == "review-pack":
         evidence = review_pack.run(args.pr, runner, github)
+    elif args.command == "auth":
+        evidence = auth.run(runner, github)
+    elif args.command == "protection":
+        evidence = protection.run(runner, github)
+    elif args.command == "environment":
+        evidence = environment.run(args.name, runner, github)
+    else:
+        evidence = publication.run(runner, github)
     if args.evidence:
         sys.stdout.write(evidence.envelope())
     elif args.as_json:
