@@ -15,3 +15,34 @@ publication_app_id_variable = "DETERMINISTIC_PUBLICATION_APP_ID"
 publication_app_slug_variable = "DETERMINISTIC_PUBLICATION_APP_SLUG"
 publication_activation_variable = "DETERMINISTIC_PUBLICATION_ACTIVATION"
 publication_pilot_run_variable = "DETERMINISTIC_PUBLICATION_PILOT_RUN_ID"
+
+pages_workflow_name = "Publish CryptoPulse Pages"
+pages_workflow_path = ".github/workflows/pages.yml"
+pages_workflow_file = "pages.yml"
+pages_build_job = "build"
+pages_deploy_job = "deploy"
+pages_trigger_paths = [
+  "reports/crypto/hourly/**/*.md",
+  "site/**",
+  "site_generator/**",
+  "scripts/build_pages_site.py",
+  "scripts/build_pages_site_with_search.py",
+  "scripts/build_pages_site_mobile_ux.py",
+  "scripts/build_pages_site_brief_glance.py",
+  "scripts/build_pages_site_search_filters.py",
+  ".github/workflows/pages.yml",
+]
+live_workflow_name = "Verify CryptoPulse Live Pages"
+live_workflow_path = ".github/workflows/verify-live-pages.yml"
+live_workflow_file = "verify-live-pages.yml"
+live_verify_job = "verify"
+live_evidence_artifact = "cryptopulse-live-site-evidence"
+public_base_url = "https://8ft0-ai.github.io/crypto-pulse/"
+publication_authority = "main only"
+publication_activation_expectation = "absent/disabled"
+project_contracts = [
+  "deterministic-site-publication/v3",
+  "phase15-public-temporal-evidence/v1",
+  "reader-facing-evidence-experience/v1",
+  "operator-toolkit/v1",
+]

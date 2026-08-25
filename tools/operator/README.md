@@ -58,6 +58,52 @@ After a separately reviewed and authorised Slice C merge, the operational owner-
 
 For the current owner/admin credential model, `auth` and `publication` are expected to report the stable installation-scope `INCOMPLETE` boundary until GitHub exposes an authorised read representation or a separately governed credential design is accepted. `protection` and `environment` should still be evaluated normally. Any other `INCOMPLETE`, any failed assertion, unexpected credential-like output or state drift is evidence to adjudicate rather than a reason to fall back to historical provisioning prose.
 
+## Slice D project-proof commands
+
+```bash
+<trusted-runtime-root>/tools/operator/cp pages [--json|--evidence]
+<trusted-runtime-root>/tools/operator/cp live [--json|--evidence]
+<trusted-runtime-root>/tools/operator/cp provenance [--json|--evidence]
+<trusted-runtime-root>/tools/operator/cp contracts [--json|--evidence]
+```
+
+Slice D consumes the repository's existing deterministic publication and proof authorities; it does not create a second deployment or live-site verifier.
+
+`pages` completely enumerates `Publish CryptoPulse Pages` workflow runs, selects the newest applicable `main` run deterministically, requires successful `build` and `deploy` jobs, and reports the exact deployed commit/run/attempt. If protected `main` has advanced since that deployment, the command calls the deployment publication-equivalent only when complete GitHub compare evidence proves that every intervening changed path is outside the frozen Pages trigger/path set. A Pages-affecting advance without a successful newer matching deployment is `FAIL`; incomplete comparison or run evidence is `INCOMPLETE`.
+
+`live` first consumes the same successful Pages proof primitive, then completely enumerates `Verify CryptoPulse Live Pages` runs. An exact `workflow_dispatch` run can prove its inspected commit from the run's own `head_sha`, so a completed successful run at the effective Pages deployment SHA may proceed to the expected `verify` job and retained-artefact checks. For the repository's automatic `workflow_run` path, however, the Actions run REST metadata exposes the triggered verifier run's own default-branch execution SHA, not the triggering Pages run's `github.event.workflow_run.head_sha` that `verify-live-pages.yml` actually checks out and records as `DEPLOYMENT_COMMIT`. Slice D does not download/reinterpret `result.json`, parse workflow logs, or change the verifier workflow to create a new binding representation, so automatic `workflow_run` evidence fails closed as `INCOMPLETE` with `live-workflow-run-source-binding-unavailable` rather than treating the outer run SHA as deployment proof. The selected exact-bound dispatch run must also have one successful `verify` job and exactly one retained, non-expired `cryptopulse-live-site-evidence` artefact whose run/head metadata matches that selected verification run. The command never dispatches or reruns the workflow itself and makes no separate CDN observation.
+
+`provenance` aggregates the exact chain already proved by those primitives: trusted operator runtime → protected `main` → effective Pages deployment → exact-bound live verification → retained live-evidence artefact. It does not weaken an `INCOMPLETE` live binding, inspect mutable rolling branches, execute candidate/site code, infer market/report provenance, or substitute historical issue prose for current GitHub evidence.
+
+`contracts` reports the reviewed project contract index and fixed operational boundaries used to interpret Slice D evidence:
+
+```text
+deterministic-site-publication/v3
+phase15-public-temporal-evidence/v1
+reader-facing-evidence-experience/v1
+operator-toolkit/v1
+
+publication authority: main only
+publication activation expectation: absent/disabled
+Pages workflow: Publish CryptoPulse Pages / .github/workflows/pages.yml
+live verification workflow: Verify CryptoPulse Live Pages / .github/workflows/verify-live-pages.yml
+live evidence artefact: cryptopulse-live-site-evidence
+public base URL: https://8ft0-ai.github.io/crypto-pulse/
+```
+
+The Pages trigger/path set used by `pages` is trusted non-secret operator configuration and is regression-checked against `.github/workflows/pages.yml`; later workflow drift therefore cannot silently change the equivalence calculation without repository validation noticing. All Slice D GitHub calls remain fixed read-only `GET` surfaces with complete pagination. None of these commands merges, dispatches/reruns workflows, changes publication activation, writes settings/credentials, deploys or publishes.
+
+After a separately reviewed and authorised Slice D merge, the operational owner-local proof should use the exact merged trusted runtime and run once:
+
+```bash
+<trusted-runtime-root>/tools/operator/cp pages --evidence
+<trusted-runtime-root>/tools/operator/cp live --evidence
+<trusted-runtime-root>/tools/operator/cp provenance --evidence
+<trusted-runtime-root>/tools/operator/cp contracts --evidence
+```
+
+An automatic `workflow_run` `INCOMPLETE` with `live-workflow-run-source-binding-unavailable` is the expected fail-closed boundary under the current accepted metadata-only design. Any other `INCOMPLETE`, any `FAIL`, sanitisation rejection or identity drift is evidence to adjudicate rather than bypass.
+
 ## Trusted runtime requirement
 
 Governed evidence must never be produced by running `./tools/operator/cp` from an arbitrary working tree. The runtime root must be a clean immutable checkout of an exact reviewed CryptoPulse commit that has entered protected `main` (or an equivalently reviewed immutable installation). Candidate copies of the launcher, package and `operator.toml` are inspection data only.

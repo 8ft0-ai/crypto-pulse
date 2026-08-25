@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from .commands import auth, candidate, ci, doctor, environment, protection, publication, review_pack, snapshot
+from .commands import auth, candidate, ci, contracts, doctor, environment, live, pages, protection, provenance, publication, review_pack, snapshot
 from .evidence import EXIT_CODE, Evidence
 from .github_read import GitHubReader
 from .process import ProcessRunner
@@ -70,6 +70,18 @@ def parser() -> argparse.ArgumentParser:
     publication_command = sub.add_parser("publication")
     _output_options(publication_command)
 
+    pages_command = sub.add_parser("pages")
+    _output_options(pages_command)
+
+    live_command = sub.add_parser("live")
+    _output_options(live_command)
+
+    provenance_command = sub.add_parser("provenance")
+    _output_options(provenance_command)
+
+    contracts_command = sub.add_parser("contracts")
+    _output_options(contracts_command)
+
     return result
 
 
@@ -104,8 +116,16 @@ def main(argv: list[str] | None = None) -> int:
         evidence = protection.run(runner, github)
     elif args.command == "environment":
         evidence = environment.run(args.name, runner, github)
-    else:
+    elif args.command == "publication":
         evidence = publication.run(runner, github)
+    elif args.command == "pages":
+        evidence = pages.run(runner, github)
+    elif args.command == "live":
+        evidence = live.run(runner, github)
+    elif args.command == "provenance":
+        evidence = provenance.run(runner, github)
+    else:
+        evidence = contracts.run(runner, github)
     if args.evidence:
         sys.stdout.write(evidence.envelope())
     elif args.as_json:

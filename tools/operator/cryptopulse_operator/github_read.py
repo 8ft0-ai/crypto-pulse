@@ -61,6 +61,13 @@ def _nonempty(value: str, label: str) -> str:
     return value
 
 
+def _git_oid(value: str, label: str) -> str:
+    text = _nonempty(value, label)
+    if len(text) != 40 or any(ch not in "0123456789abcdefABCDEF" for ch in text):
+        raise GitHubReadError(f"{label} must be a full Git object id")
+    return text
+
+
 def _object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise GitHubReadError(f"{label} representation is incomplete")
@@ -369,6 +376,29 @@ class GitHubReader:
         _positive_int(installation_id, "installation id")
         raise GitHubReadError(
             "publication App installation repositories are unavailable through the permitted owner/admin credential"
+        )
+
+    # Slice D project proof surfaces. Every endpoint remains a fixed GET surface.
+    def workflow_runs(self, workflow_file: str) -> list[Any]:
+        encoded = quote(_nonempty(workflow_file, "workflow file"), safe="")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/actions/workflows/{encoded}/runs?per_page=100",
+            item_key="workflow_runs",
+        )
+
+    def workflow_artifacts(self, run_id: int) -> list[Any]:
+        _positive_int(run_id, "workflow run id")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/actions/runs/{run_id}/artifacts?per_page=100",
+            item_key="artifacts",
+        )
+
+    def compare_commits(self, base_sha: str, head_sha: str) -> dict[str, Any]:
+        base = _git_oid(base_sha, "compare base SHA")
+        head = _git_oid(head_sha, "compare head SHA")
+        return _object(
+            self._get(f"repos/{REPOSITORY}/compare/{base}...{head}"),
+            "commit comparison",
         )
 
 
