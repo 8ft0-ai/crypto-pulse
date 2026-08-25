@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Iterable
+from urllib.parse import quote
 
 from .process import ProcessRunner
 
@@ -51,6 +52,18 @@ class GitHubReadError(RuntimeError):
 def _positive_int(value: int, label: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise GitHubReadError(f"{label} must be a positive integer")
+    return value
+
+
+def _nonempty(value: str, label: str) -> str:
+    if not isinstance(value, str) or not value or any(ord(ch) < 32 for ch in value):
+        raise GitHubReadError(f"{label} must be a non-empty printable string")
+    return value
+
+
+def _object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise GitHubReadError(f"{label} representation is incomplete")
     return value
 
 
@@ -124,9 +137,11 @@ class GitHubReader:
             commit = data["commit"]
             sha = commit["sha"]
             tree_sha = commit["commit"]["tree"]["sha"]
-            protected = bool(data["protected"])
+            protected = data["protected"]
         except (KeyError, TypeError) as exc:
             raise GitHubReadError("GitHub main-branch representation is incomplete") from exc
+        if not isinstance(protected, bool):
+            raise GitHubReadError("GitHub main-branch protected state is incomplete")
         protection = data.get("protection") or {}
         checks = (protection.get("required_status_checks") or {}).get("checks") or []
         if not isinstance(checks, list) or any(not isinstance(item, dict) for item in checks):
@@ -285,6 +300,75 @@ class GitHubReader:
         return self.keyed_collection(
             f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/{attempt}/jobs",
             item_key="jobs",
+        )
+
+    # Slice C privileged readback. Every endpoint remains a fixed GET surface.
+    def viewer(self) -> dict[str, Any]:
+        return _object(self._get("user"), "authenticated viewer")
+
+    def repository(self) -> dict[str, Any]:
+        return _object(self._get(f"repos/{REPOSITORY}"), "repository")
+
+    def branch_protection(self) -> dict[str, Any]:
+        return _object(self._get(f"repos/{REPOSITORY}/branches/main/protection"), "branch protection")
+
+    def rulesets(self) -> list[Any]:
+        return self.collection(f"repos/{REPOSITORY}/rulesets?includes_parents=true&per_page=100")
+
+    def ruleset(self, ruleset_id: int) -> dict[str, Any]:
+        _positive_int(ruleset_id, "ruleset id")
+        return _object(self._get(f"repos/{REPOSITORY}/rulesets/{ruleset_id}"), "ruleset")
+
+    def environments(self) -> list[Any]:
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/environments?per_page=100",
+            item_key="environments",
+        )
+
+    def environment(self, name: str) -> dict[str, Any]:
+        encoded = quote(_nonempty(name, "environment name"), safe="")
+        return _object(self._get(f"repos/{REPOSITORY}/environments/{encoded}"), "environment")
+
+    def deployment_branch_policies(self, name: str) -> list[Any]:
+        encoded = quote(_nonempty(name, "environment name"), safe="")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/environments/{encoded}/deployment-branch-policies?per_page=100",
+            item_key="branch_policies",
+        )
+
+    def environment_variables(self, name: str) -> list[Any]:
+        encoded = quote(_nonempty(name, "environment name"), safe="")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/environments/{encoded}/variables?per_page=100",
+            item_key="variables",
+        )
+
+    def environment_secrets(self, name: str) -> list[Any]:
+        encoded = quote(_nonempty(name, "environment name"), safe="")
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/environments/{encoded}/secrets?per_page=100",
+            item_key="secrets",
+        )
+
+    def repository_variables(self) -> list[Any]:
+        return self.keyed_collection(
+            f"repos/{REPOSITORY}/actions/variables?per_page=100",
+            item_key="variables",
+        )
+
+    def app(self, slug: str) -> dict[str, Any]:
+        encoded = quote(_nonempty(slug, "GitHub App slug"), safe="")
+        return _object(self._get(f"apps/{encoded}"), "GitHub App")
+
+    def user_installations(self) -> list[Any]:
+        raise GitHubReadError(
+            "publication App installation scope is unavailable through the permitted owner/admin credential"
+        )
+
+    def installation_repositories(self, installation_id: int) -> list[Any]:
+        _positive_int(installation_id, "installation id")
+        raise GitHubReadError(
+            "publication App installation repositories are unavailable through the permitted owner/admin credential"
         )
 
 
