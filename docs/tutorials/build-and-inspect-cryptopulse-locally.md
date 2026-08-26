@@ -6,7 +6,7 @@
 
 This tutorial uses only files already committed to the repository. It does not collect live market data, call an LLM provider, require a secret or publish anything.
 
-The complete command sequence assumes Bash or a compatible POSIX shell on macOS, Linux or Windows Subsystem for Linux. Native PowerShell users must translate the shell-specific `test` and `rm` commands before following the sequence.
+The complete command sequence assumes Bash or a compatible POSIX shell on macOS, Linux or Windows Subsystem for Linux.
 
 ## 1. Prepare the local environment
 
@@ -30,13 +30,13 @@ A successful command produces no output.
 
 ## 2. Generate the site
 
-Run the canonical build command from the repository root using the bootstrapped environment:
+Run the repository-owned build command:
 
 ```bash
-.venv/bin/python -m site_generator
+./tools/dev/cp-dev build
 ```
 
-The command rebuilds the disposable `_site/` directory from the checked-in report archive and repository-owned site assets.
+`build` runs the canonical `.venv/bin/python -m site_generator` command from the resolved repository root. It rebuilds the disposable `_site/` directory from the checked-in report archive and repository-owned site assets.
 
 Confirm that the main entry points were generated:
 
@@ -52,13 +52,13 @@ Each command should complete without output.
 
 ## 3. Serve the generated site
 
-Start a local HTTP server:
+Start the repository-owned local server:
 
 ```bash
-.venv/bin/python -m http.server 8000 --directory _site
+./tools/dev/cp-dev serve
 ```
 
-Leave this terminal running. In a browser, open:
+`serve` requires an existing `_site/index.html`, never builds implicitly, binds only to `127.0.0.1`, and serves exactly the repository `_site/` directory. Leave this terminal running. In a browser, open:
 
 ```text
 http://localhost:8000/
@@ -118,15 +118,7 @@ In a second terminal at the repository root, ask Git which `_site/` files are tr
 git ls-files _site
 ```
 
-The command should produce no output. The generated site exists locally, but it is not part of the source archive.
-
-Now inspect its working-tree status:
-
-```bash
-git status --short _site
-```
-
-The directory may appear as untracked generated output. Do not add or commit it. Pull-request validation rejects committed `_site/` content.
+The command should produce no output. The generated site exists locally, but it is ignored disposable output rather than repository source.
 
 Before opening a pull request, run the repository-owned local validation mirror:
 
@@ -136,15 +128,23 @@ Before opening a pull request, run the repository-owned local validation mirror:
 
 `cp-dev check` executes the current working tree. It is convenient local validation, not trusted operator evidence and not a substitute for the authoritative GitHub Actions PR check.
 
-## 6. Clean up
-
-Stop the HTTP server with `Ctrl+C`, then remove the generated site:
+For the unit-test gate alone, use:
 
 ```bash
-rm -rf _site
+./tools/dev/cp-dev test
 ```
 
-The checked-in Markdown report remains unchanged. Running `.venv/bin/python -m site_generator` again recreates the same path structure from the repository sources.
+## 6. Clean up
+
+Stop the HTTP server with `Ctrl+C`, then remove allowlisted disposable developer output:
+
+```bash
+./tools/dev/cp-dev clean
+```
+
+`clean` removes `_site/` plus Python cache artefacts only under its fixed source/test/developer-tool allowlist. It does not remove `.venv`, source data, reports, Git metadata or unrelated ignored files.
+
+The checked-in Markdown report remains unchanged. Running `./tools/dev/cp-dev build` again recreates the same path structure from the repository sources.
 
 ## What you have learned
 
@@ -153,9 +153,11 @@ You have now completed the local documentation journey:
 ```text
 checked-in Markdown report
         ↓
-.venv/bin/python -m site_generator
+cp-dev build
         ↓
 disposable _site/ output
+        ↓
+cp-dev serve
         ↓
 local homepage, latest page, archive and rendered report
 ```

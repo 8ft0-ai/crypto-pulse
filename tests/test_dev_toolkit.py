@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,7 +16,7 @@ sys.path.insert(0, str(DEV_ROOT))
 
 from cryptopulse_dev import cli
 from cryptopulse_dev.checks import EXPECTED_SITE_ARTIFACTS
-from cryptopulse_dev.commands import bootstrap, check, doctor
+from cryptopulse_dev.commands import bootstrap, build, check, clean, doctor, serve, test as dev_test
 from cryptopulse_dev.environment import (
     PrerequisiteError,
     normalise_remote,
@@ -41,6 +40,7 @@ class FixtureRunner:
         fail_docs: bool = False,
         fail_build: bool = False,
         fail_pip: bool = False,
+        fail_server: bool = False,
         create_artifacts: bool = True,
     ) -> None:
         self.root = root
@@ -52,6 +52,7 @@ class FixtureRunner:
         self.fail_docs = fail_docs
         self.fail_build = fail_build
         self.fail_pip = fail_pip
+        self.fail_server = fail_server
         self.create_artifacts = create_artifacts
         self.calls: list[tuple[tuple[str, ...], Path | None, bool]] = []
 
@@ -102,7 +103,19 @@ class FixtureRunner:
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text("fixture", encoding="utf-8")
             return ProcessResult(1 if self.fail_build else 0, "", "")
+        if "-m" in argv and "http.server" in argv:
+            return ProcessResult(1 if self.fail_server else 0, "", "")
         return ProcessResult(0, "", "")
+
+
+class InterruptServerRunner(FixtureRunner):
+    def run(self, argv, *, cwd=None, capture=False):
+        argv_tuple = tuple(str(item) for item in argv)
+        if "-m" in argv_tuple and "http.server" in argv_tuple:
+            cwd_path = Path(cwd) if cwd is not None else None
+            self.calls.append((argv_tuple, cwd_path, capture))
+            raise KeyboardInterrupt
+        return super().run(argv, cwd=cwd, capture=capture)
 
 
 class DevToolkitTests(unittest.TestCase):
@@ -119,18 +132,10 @@ class DevToolkitTests(unittest.TestCase):
         (venv / "pyvenv.cfg").write_text("home = fixture\n", encoding="utf-8")
 
     def test_remote_normalisation_accepts_only_canonical_repository_forms(self) -> None:
-        self.assertEqual(
-            normalise_remote("https://github.com/8ft0-ai/crypto-pulse.git"),
-            "8ft0-ai/crypto-pulse",
-        )
-        self.assertEqual(
-            normalise_remote("git@github.com:8ft0-ai/crypto-pulse.git"),
-            "8ft0-ai/crypto-pulse",
-        )
+        self.assertEqual(normalise_remote("https://github.com/8ft0-ai/crypto-pulse.git"), "8ft0-ai/crypto-pulse")
+        self.assertEqual(normalise_remote("git@github.com:8ft0-ai/crypto-pulse.git"), "8ft0-ai/crypto-pulse")
         self.assertIsNone(normalise_remote("https://example.invalid/8ft0-ai/crypto-pulse.git"))
-        self.assertIsNone(
-            normalise_remote("https://token@github.com/8ft0-ai/crypto-pulse.git")
-        )
+        self.assertIsNone(normalise_remote("https://token@github.com/8ft0-ai/crypto-pulse.git"))
 
     def test_outside_git_worktree_is_prerequisite_error(self) -> None:
         with self.assertRaisesRegex(PrerequisiteError, "Git worktree"):
@@ -162,12 +167,7 @@ class DevToolkitTests(unittest.TestCase):
         self.assertTrue(python_supported((3, 12, 0)))
         runner = FixtureRunner(self.root)
         with self.assertRaisesRegex(PrerequisiteError, "Python >= 3.12"):
-            bootstrap.run(
-                cwd=self.root,
-                runner=runner,
-                host_python=Path("/usr/bin/python3"),
-                host_version=(3, 11, 9),
-            )
+            bootstrap.run(cwd=self.root, runner=runner, host_python=Path("/usr/bin/python3"), host_version=(3, 11, 9))
 
     def test_missing_and_malformed_venv_are_rejected(self) -> None:
         runner = FixtureRunner(self.root)
@@ -192,24 +192,8 @@ class DevToolkitTests(unittest.TestCase):
     def test_bootstrap_creates_once_and_is_idempotent(self) -> None:
         runner = FixtureRunner(self.root)
         with patch("sys.stdout", new=io.StringIO()):
-            self.assertEqual(
-                bootstrap.run(
-                    cwd=self.root,
-                    runner=runner,
-                    host_python=Path("/usr/bin/python3"),
-                    host_version=(3, 12, 0),
-                ),
-                0,
-            )
-            self.assertEqual(
-                bootstrap.run(
-                    cwd=self.root,
-                    runner=runner,
-                    host_python=Path("/usr/bin/python3"),
-                    host_version=(3, 12, 0),
-                ),
-                0,
-            )
+            self.assertEqual(bootstrap.run(cwd=self.root, runner=runner, host_python=Path("/usr/bin/python3"), host_version=(3, 12, 0)), 0)
+            self.assertEqual(bootstrap.run(cwd=self.root, runner=runner, host_python=Path("/usr/bin/python3"), host_version=(3, 12, 0)), 0)
         venv_creates = [argv for argv, _, _ in runner.calls if "-m" in argv and "venv" in argv]
         pip_installs = [argv for argv, _, _ in runner.calls if "-m" in argv and "pip" in argv]
         self.assertEqual(len(venv_creates), 1)
@@ -232,22 +216,11 @@ class DevToolkitTests(unittest.TestCase):
         self.make_venv()
         runner = FixtureRunner(self.root, fail_pip=True)
         with self.assertRaisesRegex(bootstrap.TaskFailure, "installation failed"):
-            bootstrap.run(
-                cwd=self.root,
-                runner=runner,
-                host_python=Path("/usr/bin/python3"),
-                host_version=(3, 12, 0),
-            )
+            bootstrap.run(cwd=self.root, runner=runner, host_python=Path("/usr/bin/python3"), host_version=(3, 12, 0))
 
     def test_check_reports_unit_docs_and_build_failures(self) -> None:
         self.make_venv()
-        runner = FixtureRunner(
-            self.root,
-            fail_unit=True,
-            fail_docs=True,
-            fail_build=True,
-            create_artifacts=False,
-        )
+        runner = FixtureRunner(self.root, fail_unit=True, fail_docs=True, fail_build=True, create_artifacts=False)
         with patch("sys.stdout", new=io.StringIO()):
             self.assertEqual(check.run(cwd=self.root, runner=runner), 2)
         commands = [argv for argv, _, _ in runner.calls]
@@ -290,6 +263,22 @@ class DevToolkitTests(unittest.TestCase):
         self.assertTrue(all(argv[0] != "gh" for argv, _, _ in runner.calls))
         self.assertTrue(all("status" not in argv for argv, _, _ in runner.calls))
 
+    def test_standalone_test_and_build_use_exact_commands_and_propagate_failure(self) -> None:
+        self.make_venv()
+        runner = FixtureRunner(self.root)
+        with patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(dev_test.run(cwd=self.root, runner=runner), 0)
+            self.assertEqual(build.run(cwd=self.root, runner=runner), 0)
+        commands = [argv for argv, _, _ in runner.calls]
+        python = str(self.root / ".venv" / "bin" / "python")
+        self.assertIn((python, "-m", "unittest", "discover", "-s", "tests"), commands)
+        self.assertIn((python, "-m", "site_generator"), commands)
+
+        failing = FixtureRunner(self.root, fail_unit=True, fail_build=True)
+        with patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(dev_test.run(cwd=self.root, runner=failing), 2)
+            self.assertEqual(build.run(cwd=self.root, runner=failing), 2)
+
     def test_check_runs_in_fixed_order_from_repository_root_when_invoked_below_root(self) -> None:
         self.make_venv()
         subdir = self.root / "docs" / "nested"
@@ -297,7 +286,6 @@ class DevToolkitTests(unittest.TestCase):
         runner = FixtureRunner(self.root)
         with patch("sys.stdout", new=io.StringIO()):
             self.assertEqual(check.run(cwd=subdir, runner=runner), 0)
-
         relevant = []
         for argv, cwd, _ in runner.calls:
             if "unittest" in argv:
@@ -311,18 +299,101 @@ class DevToolkitTests(unittest.TestCase):
         self.assertEqual([name for name, _ in relevant], ["unit", "docs", "tracked", "build"])
         self.assertTrue(all(cwd == self.root for _, cwd in relevant))
 
+    def test_serve_requires_build_validates_port_and_uses_loopback_only(self) -> None:
+        self.make_venv()
+        runner = FixtureRunner(self.root)
+        with self.assertRaisesRegex(PrerequisiteError, "build first"):
+            serve.run(cwd=self.root, runner=runner)
+        for port in (1023, 65536):
+            with self.assertRaisesRegex(PrerequisiteError, "1024-65535"):
+                serve.run(cwd=self.root, runner=runner, port=port)
+
+        site = self.root / "_site"
+        site.mkdir()
+        (site / "index.html").write_text("fixture", encoding="utf-8")
+        with patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(serve.run(cwd=self.root, runner=runner, port=9000), 0)
+        server_calls = [(argv, cwd) for argv, cwd, _ in runner.calls if "http.server" in argv]
+        self.assertEqual(len(server_calls), 1)
+        argv, cwd = server_calls[0]
+        self.assertEqual(cwd, self.root)
+        self.assertEqual(argv[-5:], ("9000", "--bind", "127.0.0.1", "--directory", str(site)))
+        self.assertFalse(any("site_generator" in argv for argv, _, _ in runner.calls))
+
+    def test_serve_interrupt_is_normal_success_and_child_failure_propagates(self) -> None:
+        self.make_venv()
+        site = self.root / "_site"
+        site.mkdir()
+        (site / "index.html").write_text("fixture", encoding="utf-8")
+        with patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(serve.run(cwd=self.root, runner=InterruptServerRunner(self.root)), 0)
+            self.assertEqual(serve.run(cwd=self.root, runner=FixtureRunner(self.root, fail_server=True)), 2)
+
+    def test_clean_removes_only_allowlisted_disposable_output(self) -> None:
+        self.make_venv()
+        site = self.root / "_site"
+        site.mkdir()
+        (site / "index.html").write_text("fixture", encoding="utf-8")
+        for relative in (
+            "site_generator/__pycache__",
+            "scripts/__pycache__",
+            "tests/__pycache__",
+            "tools/dev/cryptopulse_dev/__pycache__",
+        ):
+            cache = self.root / relative
+            cache.mkdir(parents=True)
+            (cache / "fixture.pyc").write_text("cache", encoding="utf-8")
+        standalone_pyc = self.root / "scripts" / "fixture.pyc"
+        standalone_pyc.write_text("cache", encoding="utf-8")
+        preserved = (
+            self.root / ".venv" / "keep.txt",
+            self.root / ".git" / "keep.txt",
+            self.root / "data" / "keep.txt",
+            self.root / "reports" / "keep.txt",
+            self.root / ".ignored-sentinel",
+        )
+        for path in preserved:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("keep", encoding="utf-8")
+
+        with patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(clean.run(cwd=self.root, runner=FixtureRunner(self.root)), 0)
+        self.assertFalse(site.exists())
+        self.assertFalse(standalone_pyc.exists())
+        self.assertFalse((self.root / "tests" / "__pycache__").exists())
+        for path in preserved:
+            self.assertTrue(path.exists())
+
+    def test_clean_rejects_symlink_candidate_before_any_deletion(self) -> None:
+        self.make_venv()
+        site = self.root / "_site"
+        site.mkdir()
+        site_sentinel = site / "index.html"
+        site_sentinel.write_text("keep", encoding="utf-8")
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        tests = self.root / "tests"
+        tests.mkdir()
+        (tests / "__pycache__").symlink_to(Path(outside.name), target_is_directory=True)
+        with self.assertRaisesRegex(PrerequisiteError, "symlinked"):
+            clean.run(cwd=self.root, runner=FixtureRunner(self.root))
+        self.assertTrue(site_sentinel.exists())
+
     def test_cli_exit_mapping_is_stable(self) -> None:
         with patch("cryptopulse_dev.cli.doctor.run", return_value=2):
             self.assertEqual(cli.main(["doctor"]), 2)
-        with patch(
-            "cryptopulse_dev.cli.doctor.run",
-            side_effect=PrerequisiteError("missing"),
-        ), patch("sys.stderr", new=io.StringIO()):
+        with patch("cryptopulse_dev.cli.dev_test.run", return_value=2):
+            self.assertEqual(cli.main(["test"]), 2)
+        with patch("cryptopulse_dev.cli.build.run", return_value=0):
+            self.assertEqual(cli.main(["build"]), 0)
+        with patch("cryptopulse_dev.cli.serve.run", return_value=0) as mocked_serve:
+            self.assertEqual(cli.main(["serve", "--port", "9001"]), 0)
+            mocked_serve.assert_called_once_with(port=9001)
+        with patch("cryptopulse_dev.cli.clean.run", return_value=0):
+            self.assertEqual(cli.main(["clean"]), 0)
+        with patch("cryptopulse_dev.cli.doctor.run", side_effect=PrerequisiteError("missing")), patch("sys.stderr", new=io.StringIO()):
             self.assertEqual(cli.main(["doctor"]), 3)
-        with patch(
-            "cryptopulse_dev.cli.doctor.run",
-            side_effect=RuntimeError("boom"),
-        ), patch("sys.stderr", new=io.StringIO()):
+        with patch("cryptopulse_dev.cli.doctor.run", side_effect=RuntimeError("boom")), patch("sys.stderr", new=io.StringIO()):
             self.assertEqual(cli.main(["doctor"]), 4)
         with patch("sys.stderr", new=io.StringIO()):
             self.assertEqual(cli.main(["unknown"]), 3)

@@ -17,14 +17,18 @@ Prerequisites:
 
 GitHub CLI is not required.
 
-## Slice A commands
+## Commands
 
 Run commands by path from anywhere inside the worktree:
 
 ```bash
 ./tools/dev/cp-dev bootstrap
 ./tools/dev/cp-dev doctor
+./tools/dev/cp-dev test
 ./tools/dev/cp-dev check
+./tools/dev/cp-dev build
+./tools/dev/cp-dev serve
+./tools/dev/cp-dev clean
 ```
 
 ### `bootstrap`
@@ -40,9 +44,17 @@ Creates or repairs the repository-local `.venv` and installs `requirements-dev.t
 
 ### `doctor`
 
-Runs read-only local diagnostics for Git/repository identity, host Python, `.venv`, declared dependencies and tracked `_site/` content. A dirty working tree is allowed. An untracked `_site/` directory is reported as disposable state rather than a failure.
+Runs read-only local diagnostics for Git/repository identity, host Python, `.venv`, declared dependencies and tracked `_site/` content. A dirty working tree is allowed. An untracked/ignored `_site/` directory is reported as disposable state rather than a failure.
 
 `doctor` does not contact GitHub and does not require `gh`.
+
+### `test`
+
+Runs the canonical unit-test command from the resolved repository root:
+
+```text
+.venv/bin/python -m unittest discover -s tests
+```
 
 ### `check`
 
@@ -55,6 +67,37 @@ Runs the local pre-PR mirror using `.venv/bin/python`:
 5. verify the expected generated artefacts.
 
 GitHub Actions remains the authoritative PR acceptance gate and executes these checks directly rather than delegating acceptance to candidate-controlled `cp-dev check`.
+
+### `build`
+
+Runs the canonical local site build without publishing:
+
+```text
+.venv/bin/python -m site_generator
+```
+
+The generated `_site/` tree is disposable output.
+
+### `serve`
+
+Serves an **existing** `_site/index.html` and never builds implicitly:
+
+```bash
+./tools/dev/cp-dev serve
+./tools/dev/cp-dev serve --port 9000
+```
+
+The default port is `8000`; accepted ports are `1024`–`65535`. The server binds `127.0.0.1` only and serves exactly the repository `_site/` directory. Stop it with `Ctrl+C`.
+
+### `clean`
+
+Removes only allowlisted disposable developer output:
+
+- `_site/`;
+- `__pycache__` directories beneath `site_generator/`, `scripts/`, `tests/` and `tools/dev/`;
+- `.pyc` files beneath those same allowlisted roots.
+
+Cleanup is two-phase: all deletion candidates are discovered and validated before anything is deleted. Symlinked or escaped candidates fail closed. `clean` does not remove `.venv`, `.git`, source data, reports, worktrees, credentials or unrelated ignored files.
 
 ## Exit codes
 
@@ -76,5 +119,3 @@ If `.venv` is missing or invalid:
 ```
 
 If local validation differs from CI, treat CI as authoritative and update the developer mirror only through reviewed repository changes.
-
-Slice B commands such as `test`, `build`, `serve` and `clean` are not part of Slice A.

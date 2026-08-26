@@ -175,7 +175,7 @@ Prefer a tested repository-owned utility over a large bespoke external script wh
 
 Use the execution plane that matches the task:
 
-- use `./tools/dev/cp-dev` for recurring working-tree setup, diagnostics and local validation;
+- use `./tools/dev/cp-dev` for recurring working-tree setup, diagnostics, testing, validation, building, local serving and cleanup;
 - use `tools/operator/cp` for authoritative GitHub, protected-main, CI and publication evidence;
 - when a repeated capability belongs in one of those planes but is missing, shape the smallest extension rather than repeatedly recreating a large script;
 - use a bounded temporary command or script only for a genuinely one-off local observation;
@@ -370,23 +370,35 @@ Prepare the repository-local development environment:
 ./tools/dev/cp-dev bootstrap
 ```
 
+Run the canonical unit-test suite when you need the test gate alone:
+
+```bash
+./tools/dev/cp-dev test
+```
+
 Run the normal local pre-PR mirror:
 
 ```bash
 ./tools/dev/cp-dev check
 ```
 
-For direct site inspection while Slice B remains deferred:
+Build and inspect the disposable site with the stable developer commands:
 
 ```bash
-.venv/bin/python -m site_generator
-.venv/bin/python -m http.server 8000 --directory _site
+./tools/dev/cp-dev build
+./tools/dev/cp-dev serve
 ```
 
 Then open:
 
 ```text
 http://localhost:8000
+```
+
+Stop the server with `Ctrl+C`. Remove generated site output and allowlisted Python caches with:
+
+```bash
+./tools/dev/cp-dev clean
 ```
 
 `cp-dev` executes the current working tree and does not produce trusted operator evidence. For authoritative GitHub/CI state, use the separately governed operator toolkit.
