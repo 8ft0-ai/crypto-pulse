@@ -109,7 +109,7 @@ class DevToolkitTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         (self.root / "requirements-dev.txt").write_text("pyyaml\nmarkdown\n", encoding="utf-8")
 
     def make_venv(self) -> None:
