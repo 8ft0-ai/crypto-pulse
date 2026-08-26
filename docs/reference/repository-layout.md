@@ -26,6 +26,7 @@
 | `site/` | Checked-in static-site source assets. | Source assets copied or transformed into generated output. |
 | `site_generator/` | Canonical Python package entry point and build orchestration. | Canonical local and CI site build interface. |
 | `tests/` | Unit tests, fixtures and test-specific notes. | Validation evidence and fixture contracts. |
+| `tools/` | Repository-owned developer and operator command surfaces. | `tools/dev/` executes the working tree; `tools/operator/` is the trusted read-only evidence plane. |
 | `_site/` | Generated static site. | Disposable output; never source-controlled. |
 
 ## Documentation layout
@@ -40,6 +41,20 @@ docs/
 ```
 
 Only current documentation for learning, operating, looking up or understanding CryptoPulse belongs here. Planning, evaluation and test evidence remains in its domain-specific path.
+
+## Tooling planes
+
+```text
+tools/
+├── dev/
+│   └── cp-dev
+└── operator/
+    └── cp
+```
+
+`tools/dev/cp-dev` intentionally executes the current working tree for local setup, diagnostics and pre-PR validation. Its output is developer evidence only.
+
+`tools/operator/cp` remains the separately governed trusted read-only evidence interface for authoritative GitHub, protected-main and CI observations. Developer tooling must not claim or inherit that trust boundary.
 
 ## Market evidence and report paths
 
@@ -99,17 +114,23 @@ For the complete generated output catalogue, see [Generated site artefacts](gene
 
 | Goal | Command or path |
 | --- | --- |
-| Run all unit tests | `python -m unittest discover -s tests` |
-| Validate documentation | `python scripts/validate_documentation.py` |
-| Build the static site | `python -m site_generator` |
+| Bootstrap local developer environment | `./tools/dev/cp-dev bootstrap` |
+| Diagnose local developer prerequisites | `./tools/dev/cp-dev doctor` |
+| Run the local pre-PR mirror | `./tools/dev/cp-dev check` |
+| Run all unit tests directly | `python -m unittest discover -s tests` |
+| Validate documentation directly | `python scripts/validate_documentation.py` |
+| Build the static site directly | `python -m site_generator` |
 | Validate source snapshots | `python scripts/validate_crypto_snapshot.py <path>` |
 | Validate pull requests | [`.github/workflows/pr-validation.yml`](../../.github/workflows/pr-validation.yml) |
 | Deploy GitHub Pages | [`.github/workflows/pages.yml`](../../.github/workflows/pages.yml) |
 | Verify the public site | [`.github/workflows/verify-live-pages.yml`](../../.github/workflows/verify-live-pages.yml) |
 
+The local `cp-dev check` mirror is convenient working-tree validation. GitHub Actions remains authoritative for PR acceptance and continues to run the underlying checks directly.
+
 ## Boundary rules
 
 - Do not treat `_site/` as source content.
+- Do not treat `cp-dev` output as trusted operator evidence.
 - Do not copy schemas, prompts or executable configuration into `docs/`; link to their canonical files.
 - Do not move planning, evaluation or fixture evidence into the current documentation tree.
 - Do not use generated analysis as market evidence for a later analysis run.

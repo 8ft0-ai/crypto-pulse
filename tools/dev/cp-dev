@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+
+case "$0" in
+  */*) SCRIPT_DIR=$(CDPATH= cd -- "${0%/*}" && pwd -P) ;;
+  *) echo "cp-dev: launcher must be invoked by path" >&2; exit 3 ;;
+esac
+
+PYTHON=""
+for candidate in python3.13 python3.12 python3; do
+  resolved=$(command -v "$candidate" 2>/dev/null || true)
+  if [ -n "$resolved" ] && "$resolved" -I -B -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then
+    PYTHON=$resolved
+    break
+  fi
+done
+
+if [ -z "$PYTHON" ]; then
+  echo "cp-dev: Python >= 3.12 is required" >&2
+  exit 3
+fi
+
+export PYTHONDONTWRITEBYTECODE=1
+
+exec "$PYTHON" -I -B -c '
+import runpy
+import sys
+package_root = sys.argv[1]
+sys.path.insert(0, package_root)
+sys.argv = [package_root + "/cryptopulse_dev/cli.py"] + sys.argv[2:]
+runpy.run_module("cryptopulse_dev.cli", run_name="__main__")
+' "$SCRIPT_DIR" "$@"
