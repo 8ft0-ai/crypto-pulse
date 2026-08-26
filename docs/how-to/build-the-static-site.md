@@ -4,26 +4,23 @@
 > **Audience:** CryptoPulse contributors and operators  
 > **Outcome:** Generate and verify the local `_site/` output from the current checked-in report archive.
 
-## Install the local dependencies
+## Prepare the local environment
 
 From the repository root:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install pyyaml markdown
+./tools/dev/cp-dev bootstrap
 ```
 
-The canonical build requires the repository source, PyYAML and Python-Markdown. It does not require market-data credentials or an LLM provider secret.
+The canonical build requires the repository source, PyYAML and Python-Markdown. `bootstrap` creates the repository-local `.venv` and installs the declared dependencies from `requirements-dev.txt`; it does not require market-data credentials or an LLM provider secret.
 
 ## Run the canonical build
 
 ```bash
-python -m site_generator
+./tools/dev/cp-dev build
 ```
 
-The package entry point calls `site_generator.pipeline.build()`. The pipeline removes any existing `_site/` directory and rebuilds it from the current Markdown archive and site assets.
+`build` runs the underlying `.venv/bin/python -m site_generator` command from the resolved repository root. The package entry point calls `site_generator.pipeline.build()`, which removes any existing `_site/` directory and rebuilds it from the current Markdown archive and site assets.
 
 ## Verify the required output
 
@@ -46,21 +43,28 @@ test -f _site/archive/2026/05/09/1848_AEST_crypto_market_intelligence.html
 ## Inspect the result locally
 
 ```bash
-python -m http.server 8000 --directory _site
+./tools/dev/cp-dev serve
 ```
 
-Open `http://localhost:8000/`, then inspect `latest.html`, `archive/` and `search.html`.
+Open `http://localhost:8000/`, then inspect `latest.html`, `archive/` and `search.html`. Use `--port <port>` for another loopback port in the range 1024–65535. `serve` never builds implicitly.
 
-## Run the repository validation
+## Run repository validation
 
-Before opening a pull request that can affect the site, run:
+For the unit-test suite alone:
 
 ```bash
-python -m unittest discover -s tests
-python -m site_generator
+./tools/dev/cp-dev test
 ```
 
-Confirm that `_site/` is not tracked or staged:
+Before opening a pull request that can affect the site, run the full local pre-PR mirror:
+
+```bash
+./tools/dev/cp-dev check
+```
+
+`check` runs unit tests, documentation validation, the tracked-`_site` guard, site build and expected-artefact verification. GitHub Actions remains authoritative for PR acceptance.
+
+Confirm that `_site/` is not tracked or staged when diagnosing Git state directly:
 
 ```bash
 git ls-files _site
@@ -71,11 +75,13 @@ Both commands must produce no output.
 
 ## Remove generated output
 
-The generated site is disposable:
+Stop any local server with `Ctrl+C`, then run:
 
 ```bash
-rm -rf _site
+./tools/dev/cp-dev clean
 ```
+
+`clean` removes `_site/` and allowlisted Python cache artefacts only after validating all deletion candidates. It preserves `.venv`, Git metadata, source data, reports, worktrees, credentials and unrelated ignored files.
 
 Do not commit `_site/`. GitHub Actions rebuilds the output for validation and deployment.
 

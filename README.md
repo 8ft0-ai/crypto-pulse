@@ -29,8 +29,8 @@ From the repository root with Git and Python 3.12 or later available:
 
 ```bash
 ./tools/dev/cp-dev bootstrap
-.venv/bin/python -m site_generator
-.venv/bin/python -m http.server 8000 --directory _site
+./tools/dev/cp-dev build
+./tools/dev/cp-dev serve
 ```
 
 Open:
@@ -55,7 +55,7 @@ The build uses checked-in report data. It does not require a market-data credent
 | [`planning/`](planning/) | Planning, delivery and decision records. |
 | [`evaluation/`](evaluation/) | Evaluation evidence and reviewed decisions. |
 
-The generated `_site/` directory is disposable output. It may appear as untracked content locally, is rebuilt by CI and deployment workflows, and must not be staged or committed.
+The generated `_site/` directory is disposable output. It is ignored locally, rebuilt by CI and deployment workflows, and must not be staged or committed.
 
 ## Validation
 

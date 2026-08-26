@@ -3,28 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..checks import missing_site_artifacts, tracked_site_paths
-from ..environment import (
-    check_dependency_imports,
-    require_expected_repository,
-    resolve_repository,
-    validate_venv,
-)
 from ..process import ProcessRunner
-
-
-def _run_gate(
-    label: str,
-    argv: list[str],
-    *,
-    root: Path,
-    runner: ProcessRunner,
-) -> bool:
-    result = runner.run(argv, cwd=root)
-    if result.returncode == 0:
-        print(f"OK {label}")
-        return True
-    print(f"FAILED {label} (exit {result.returncode})")
-    return False
+from ._common import BUILD_ARGV, TEST_ARGV, prepare, run_gate
 
 
 def run(
@@ -32,47 +12,31 @@ def run(
     cwd: Path | None = None,
     runner: ProcessRunner | None = None,
 ) -> int:
-    runner = runner or ProcessRunner()
-    cwd = (cwd or Path.cwd()).resolve()
-    context = resolve_repository(cwd, runner)
-    require_expected_repository(context)
-    python = validate_venv(context.root, runner)
-    check_dependency_imports(context.root, python, runner)
-
+    root, python, runner = prepare(cwd=cwd, runner=runner)
     failures = 0
 
-    if not _run_gate(
-        "unit tests",
-        [str(python), "-m", "unittest", "discover", "-s", "tests"],
-        root=context.root,
-        runner=runner,
-    ):
+    if not run_gate("unit tests", [str(python), *TEST_ARGV], root=root, runner=runner):
         failures += 1
 
-    if not _run_gate(
+    if not run_gate(
         "documentation validation",
         [str(python), "scripts/validate_documentation.py"],
-        root=context.root,
+        root=root,
         runner=runner,
     ):
         failures += 1
 
-    tracked = tracked_site_paths(context.root, runner)
+    tracked = tracked_site_paths(root, runner)
     if tracked:
         print("FAILED generated output: tracked _site/ content exists")
         failures += 1
     else:
         print("OK generated output: no tracked _site/ content")
 
-    if not _run_gate(
-        "site build",
-        [str(python), "-m", "site_generator"],
-        root=context.root,
-        runner=runner,
-    ):
+    if not run_gate("site build", [str(python), *BUILD_ARGV], root=root, runner=runner):
         failures += 1
 
-    missing = missing_site_artifacts(context.root)
+    missing = missing_site_artifacts(root)
     if missing:
         print("FAILED expected site artefacts:")
         for path in missing:
