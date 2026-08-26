@@ -1,8 +1,8 @@
 # CryptoPulse roadmap backlog
 
-This backlog parks ideas that remain outside the completed Phase 16 reader-facing evidence experience and the completed Phase 14–15 delivery boundaries. Items here are not commitments. Phase 16 is complete under #501 and `reader-facing-evidence-experience/v1`; its completion does not implicitly promote any other backlog item or select a successor. Promote another item only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
+This backlog parks ideas that remain outside the selected Phase 17 trusted-main source-evidence accumulation direction and the completed Phase 14–16 delivery boundaries. Items here are not commitments. Phase 17 was selected under #516 from the freshly approved `trusted-main-source-evidence-accumulation/v1.1` contract and owner promotion/delivery authority in comment `5425197783`; that selection does not implicitly promote any other backlog item. Promote another item only when it has a clear problem statement, acceptance gates, proof path and separate owner authority.
 
-Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. Phase 14 — deterministic site publication — is complete at the safe inert control-plane boundary under #458: the reviewed `deterministic-site-publication/v3` control plane and App/protection boundary are delivered, while the real live stale-base race, live pilot and recurring activation remain deliberately deferred. Phase 15 — public deterministic temporal evidence — is complete under #482 with contract `phase15-public-temporal-evidence/v1`: one repository-bound `BTC.price_usd` 24-slot temporal-evidence page plus one minimum discovery link is delivered and publicly proved through the existing Pages path. Phase 16 is complete under #501 from the freshly approved reconciled `reader-facing-evidence-experience/v1` design, having delivered canonical reader authority + Home/Most recent, temporal reader-state presentation over the unchanged Phase 15 record, and Archive/navigation integration. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is approved for operational use.
+Phase 12 — canonical observation-hour evidence — is complete under #436/#441. Future source snapshots carry separately validated containing-hour identity while preserving actual timing evidence, historical snapshots and frozen Phase 10/11 contracts. Phase 13 — deterministic observation-hour comparison and temporal evidence — is complete under #446/#453, providing separately versioned exact adjacent-slot comparison and canonical temporal evidence over Phase-12-ready snapshots. Phase 14 — deterministic site publication — is complete at the safe inert control-plane boundary under #458: the reviewed `deterministic-site-publication/v3` control plane and App/protection boundary are delivered, while the real live stale-base race, live pilot and recurring activation remain deliberately deferred. Phase 15 — public deterministic temporal evidence — is complete under #482 with contract `phase15-public-temporal-evidence/v1`: one repository-bound `BTC.price_usd` 24-slot temporal-evidence page plus one minimum discovery link is delivered and publicly proved through the existing Pages path. Phase 16 is complete under #501 from the freshly approved reconciled `reader-facing-evidence-experience/v1` design, having delivered canonical reader authority + Home/Most recent, temporal reader-state presentation over the unchanged Phase 15 record, and Archive/navigation integration. Phase 17 is selected to address the previously parked #497 T2 accumulation problem without activating Phase 14/#477 or changing the frozen reader/temporal contracts. The Phase 6 deterministic selector remains the sole active selector, Phase 9 ended `no-stable-material-uplift`, and no model/provider path is approved for operational use.
 
 ## Candidate future phases
 
@@ -20,17 +20,17 @@ Candidate sequence:
   -> separately authorised recurring-activation decision
 ```
 
-Why parked: Phase 14 already delivered the safe control plane and left activation absent/`disabled`. V1–V13 demonstrated fail-closed behaviour but did not produce the required real stale-base race observation, and continuing with another timing-only V14+ runner would optimise around scheduler timing rather than prove the production invariant deterministically. There is no current product requirement that justifies operationalising automatic publication now. Selection or completion of Phase 16 does not change or implicitly promote this path.
+Why parked: Phase 14 already delivered the safe control plane and left activation absent/`disabled`. V1–V13 demonstrated fail-closed behaviour but did not produce the required real stale-base race observation, and continuing with another timing-only V14+ runner would optimise around scheduler timing rather than prove the production invariant deterministically. There is no current product requirement that justifies operationalising automatic publication now. Selection of Phase 17 does not change or implicitly promote this path.
 
 Any future work must keep `main` as sole publication authority, preserve the existing v3 candidate/attestation/head/base controls and strict required-check protection, remain inert by default until separately authorised execution, and must not revive V1–V13.
 
-### Source-evidence accumulation for temporal usefulness — #497 T2 remains parked
+### Source-evidence accumulation for temporal usefulness — selected as Phase 17
 
-Accumulate or promote additional Phase-12-valid repository-owned source evidence only if a separately shaped product need justifies improving temporal coverage beyond the sparse evidence that Phase 16 must present truthfully.
+The #497 T2 accumulation need is no longer parked. It was separately shaped under #516 as `trusted-main-source-evidence-accumulation/v1.1`, received fresh substantive approval in #516 comment `5425040365`, and was selected as **Phase 17 — trusted-main source-evidence accumulation and freshness** by owner decision in comment `5425197783`.
 
-Why parked: the approved Phase 16 boundary explicitly excludes #497 T2. Reader presentation must not create mutable rolling-branch authority, automatic evidence promotion, recurring publication activation, a new retention policy or historical backfill merely to make the chart look fuller. Any T2 proposal requires its own evidence ownership, promotion, freshness, retention, validation and fail-closed governance design plus fresh review and separate owner authority.
+The selected scope is deliberately narrower than automatic publication: exact scheduled-ingestion artifacts and Phase-12-valid snapshot bytes feed a deterministic bounded `H_main + 1 ... H_main + 25` source-only candidate; protected `main` remains the sole public evidence authority; unsafe evidence fails closed unless an exact durable terminal recovery decision excludes it without promotion or synthetic cursor movement; candidate review/merge remains exact-head and human-governed; initial construction is `workflow_dispatch` only; and recurring refresh remains a later separate owner decision.
 
-Phase 16 therefore treats sparse or unavailable temporal evidence as a valid reader state rather than an implementation defect to be repaired through accumulation automation.
+Phase 17 does not activate Phase 14/#477, make a mutable rolling branch public authority, reinterpret Phase 13/15/16, backfill history, add models/providers/report generation, or make `live/current/up to date` public claims. See `phase-17-trusted-main-source-evidence-accumulation.md` and roadmap-promotion control #521.
 
 ### News and event evidence ingestion
 
@@ -50,7 +50,7 @@ Use validated `phase12-observation-hour/v1` identity to define an operational ca
 
 Status: complete. Delivered under Phase 13 as **deterministic observation-hour comparison and temporal evidence**. The accepted implementation provides exact adjacent observation-hour selection, explicit missing/duplicate/invalid evidence, immutable provenance, deterministic repository-bound comparison/series records, bounded 12-metric/8-source temporal vocabulary and closed offline proof while preserving frozen Phase 10/11 v1 semantics.
 
-See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. Its first bounded public integration is complete separately as Phase 15; Phase 16 changes only the reader projection/presentation of that existing public evidence. Additional temporal evidence identities remain parked.
+See `phase-13-observation-hour-temporal-evidence.md` and `../delivery/phase-13-observation-hour-temporal-evidence.md`. Its first bounded public integration is complete separately as Phase 15; Phase 16 changes only the reader projection/presentation of that existing public evidence. Phase 17 may increase the trusted source population without changing those evidence identities.
 
 ### Deterministic report publication freshness — delivered at the Phase 14 inert boundary
 
@@ -58,7 +58,7 @@ Restore recent public deterministic Markdown reports from already validated sour
 
 Status: the control-plane portion is complete under #458 as **Phase 14 — deterministic site publication** with contract `deterministic-site-publication/v3`. The delivered direction keeps `main` as the sole publication authority, uses immutable trusted-generation attestation plus exact-head credential-free validation, retains strict stale-base controls and the existing Pages/live-verification path, and leaves publication activation absent/`disabled`.
 
-Not delivered: the real live stale-base race, one live publication pilot, live Pages identity proof for a Phase 14 candidate and recurring activation. Those are not implicit follow-on work; any revisit starts from #477 and requires fresh governance. Phase 16 safe recency wording deliberately does not depend on activating this path.
+Not delivered: the real live stale-base race, one live publication pilot, live Pages identity proof for a Phase 14 candidate and recurring activation. Those are not implicit follow-on work; any revisit starts from #477 and requires fresh governance. Phase 17 does not depend on activating this path.
 
 See `phase-14-deterministic-site-publication.md` and `../delivery/phase-14-deterministic-site-publication.md`.
 
@@ -72,7 +72,7 @@ The delivered design inherits exact Phase 13 participation and malformed/unorder
 
 The site integration merged as PR #490 at `99c4ced3001bb227d599173bb5a17011d23eea53`. Existing Pages run `32528437373` automatically deployed that exact state successfully, and the exact deployed artifact was verified under #482 comment `5375652127` for `temporal.html`, commit identity, one homepage discovery link, disclaimer-before-evidence ordering and the complete 24-slot table.
 
-Phase 15 did not activate Phase 14/#477, render from a mutable rolling branch, backfill history, add narrative/forecast/advice, enable a model/provider path, or select broader visual market-card scope. Phase 16 consumes the existing narrow temporal record only for the approved reader-state projection and presentation fixes.
+Phase 15 did not activate Phase 14/#477, render from a mutable rolling branch, backfill history, add narrative/forecast/advice, enable a model/provider path, or select broader visual market-card scope. Phase 16 consumes the existing narrow temporal record only for the approved reader-state projection and presentation fixes. Phase 17 may add more valid source snapshots to protected `main` under separate governance, after which Phase 15 continues to consume them under its frozen semantics.
 
 ### Reader-facing evidence experience — delivered as Phase 16
 
@@ -87,19 +87,19 @@ Included only:
 - temporal reader-state projection/presentation over the unchanged Phase 15 `BTC.price_usd` 24-slot evidence;
 - Archive canonical chronology, actual coverage/discontinuity semantics, bounded taxonomy/filtering and navigation integration.
 
-Explicitly not included: #497 T2 evidence accumulation/promotion, Phase 14/#477 operationalisation, additional temporal series, new providers/models, derived analytics, forecasts, recommendations or trading signals.
+Phase 16 explicitly excluded #497 T2 evidence accumulation/promotion, Phase 14/#477 operationalisation, additional temporal series, new providers/models, derived analytics, forecasts, recommendations or trading signals. The T2 accumulation path is now separately governed as Phase 17; all other exclusions remain parked.
 
-See `phase-16-reader-facing-evidence-experience.md` after the planning promotion merges.
+See `phase-16-reader-facing-evidence-experience.md` for the delivered reader-facing planning contract.
 
-### Deterministic charts and visual market cards — broader product scope still parked beyond Phase 16
+### Deterministic charts and visual market cards — broader product scope still parked beyond Phase 17
 
-Generate deterministic visual evidence and market-card product surfaces beyond the exact point-in-time fields and single Phase 15 BTC temporal series authorised inside Phase 16.
+Generate deterministic visual evidence and market-card product surfaces beyond the exact point-in-time fields and single Phase 15 BTC temporal series already authorised for public presentation.
 
 Status: the bounded offline rendering foundation is complete under Phase 11. `crypto-temporal-series/v1`, repository-bound replay validation, deterministic accessible HTML/SVG rendering and the closed repeatability proof corpus are delivered and recorded in `../delivery/phase-11-deterministic-temporal-visualisation.md`.
 
-Operational evidence prerequisites are also complete: Phase 12 provides future slot-ready observation-hour identity, Phase 13 provides the separately versioned observation-hour comparison/temporal consumer, Phase 15 proved one narrow public `BTC.price_usd` integration, and Phase 16 is selected to make that existing evidence reader-first without broadening its authority.
+Operational evidence prerequisites are also complete: Phase 12 provides future slot-ready observation-hour identity, Phase 13 provides the separately versioned observation-hour comparison/temporal consumer, Phase 15 proved one narrow public `BTC.price_usd` integration, and Phase 16 made that existing evidence reader-first without broadening its authority. Phase 17 is selected only to accumulate more trusted source evidence into those frozen consumers.
 
-Still parked beyond Phase 16: additional metrics or source-status series, derived/aggregate temporal metrics, richer analytical market cards not directly authorised by the exact current observation, and any trend/interpretive analytics. Those require separate product/evidence/governance decisions rather than being implied by Phase 16.
+Still parked beyond Phase 17: additional metrics or source-status series, derived/aggregate temporal metrics, richer analytical market cards not directly authorised by the exact current observation, and any trend/interpretive analytics. Those require separate product/evidence/governance decisions rather than being implied by a fuller trusted evidence population.
 
 ### Technical-level calculation policy
 
@@ -123,7 +123,7 @@ Why parked: No model-authored operational narrative is currently enabled. Revisi
 
 Trigger governed LLM analysis automatically after a source snapshot PR merges, rather than requiring `workflow_dispatch`.
 
-Why parked: No model is currently selected or enabled. Phase 14 delivered only a deterministic publication control plane, Phase 15 delivered only deterministic historical temporal evidence, and Phase 16 is only a reader-facing evidence/presentation phase; none authorises model generation, model scheduling or model credentials. Any future LLM automation requires a new separately governed model programme and completed validation evidence first.
+Why parked: No model is currently selected or enabled. Phase 14 delivered only a deterministic publication control plane, Phase 15 delivered only deterministic historical temporal evidence, Phase 16 delivered only a reader-facing evidence/presentation layer, and Phase 17 adds source-evidence accumulation only; none authorises model generation, model scheduling or model credentials. Any future LLM automation requires a new separately governed model programme and completed validation evidence first.
 
 ### Expanded approved prose slots in reports
 
@@ -151,7 +151,7 @@ Why parked: There is no active generated-narrative delivery path to optimise. Re
 
 ## Parking lot from the original analyst prompt
 
-These original prompt features remain parked after completion of the Phase 10–15 evidence/control-plane foundations and selection of the bounded Phase 16 reader-facing experience. Each requires separate product, evidence and governance decisions before implementation:
+These original prompt features remain parked after completion of the Phase 10–16 evidence/control-plane/reader foundations and selection of the bounded Phase 17 source-evidence accumulation direction. Each requires separate product, evidence and governance decisions before implementation:
 
 - live or most-recent data collection by a model;
 - model-selected credible sources;
