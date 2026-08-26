@@ -17,6 +17,7 @@ on:
       - "docs/**"
       - "planning/**"
       - "README.md"
+      - "requirements-dev.txt"
       - "tests/**"
       - "config/**"
 
@@ -46,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml markdown
+          python -m pip install -r requirements-dev.txt
 
       - name: Run semantic-plan benchmark integration tests
         run: |

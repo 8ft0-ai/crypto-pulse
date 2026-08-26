@@ -169,6 +169,20 @@ Relevant skills include:
 
 Use these runbooks before making related changes.
 
+## Developer/operator tool selection
+
+Prefer a tested repository-owned utility over a large bespoke external script when the task class is recurring or substantially duplicates an existing workflow. One-off investigation scripts remain acceptable where durable tooling would add more complexity than value.
+
+Use the execution plane that matches the task:
+
+- use `./tools/dev/cp-dev` for recurring working-tree setup, diagnostics and local validation;
+- use `tools/operator/cp` for authoritative GitHub, protected-main, CI and publication evidence;
+- when a repeated capability belongs in one of those planes but is missing, shape the smallest extension rather than repeatedly recreating a large script;
+- use a bounded temporary command or script only for a genuinely one-off local observation;
+- stop and require separately governed design and authority for privileged mutation, workflow dispatch, merge, deployment, publication, credential changes or other administration capability.
+
+`cp-dev` intentionally executes candidate working-tree code. Its output is developer validation only and must never be presented as trusted `CRYPTOPULSE_OPERATOR_EVIDENCE` merely because the command is repository-owned.
+
 ## Legacy low-level Git strategy
 
 If direct lower-level Git object operations become fully available again, the following strategy remains acceptable:
@@ -350,15 +364,23 @@ This applies to:
 
 ## Local build and verification
 
-To test locally:
+Prepare the repository-local development environment:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install pyyaml markdown
-python scripts/build_pages_site.py
-python -m http.server 8000 --directory _site
+./tools/dev/cp-dev bootstrap
+```
+
+Run the normal local pre-PR mirror:
+
+```bash
+./tools/dev/cp-dev check
+```
+
+For direct site inspection while Slice B remains deferred:
+
+```bash
+.venv/bin/python -m site_generator
+.venv/bin/python -m http.server 8000 --directory _site
 ```
 
 Then open:
@@ -366,6 +388,8 @@ Then open:
 ```text
 http://localhost:8000
 ```
+
+`cp-dev` executes the current working tree and does not produce trusted operator evidence. For authoritative GitHub/CI state, use the separately governed operator toolkit.
 
 For small documentation-only changes, local build is not required.
 

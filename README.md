@@ -25,15 +25,12 @@ Common entry points:
 
 ## Quick start
 
-From the repository root:
+From the repository root with Git and Python 3.12 or later available:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install pyyaml markdown
-python -m site_generator
-python -m http.server 8000 --directory _site
+./tools/dev/cp-dev bootstrap
+.venv/bin/python -m site_generator
+.venv/bin/python -m http.server 8000 --directory _site
 ```
 
 Open:
@@ -42,7 +39,7 @@ Open:
 http://localhost:8000
 ```
 
-The build uses checked-in report data. It does not require a market-data credential or LLM provider secret.
+The build uses checked-in report data. It does not require a market-data credential or LLM provider secret. See [`tools/dev/README.md`](tools/dev/README.md) for the developer command contract and trust boundary.
 
 ## Repository sources
 
@@ -53,6 +50,8 @@ The build uses checked-in report data. It does not require a market-data credent
 | [`docs/`](docs/) | Tutorials, how-to guides, reference and explanation. |
 | [`site_generator/`](site_generator/) | Canonical static-site build package. |
 | [`site/`](site/) | Checked-in site assets. |
+| [`tools/dev/`](tools/dev/) | Working-tree developer utilities. |
+| [`tools/operator/`](tools/operator/) | Trusted read-only operator evidence tooling. |
 | [`planning/`](planning/) | Planning, delivery and decision records. |
 | [`evaluation/`](evaluation/) | Evaluation evidence and reviewed decisions. |
 
@@ -60,15 +59,13 @@ The generated `_site/` directory is disposable output. It may appear as untracke
 
 ## Validation
 
-Run the repository baseline before opening a pull request:
+Run the normal local pre-PR mirror:
 
 ```bash
-python -m unittest discover -s tests
-python scripts/validate_documentation.py
-python -m site_generator
+./tools/dev/cp-dev check
 ```
 
-Pull requests are also validated by [`.github/workflows/pr-validation.yml`](.github/workflows/pr-validation.yml), which runs the test suite, validates documentation navigation, rejects committed `_site/` output, builds the site and checks expected artefacts.
+`cp-dev check` executes the current working tree and is a convenience mirror only. Pull requests are authoritatively validated by [`.github/workflows/pr-validation.yml`](.github/workflows/pr-validation.yml), which runs the test suite, validates documentation navigation, rejects committed `_site/` output, builds the site and checks expected artefacts directly.
 
 ## Publication
 
