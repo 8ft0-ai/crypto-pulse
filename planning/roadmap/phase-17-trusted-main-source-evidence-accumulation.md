@@ -18,7 +18,7 @@ Deliver the minimum safe accumulation and promotion capability defined by `trust
 - exact snapshot bytes that validate under `phase12-observation-hour/v1` are the only authority for canonical observation-hour identity;
 - one deterministic manifest classifies a bounded `H_main + 1 ... H_main + 25` window;
 - unsafe evidence fails closed by default;
-- terminal recovery is explicit, exact and durable, never promotes excluded bytes, never elects a duplicate winner and never synthesises a missing hour;
+- terminal recovery is an explicit owner decision, exact and durable, never promotes excluded bytes, never elects a duplicate winner and never synthesises a missing hour;
 - a source-only candidate may reach protected `main` only through exact-head validation, fresh substantive review and a separate owner merge decision;
 - protected `main` remains the sole public evidence authority.
 
@@ -106,13 +106,13 @@ Unsafe evidence whose canonical hour cannot be established remains an input-leve
 
 ## Recovery and fail-closed semantics
 
-Unsafe evidence blocks the candidate by default. A terminal exclusion can be applied only through the separately defined durable recovery record:
+Unsafe evidence blocks the candidate by default. A terminal exclusion can be applied only through an explicit owner decision recorded as the separately defined durable recovery record:
 
 ```text
 trusted-main-source-evidence-recovery-decision/v1
 ```
 
-The record is a top-level GitHub issue comment on the active Phase 17 delivery-control issue or an explicitly linked recovery issue. It is supplied explicitly to a manual recovery invocation; the accumulator must not discover or choose recovery authority automatically.
+The owner decision record is a top-level GitHub issue comment on the active Phase 17 delivery-control issue or an explicitly linked recovery issue. It is supplied explicitly to a manual recovery invocation; the accumulator must not discover or choose recovery authority automatically.
 
 The manifest binds the exact recovery comment ID, body hash, blocker fingerprint, strongest immutable input identities and canonical hour when one is provable. Edited, mismatched or stale recovery decisions are invalid. The exact input is reclassified against current protected `main` before recovery is applied.
 
@@ -227,7 +227,7 @@ Mitigation: explicit terminal recovery can exclude the exact unsafe input while 
 
 ### Risk: recovery becomes an automatic skip mechanism
 
-Mitigation: recovery is durable human control-plane input supplied explicitly to manual invocation, bound byte-for-byte into candidate identity, revalidated against current main and incapable of choosing a duplicate winner.
+Mitigation: recovery is durable owner control-plane input supplied explicitly to manual invocation, bound byte-for-byte into candidate identity, revalidated against current main and incapable of choosing a duplicate winner.
 
 ### Risk: automation silently expands into publication authority
 
