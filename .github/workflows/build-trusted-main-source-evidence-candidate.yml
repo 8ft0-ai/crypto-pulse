@@ -562,6 +562,145 @@ jobs:
             --base-sha "$EXPECTED_MAIN_SHA" \
             --bundle-root "$RUNNER_TEMP/prepared-bundle"
 
+      - name: Freshly reclassify exact Git objects before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd() / "scripts"))
+          import trusted_main_source_evidence_candidate as candidate
+
+          runner = Path(os.environ["RUNNER_TEMP"])
+          bundle = runner / "prepared-bundle"
+          replay_bundle = runner / "fresh-replay-bundle"
+          candidate.verify_bundle(bundle)
+
+          source_rows = json.loads((bundle / "raw-inputs/source-inputs.json").read_text())
+          evidence = json.loads((bundle / "candidate-evidence.json").read_text())
+          prepared_proof = evidence.get("exact_git_object_retrieval", [])
+          if not isinstance(prepared_proof, list) or any(not isinstance(row, dict) for row in prepared_proof):
+              raise RuntimeError("prepared exact Git-object proof is malformed")
+
+          by_key = {}
+          byte_keys = set()
+          for source in source_rows:
+              key = (int(source["run_id"]), int(source["run_attempt"]))
+              if key in by_key:
+                  raise RuntimeError("duplicate bundled source identity")
+              by_key[key] = source
+              intent_rel = source.get("publication_intent_path")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if intent_rel is not None or snapshot_rel is not None:
+                  if not isinstance(intent_rel, str) or not isinstance(snapshot_rel, str):
+                      raise RuntimeError("bundled source byte references are incomplete")
+                  byte_keys.add(key)
+
+          token = os.environ["GH_TOKEN"]
+          auth = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+          fresh_proof = []
+          seen = set()
+          reference_fields = (
+              "publication_intent_sha256",
+              "intent_parse_succeeded",
+              "intent_reference_valid",
+              "snapshot_commit_sha",
+              "snapshot_path",
+          )
+          for prepared in prepared_proof:
+              key = (int(prepared["run_id"]), int(prepared["run_attempt"]))
+              if key in seen:
+                  raise RuntimeError("duplicate prepared Git-object proof identity")
+              seen.add(key)
+              source = by_key.get(key)
+              if source is None:
+                  raise RuntimeError("Git-object proof source identity is missing from prepared bundle")
+              intent_rel = source.get("publication_intent_path")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if not isinstance(intent_rel, str) or not isinstance(snapshot_rel, str):
+                  raise RuntimeError("Git-object proof source has no exact bundled bytes")
+              intent_bytes = (bundle / intent_rel).read_bytes()
+              snapshot_bytes = (bundle / snapshot_rel).read_bytes()
+              reference = candidate.publication_intent_git_reference(intent_bytes)
+              for field in reference_fields:
+                  if prepared.get(field) != reference[field]:
+                      raise RuntimeError(f"prepared Git-object proof {field} differs from bundled intent")
+              if prepared.get("snapshot_sha256") != candidate.sha256_bytes(snapshot_bytes):
+                  raise RuntimeError("prepared Git-object proof snapshot hash differs from bundled bytes")
+
+              row = dict(prepared)
+              row.update(
+                  fetch_succeeded=False,
+                  commit_present=False,
+                  path_present=False,
+                  bytes_match=False,
+              )
+              if reference["intent_reference_valid"]:
+                  commit_sha = str(reference["snapshot_commit_sha"])
+                  snapshot_path = str(reference["snapshot_path"])
+                  fetched = subprocess.run(
+                      [
+                          "git",
+                          "-c",
+                          f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}",
+                          "fetch",
+                          "--no-tags",
+                          "origin",
+                          commit_sha,
+                      ],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.PIPE,
+                      check=False,
+                  )
+                  row["fetch_succeeded"] = fetched.returncode == 0
+                  if fetched.returncode == 0:
+                      commit_probe = subprocess.run(
+                          ["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"],
+                          check=False,
+                      )
+                      row["commit_present"] = commit_probe.returncode == 0
+                      path_probe = subprocess.run(
+                          ["git", "cat-file", "-e", f"{commit_sha}:{snapshot_path}"],
+                          check=False,
+                      )
+                      row["path_present"] = path_probe.returncode == 0
+                      if path_probe.returncode == 0:
+                          exact = subprocess.run(
+                              ["git", "show", f"{commit_sha}:{snapshot_path}"],
+                              check=True,
+                              stdout=subprocess.PIPE,
+                          ).stdout
+                          row["bytes_match"] = exact == snapshot_bytes
+              fresh_proof.append(row)
+
+          if seen != byte_keys:
+              raise RuntimeError("fresh Git-object proof does not cover every bundled exact-byte source")
+
+          if replay_bundle.exists():
+              shutil.rmtree(replay_bundle)
+          shutil.copytree(bundle, replay_bundle)
+          replay_evidence = json.loads((replay_bundle / "candidate-evidence.json").read_text())
+          replay_evidence["exact_git_object_retrieval"] = fresh_proof
+          candidate._write_json(replay_bundle / "candidate-evidence.json", replay_evidence)
+          candidate._write_json(replay_bundle / "bundle-sha256.json", candidate._bundle_hashes(replay_bundle))
+          candidate.verify_bundle(replay_bundle)
+          PY
+          python scripts/trusted_main_source_evidence_candidate.py replay \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --bundle-root "$RUNNER_TEMP/fresh-replay-bundle"
+
       - name: Install reusable GitHub capture helpers for this publish job
         env:
           RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}

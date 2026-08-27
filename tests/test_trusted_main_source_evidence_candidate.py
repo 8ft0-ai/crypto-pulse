@@ -424,6 +424,151 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(candidate.CandidateError, "base identity mismatch"):
             candidate.verify_pr_snapshot(drifted, "a" * 40, "9" * 40, "c" * 64, 123, 2)
 
+    def test_prepare_unavailable_then_publish_available_reclassifies_exact_bytes(self) -> None:
+        intent = json.dumps(
+            {
+                "snapshot_commit_sha": "a" * 40,
+                "snapshot_path": "data/crypto/hourly/x_source_snapshot.json",
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+        snapshot = b"snapshot\n"
+        source = {
+            "repository": candidate.EXPECTED_REPOSITORY,
+            "workflow_path": candidate.EXPECTED_WORKFLOW_PATH,
+            "workflow_id": 77,
+            "event": "schedule",
+            "conclusion": "success",
+            "run_id": 100,
+            "run_attempt": 1,
+            "workflow_head_sha": "a" * 40,
+            "artifact_name": "deterministic-publication-intent-100-1",
+            "publication_intent_bytes": intent,
+            "snapshot_bytes": snapshot,
+        }
+        reference = candidate.publication_intent_git_reference(intent)
+        base_proof = {
+            "run_id": 100,
+            "run_attempt": 1,
+            **reference,
+            "snapshot_sha256": hashlib.sha256(snapshot).hexdigest(),
+            "fetch_succeeded": False,
+            "commit_present": False,
+            "path_present": False,
+            "bytes_match": False,
+        }
+        prepared = candidate._apply_git_object_proof([source], [base_proof])
+        fresh_proof = dict(base_proof)
+        fresh_proof.update(
+            fetch_succeeded=True,
+            commit_present=True,
+            path_present=True,
+            bytes_match=True,
+        )
+        fresh = candidate._apply_git_object_proof([source], [fresh_proof])
+        self.assertIsNone(prepared[0]["publication_intent_bytes"])
+        self.assertIsNone(prepared[0]["snapshot_bytes"])
+        self.assertEqual(fresh[0]["publication_intent_bytes"], intent)
+        self.assertEqual(fresh[0]["snapshot_bytes"], snapshot)
+
+    def test_publish_rebuilds_fresh_object_proof_before_any_remote_mutation(self) -> None:
+        workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        steps = workflow["jobs"]["publish"]["steps"]
+        names = [step.get("name") for step in steps]
+        fresh_name = "Freshly reclassify exact Git objects before publication"
+        fresh_index = names.index(fresh_name)
+        self.assertLess(fresh_index, names.index("Build local disposable candidate commit from exact base"))
+        run = steps[fresh_index]["run"]
+        self.assertIn("candidate.verify_bundle(bundle)", run)
+        self.assertIn("publication_intent_git_reference", run)
+        self.assertIn('"fetch",', run)
+        self.assertIn("fresh-replay-bundle", run)
+        self.assertIn("candidate._bundle_hashes(replay_bundle)", run)
+        self.assertIn("--bundle-root \"$RUNNER_TEMP/fresh-replay-bundle\"", run)
+
+    def test_old_original_run_late_rerun_and_expired_rerun_are_closed_cases(self) -> None:
+        capture = copy.deepcopy(self.fixture["higher_attempt_capture"])
+        capture["runs"][0]["attempts"][0]["created_at"] = "2026-07-27T01:00:00Z"
+        capture["runs"][0]["attempts"][1]["created_at"] = "2026-07-27T01:00:00Z"
+        capture["runs"][0]["attempts"][1]["run_started_at"] = "2026-08-27T02:11:00Z"
+        capture["runs"][0]["attempts"][1]["updated_at"] = "2026-08-27T02:14:00Z"
+        capture["runs"][0]["attempts"][1]["conclusion"] = "success"
+        late_artifact = copy.deepcopy(capture["runs"][0]["artifacts"][0])
+        late_artifact["id"] = 9002
+        late_artifact["name"] = "deterministic-publication-intent-100-2"
+        capture["runs"][0]["artifacts"].append(late_artifact)
+        closure = candidate.build_source_population_closure(capture)
+        self.assertEqual([row["run_attempt"] for row in closure["runs"][0]["attempts"]], [1, 2])
+        self.assertEqual(closure["runs"][0]["attempts"][1]["artifact"]["availability"], "retained")
+
+        expired = copy.deepcopy(capture)
+        expired["runs"][0]["artifacts"][1]["expired"] = True
+        expired_closure = candidate.build_source_population_closure(expired)
+        self.assertEqual(expired_closure["runs"][0]["attempts"][1]["artifact"]["availability"], "unavailable")
+        with tempfile.TemporaryDirectory() as temporary:
+            source_inputs = candidate.source_inputs_from_capture(expired, Path(temporary))
+        attempt_two = next(row for row in source_inputs if row["run_attempt"] == 2)
+        self.assertIsNone(attempt_two["publication_intent_bytes"])
+        self.assertIsNone(attempt_two["snapshot_bytes"])
+
+    def test_rerun_horizon_excludes_run_before_frozen_census_without_inventing_hour(self) -> None:
+        bounds = candidate.census_bounds(
+            {"start_utc": "2026-08-27T01:00:00Z", "end_utc": "2026-08-28T01:00:00Z"}
+        )
+        self.assertEqual(bounds["start_utc"], "2026-07-27T01:00:00Z")
+        self.assertLess("2026-07-27T00:59:59Z", bounds["start_utc"])
+        self.assertEqual(set(bounds), {"start_utc", "end_utc"})
+
+    def test_outside_window_diagnostics_are_identity_neutral_but_supersession_is_not(self) -> None:
+        manifest = {
+            "contract": "trusted-main-source-evidence-accumulation/v1.1",
+            "repository": candidate.EXPECTED_REPOSITORY,
+            "base_sha": "a" * 40,
+            "base_tree_sha": "b" * 40,
+            "anchor_observation_hour_utc": "2026-08-27T00:00:00Z",
+            "window": {"start_utc": "2026-08-27T01:00:00Z", "end_utc": "2026-08-28T01:00:00Z", "hours": 25},
+            "hours": [],
+            "verified_source_inputs": [],
+            "supersession_records": [],
+            "operational_diagnostics": [],
+            "input_level_blockers": [],
+            "hour_level_blockers": [],
+            "applied_recovery_decisions": [],
+            "blocking_findings": [],
+            "added_paths": [],
+        }
+        base_id = candidate.accumulation._candidate_id(manifest)
+        diagnostic_only = copy.deepcopy(manifest)
+        diagnostic_only["operational_diagnostics"].append(
+            {"kind": "verified-input-outside-window", "input_identity": {"run_id": 100}}
+        )
+        self.assertEqual(candidate.accumulation._candidate_id(diagnostic_only), base_id)
+        superseded = copy.deepcopy(manifest)
+        superseded["supersession_records"].append(
+            {"run_id": 100, "winning_run_attempt": 2, "superseded_run_attempts": [1]}
+        )
+        self.assertNotEqual(candidate.accumulation._candidate_id(superseded), base_id)
+
+    def test_main_and_recovery_freshness_checks_are_ordered_at_each_publication_boundary(self) -> None:
+        workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        steps = workflow["jobs"]["publish"]["steps"]
+        names = [step.get("name") for step in steps]
+        repeat = names.index("Repeat complete population census immediately before remote publication")
+        pre_push = names.index("Final pre-push main and recovery freshness cut")
+        push = names.index("Push disposable candidate with exact force-with-lease")
+        post_push = names.index("Recheck mutable authority after branch push and before PR mutation")
+        pr = names.index("Create or refresh exact source-only candidate PR")
+        final = names.index("Final post-PR identity and freshness proof")
+        self.assertLess(repeat, pre_push)
+        self.assertLess(pre_push, push)
+        self.assertLess(push, post_push)
+        self.assertLess(post_push, pr)
+        self.assertLess(pr, final)
+        for index in (pre_push, post_push, final):
+            run = steps[index]["run"]
+            self.assertIn('live_main="$(gh api', run)
+            self.assertIn("verify-recoveries", run)
+
     def test_fixture_declares_all_closed_race_regressions(self) -> None:
         self.assertIn("higher_attempt_capture", self.fixture)
         self.assertIn("new_run_capture", self.fixture)
