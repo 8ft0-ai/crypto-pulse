@@ -25,6 +25,7 @@ from trusted_main_source_evidence_accumulation import (  # noqa: E402
     OWNER_LOGIN,
     RECOVERY_CONTRACT,
     RECOVERY_DISPOSITION,
+    RECOVERY_PROHIBITIONS,
     build_accumulation_manifest,
     canonical_json_bytes,
     sha256_bytes,
@@ -275,6 +276,7 @@ class Phase17TrustedMainSourceEvidenceProofTests(unittest.TestCase):
             "contract": RECOVERY_CONTRACT,
             "repository": EXPECTED_REPOSITORY,
             "disposition": RECOVERY_DISPOSITION,
+            "prohibitions": list(RECOVERY_PROHIBITIONS),
             "blocker_class": blocker["blocker_class"],
             "blocker_fingerprint": blocker["blocker_fingerprint"],
             "canonical_observation_hour_utc": blocker["canonical_observation_hour_utc"],
@@ -504,7 +506,12 @@ class Phase17TrustedMainSourceEvidenceProofTests(unittest.TestCase):
             blocker = initial["blocking_findings"][0]
             edited = self._recovery(blocker, record_changes={"repository": "other/repo"})
             stale = self._recovery(blocker, record_changes={"blocker_fingerprint": "0" * 64}, comment_id=5439990002)
-            for recovery in (edited, stale):
+            prohibition_drift = self._recovery(
+                blocker,
+                record_changes={"prohibitions": list(RECOVERY_PROHIBITIONS[:-1])},
+                comment_id=5439990003,
+            )
+            for recovery in (edited, stale, prohibition_drift):
                 manifest = build_accumulation_manifest(repo, base, [bad], [recovery], [523])
                 self.assertIn(
                     "recovery-decision-invalid",

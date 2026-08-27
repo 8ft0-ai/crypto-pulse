@@ -32,6 +32,12 @@ from validate_crypto_snapshot import ValidationError, load_config
 CONTRACT = "trusted-main-source-evidence-accumulation/v1.1"
 RECOVERY_CONTRACT = "trusted-main-source-evidence-recovery-decision/v1"
 RECOVERY_DISPOSITION = "exclude-from-accumulation"
+RECOVERY_PROHIBITIONS = (
+    "do-not-promote-excluded-bytes",
+    "do-not-elect-duplicate-winner",
+    "do-not-reconstruct-or-backfill",
+    "do-not-infer-missing-observation-hour",
+)
 EXPECTED_REPOSITORY = "8ft0-ai/crypto-pulse"
 EXPECTED_WORKFLOW_PATH = EXPECTED_SOURCE_WORKFLOW_PATH
 EXPECTED_EVENT = "schedule"
@@ -62,6 +68,15 @@ def canonical_json_bytes(payload: Any) -> bytes:
 
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _candidate_id(manifest: Mapping[str, Any]) -> str:
+    identity = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"candidate_id", "operational_diagnostics"}
+    }
+    return sha256_bytes(canonical_json_bytes(identity))
 
 
 def git_blob_sha(raw: bytes) -> str:
@@ -439,6 +454,14 @@ def _apply_recoveries(
                 raise ValueError("recovery decision repository mismatch")
             if record.get("disposition") != RECOVERY_DISPOSITION:
                 raise ValueError("recovery decision disposition mismatch")
+            prohibitions = record.get("prohibitions")
+            if (
+                not isinstance(prohibitions, list)
+                or any(not isinstance(value, str) for value in prohibitions)
+                or len(prohibitions) != len(RECOVERY_PROHIBITIONS)
+                or set(prohibitions) != set(RECOVERY_PROHIBITIONS)
+            ):
+                raise ValueError("recovery decision prohibitions do not match the exact v1.1 set")
             blocker_class = str(record.get("blocker_class", ""))
             fingerprint = str(record.get("blocker_fingerprint", ""))
             if SHA256_RE.fullmatch(fingerprint) is None:
@@ -468,6 +491,7 @@ def _apply_recoveries(
                     "contract": RECOVERY_CONTRACT,
                     "repository": EXPECTED_REPOSITORY,
                     "disposition": RECOVERY_DISPOSITION,
+                    "prohibitions": list(RECOVERY_PROHIBITIONS),
                     "blocker_class": blocker_class,
                     "blocker_fingerprint": fingerprint,
                     "canonical_observation_hour_utc": canonical_hour,
@@ -526,7 +550,7 @@ def build_accumulation_manifest(
             "blocking_findings": [finding],
             "added_paths": [],
         }
-        manifest["candidate_id"] = sha256_bytes(canonical_json_bytes(manifest))
+        manifest["candidate_id"] = _candidate_id(manifest)
         return manifest
 
     window = [_hour_add(anchor, offset) for offset in range(1, WINDOW_HOURS + 1)]
@@ -760,7 +784,7 @@ def build_accumulation_manifest(
         "blocking_findings": blocking_findings,
         "added_paths": added_paths,
     }
-    manifest["candidate_id"] = sha256_bytes(canonical_json_bytes(manifest))
+    manifest["candidate_id"] = _candidate_id(manifest)
     return manifest
 
 

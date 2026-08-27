@@ -101,6 +101,18 @@ class TrustedMainSourceEvidenceAccumulationTests(unittest.TestCase):
             ["non-schedule-input", "non-success-input"],
         )
 
+    def test_diagnostic_only_inputs_do_not_change_candidate_identity(self) -> None:
+        baseline = self._build([], [])
+        diagnostic_only = self._build(
+            [
+                self._source(event="workflow_dispatch"),
+                self._source(run_id=11, conclusion="failure"),
+            ],
+            [],
+        )
+        self.assertNotEqual(baseline["operational_diagnostics"], diagnostic_only["operational_diagnostics"])
+        self.assertEqual(baseline["candidate_id"], diagnostic_only["candidate_id"])
+
     def test_highest_successful_attempt_supersedes_lower_attempt(self) -> None:
         low = self._source(run_id=12, attempt=1)
         high = self._source(run_id=12, attempt=2)
@@ -211,6 +223,7 @@ class TrustedMainSourceEvidenceAccumulationTests(unittest.TestCase):
             "contract": accumulation.RECOVERY_CONTRACT,
             "repository": accumulation.EXPECTED_REPOSITORY,
             "disposition": accumulation.RECOVERY_DISPOSITION,
+            "prohibitions": list(accumulation.RECOVERY_PROHIBITIONS),
             "blocker_class": "x",
             "blocker_fingerprint": blocker["blocker_fingerprint"],
             "canonical_observation_hour_utc": None,
@@ -232,11 +245,54 @@ class TrustedMainSourceEvidenceAccumulationTests(unittest.TestCase):
         )
         self.assertEqual(recovered, {blocker["blocker_fingerprint"]})
         self.assertFalse(recovery_blockers)
+        self.assertEqual(applied[0]["prohibitions"], list(accumulation.RECOVERY_PROHIBITIONS))
         self.assertEqual(
             applied[0]["carrier"]["body_sha256"],
             hashlib.sha256(body_bytes).hexdigest(),
         )
         self.assertEqual(applied[0]["carrier"]["comment_id"], 100)
+
+    def test_recovery_prohibitions_are_required_as_exact_set(self) -> None:
+        blocker = accumulation._blocker("x", [{"run_id": 1}], None)
+        base_record = {
+            "contract": accumulation.RECOVERY_CONTRACT,
+            "repository": accumulation.EXPECTED_REPOSITORY,
+            "disposition": accumulation.RECOVERY_DISPOSITION,
+            "prohibitions": list(accumulation.RECOVERY_PROHIBITIONS),
+            "blocker_class": "x",
+            "blocker_fingerprint": blocker["blocker_fingerprint"],
+            "canonical_observation_hour_utc": None,
+            "input_identities": blocker["input_identities"],
+            "reason": "owner exclusion",
+        }
+        variants = []
+        missing = dict(base_record)
+        missing.pop("prohibitions")
+        variants.append(missing)
+        omitted = dict(base_record)
+        omitted["prohibitions"] = list(accumulation.RECOVERY_PROHIBITIONS[:-1])
+        variants.append(omitted)
+        altered = dict(base_record)
+        altered["prohibitions"] = [*accumulation.RECOVERY_PROHIBITIONS[:-1], "do-not-infer-hour"]
+        variants.append(altered)
+        extra = dict(base_record)
+        extra["prohibitions"] = [*accumulation.RECOVERY_PROHIBITIONS, "extra-authority"]
+        variants.append(extra)
+        duplicate = dict(base_record)
+        duplicate["prohibitions"] = [*accumulation.RECOVERY_PROHIBITIONS[:-1], accumulation.RECOVERY_PROHIBITIONS[0]]
+        variants.append(duplicate)
+
+        for index, variant in enumerate(variants, start=1):
+            body_bytes = json.dumps(variant, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            recovered, applied, recovery_blockers = accumulation._apply_recoveries(
+                [blocker],
+                [{"issue_number": 523, "comment_id": 200 + index, "author_login": accumulation.OWNER_LOGIN, "body_bytes": body_bytes}],
+                {523},
+            )
+            self.assertFalse(recovered)
+            self.assertFalse(applied)
+            self.assertEqual(recovery_blockers[0]["blocker_class"], "recovery-decision-invalid")
+            self.assertIn("prohibitions", recovery_blockers[0]["reason"])
 
     def test_recovery_repository_or_disposition_edit_restores_hard_block(self) -> None:
         blocker = accumulation._blocker("x", [{"run_id": 1}], None)
@@ -244,6 +300,7 @@ class TrustedMainSourceEvidenceAccumulationTests(unittest.TestCase):
             "contract": accumulation.RECOVERY_CONTRACT,
             "repository": accumulation.EXPECTED_REPOSITORY,
             "disposition": accumulation.RECOVERY_DISPOSITION,
+            "prohibitions": list(accumulation.RECOVERY_PROHIBITIONS),
             "blocker_class": "x",
             "blocker_fingerprint": blocker["blocker_fingerprint"],
             "canonical_observation_hour_utc": None,
