@@ -91,6 +91,7 @@ jobs:
 
           import json
           import os
+          import re
           import subprocess
           from pathlib import Path
 
@@ -98,6 +99,7 @@ jobs:
           expected = os.environ["EXPECTED_MAIN_SHA"]
           window = json.loads((Path(os.environ["RUNNER_TEMP"]) / "window.json").read_text())
           census = window["census"]
+          ARTIFACT_NAME_RE = re.compile(r"^deterministic-publication-intent-(\d+)-(\d+)$")
 
           def gh_json(*args: str):
               completed = subprocess.run(
@@ -133,27 +135,43 @@ jobs:
                   census_runs[int(run["id"])] = run
 
           artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
-          extension_ids = set()
+          extension_candidates = set()
           for page in artifact_pages:
               for artifact in page.get("artifacts", []):
                   name = str(artifact.get("name", ""))
+                  match = ARTIFACT_NAME_RE.fullmatch(name)
                   workflow_run = artifact.get("workflow_run") or {}
                   if (
-                      name.startswith("deterministic-publication-intent-")
+                      match is not None
                       and not bool(artifact.get("expired", False))
                       and workflow_run.get("id")
+                      and int(match.group(1)) == int(workflow_run["id"])
                   ):
-                      extension_ids.add(int(workflow_run["id"]))
+                      extension_candidates.add(int(workflow_run["id"]))
+
+          extension_ids = set()
+          for run_id in sorted(extension_candidates):
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+                  extension_ids.add(run_id)
 
           discovered = sorted(set(census_runs) | extension_ids)
           runs = []
           for run_id in discovered:
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+                  raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
               latest_attempt = int(latest["run_attempt"])
               attempts = [
                   gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}")
                   for number in range(1, latest_attempt + 1)
               ]
+              if any(
+                  int(attempt.get("workflow_id", 0) or 0) != workflow_id
+                  or str(attempt.get("event", "")) != "schedule"
+                  for attempt in attempts
+              ):
+                  raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
               pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
               artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
               sources = []
@@ -174,6 +192,7 @@ jobs:
           capture = {
               "repository": repo,
               "workflow_path": os.environ["SOURCE_WORKFLOW_PATH"],
+              "workflow_id": workflow_id,
               "expected_main_sha": expected,
               "census": census,
               "retained_artifact_extension_run_ids": sorted(extension_ids),
@@ -248,7 +267,11 @@ jobs:
           import json
           import os
           import subprocess
+          import sys
           from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd() / "scripts"))
+          from trusted_main_source_evidence_candidate import publication_intent_git_reference
 
           runner = Path(os.environ["RUNNER_TEMP"])
           artifact_root = runner / "source-artifacts"
@@ -259,49 +282,51 @@ jobs:
               snapshot_file = intent_path.parent / "payload/snapshot.json"
               if not snapshot_file.is_file():
                   continue
-              intent = json.loads(intent_path.read_text(encoding="utf-8"))
               run_id = int(intent_path.parent.parent.name)
               run_attempt = int(intent_path.parent.name)
-              commit_sha = str(intent["snapshot_commit_sha"])
-              snapshot_path = str(intent["snapshot_path"])
+              intent_bytes = intent_path.read_bytes()
+              snapshot_bytes = snapshot_file.read_bytes()
+              reference = publication_intent_git_reference(intent_bytes)
               row = {
                   "run_id": run_id,
                   "run_attempt": run_attempt,
-                  "snapshot_commit_sha": commit_sha,
-                  "snapshot_path": snapshot_path,
-                  "bundled_snapshot_sha256": hashlib.sha256(snapshot_file.read_bytes()).hexdigest(),
+                  **reference,
+                  "snapshot_sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
                   "fetch_succeeded": False,
                   "commit_present": False,
                   "path_present": False,
                   "bytes_match": False,
               }
-              fetched = subprocess.run(
-                  [
-                      "git",
-                      "-c",
-                      f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}",
-                      "fetch",
-                      "--no-tags",
-                      "origin",
-                      commit_sha,
-                  ],
-                  stdout=subprocess.DEVNULL,
-                  stderr=subprocess.PIPE,
-                  check=False,
-              )
-              row["fetch_succeeded"] = fetched.returncode == 0
-              if fetched.returncode == 0:
-                  commit_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"], check=False)
-                  row["commit_present"] = commit_probe.returncode == 0
-                  path_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}:{snapshot_path}"], check=False)
-                  row["path_present"] = path_probe.returncode == 0
-                  if path_probe.returncode == 0:
-                      exact = subprocess.run(
-                          ["git", "show", f"{commit_sha}:{snapshot_path}"],
-                          check=True,
-                          stdout=subprocess.PIPE,
-                      ).stdout
-                      row["bytes_match"] = exact == snapshot_file.read_bytes()
+              if reference["intent_reference_valid"]:
+                  commit_sha = str(reference["snapshot_commit_sha"])
+                  snapshot_path = str(reference["snapshot_path"])
+                  fetched = subprocess.run(
+                      [
+                          "git",
+                          "-c",
+                          f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}",
+                          "fetch",
+                          "--no-tags",
+                          "origin",
+                          commit_sha,
+                      ],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.PIPE,
+                      check=False,
+                  )
+                  row["fetch_succeeded"] = fetched.returncode == 0
+                  if fetched.returncode == 0:
+                      commit_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"], check=False)
+                      row["commit_present"] = commit_probe.returncode == 0
+                      path_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}:{snapshot_path}"], check=False)
+                      row["path_present"] = path_probe.returncode == 0
+                      if path_probe.returncode == 0:
+                          exact = subprocess.run(
+                              ["git", "show", f"{commit_sha}:{snapshot_path}"],
+                              check=True,
+                              stdout=subprocess.PIPE,
+                          ).stdout
+                          row["bytes_match"] = exact == snapshot_bytes
               proof.append(row)
           (runner / "git-object-proof.json").write_text(
               json.dumps(proof, sort_keys=True, separators=(",", ":")),
@@ -500,16 +525,27 @@ jobs:
           from pathlib import Path
 
           bundle = Path(os.environ["RUNNER_TEMP"]) / "prepared-bundle"
-          rows = json.loads((bundle / "raw-inputs/source-inputs.json").read_text())
-          for row in rows:
-              intent_rel = row.get("publication_intent_path")
-              snapshot_rel = row.get("snapshot_path_in_bundle")
-              if not intent_rel or not snapshot_rel:
+          source_rows = json.loads((bundle / "raw-inputs/source-inputs.json").read_text())
+          evidence = json.loads((bundle / "candidate-evidence.json").read_text())
+          by_key = {}
+          for row in source_rows:
+              key = (int(row["run_id"]), int(row["run_attempt"]))
+              if key in by_key:
+                  raise RuntimeError("duplicate bundled source identity")
+              by_key[key] = row
+          for proof in evidence.get("exact_git_object_retrieval", []):
+              if proof.get("intent_reference_valid") is not True:
                   continue
-              intent_path = bundle / intent_rel
-              snapshot_path = bundle / snapshot_rel
-              intent = json.loads(intent_path.read_text(encoding="utf-8"))
-              print("\t".join((str(intent["snapshot_commit_sha"]), str(intent["snapshot_path"]), str(snapshot_path))))
+              if not all(proof.get(field) is True for field in ("fetch_succeeded", "commit_present", "path_present", "bytes_match")):
+                  continue
+              key = (int(proof["run_id"]), int(proof["run_attempt"]))
+              source = by_key.get(key)
+              if source is None:
+                  raise RuntimeError("Git-object proof source identity is missing from prepared bundle")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if not isinstance(snapshot_rel, str) or not snapshot_rel:
+                  raise RuntimeError("proved Git-object source has no bundled snapshot")
+              print("\t".join((str(proof["snapshot_commit_sha"]), str(proof["snapshot_path"]), str(bundle / snapshot_rel))))
           PY
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           while IFS=$'\t' read -r commit_sha snapshot_path bundled_snapshot; do
@@ -562,12 +598,13 @@ jobs:
           PY
           cat > "$RUNNER_TEMP/capture-sources.py" <<'PY'
           from __future__ import annotations
-          import json, os, subprocess, sys
+          import json, os, re, subprocess, sys
           from pathlib import Path
 
           repo = os.environ["GITHUB_REPOSITORY"]
           expected = os.environ["EXPECTED_MAIN_SHA"]
           census = json.loads(Path(sys.argv[1]).read_text())["census"]
+          ARTIFACT_NAME_RE = re.compile(r"^deterministic-publication-intent-(\d+)-(\d+)$")
 
           def gh_json(*args: str):
               completed = subprocess.run(["gh", "api", *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -587,19 +624,36 @@ jobs:
           run_pages = paged(f"/repos/{repo}/actions/workflows/{workflow_id}/runs", event="schedule", created=created, per_page="100")
           census_runs = {int(run["id"]): run for page in run_pages for run in page.get("workflow_runs", [])}
           artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
-          extension_ids = {
-              int((artifact.get("workflow_run") or {})["id"])
-              for page in artifact_pages
-              for artifact in page.get("artifacts", [])
-              if str(artifact.get("name", "")).startswith("deterministic-publication-intent-")
-              and not bool(artifact.get("expired", False))
-              and (artifact.get("workflow_run") or {}).get("id")
-          }
+          extension_candidates = set()
+          for page in artifact_pages:
+              for artifact in page.get("artifacts", []):
+                  match = ARTIFACT_NAME_RE.fullmatch(str(artifact.get("name", "")))
+                  workflow_run = artifact.get("workflow_run") or {}
+                  if (
+                      match is not None
+                      and not bool(artifact.get("expired", False))
+                      and workflow_run.get("id")
+                      and int(match.group(1)) == int(workflow_run["id"])
+                  ):
+                      extension_candidates.add(int(workflow_run["id"]))
+          extension_ids = set()
+          for run_id in sorted(extension_candidates):
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+                  extension_ids.add(run_id)
           runs = []
           for run_id in sorted(set(census_runs) | extension_ids):
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+                  raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
               upper = int(latest["run_attempt"])
               attempts = [gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}") for number in range(1, upper + 1)]
+              if any(
+                  int(attempt.get("workflow_id", 0) or 0) != workflow_id
+                  or str(attempt.get("event", "")) != "schedule"
+                  for attempt in attempts
+              ):
+                  raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
               pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
               artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
               discovery = []
@@ -609,6 +663,7 @@ jobs:
           capture = {
               "repository": repo,
               "workflow_path": os.environ["SOURCE_WORKFLOW_PATH"],
+              "workflow_id": workflow_id,
               "expected_main_sha": expected,
               "census": census,
               "retained_artifact_extension_run_ids": sorted(extension_ids),

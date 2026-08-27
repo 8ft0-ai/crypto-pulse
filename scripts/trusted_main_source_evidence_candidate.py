@@ -961,5 +961,133 @@ def main() -> int:
         return 1
 
 
+# Review-remediation overrides are intentionally defined after the original
+# helpers so the Slice B behaviour changes remain narrow and auditable.
+_ORIGINAL_BUILD_SOURCE_POPULATION_CLOSURE = build_source_population_closure
+
+
+def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any]:
+    """Bind the closed population to the resolved scheduled ingestion workflow."""
+    expected_workflow_id = _positive_int(capture.get("workflow_id"), "capture.workflow_id")
+    closure = _ORIGINAL_BUILD_SOURCE_POPULATION_CLOSURE(capture)
+    for run in closure["runs"]:
+        for attempt in run["attempts"]:
+            if attempt["workflow_id"] != expected_workflow_id:
+                raise CandidateError("attempt workflow id does not match capture workflow")
+            if attempt["event"] != EXPECTED_EVENT:
+                raise CandidateError("attempt event does not match scheduled ingestion workflow")
+    closure.pop("sha256", None)
+    closure["workflow_id"] = expected_workflow_id
+    closure["sha256"] = sha256_bytes(canonical_json_bytes(closure))
+    return closure
+
+
+def publication_intent_git_reference(intent_bytes: bytes) -> dict[str, Any]:
+    """Classify exact intent bytes without failing before Slice A can fingerprint them."""
+    if not isinstance(intent_bytes, (bytes, bytearray)):
+        raise CandidateError("publication intent reference requires exact bytes")
+    raw = bytes(intent_bytes)
+    result: dict[str, Any] = {
+        "publication_intent_sha256": sha256_bytes(raw),
+        "intent_parse_succeeded": False,
+        "intent_reference_valid": False,
+        "snapshot_commit_sha": None,
+        "snapshot_path": None,
+    }
+    try:
+        payload = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return result
+    if not isinstance(payload, dict):
+        return result
+    result["intent_parse_succeeded"] = True
+    commit_sha = str(payload.get("snapshot_commit_sha") or "")
+    snapshot_path = str(payload.get("snapshot_path") or "").replace("\\", "/")
+    result["snapshot_commit_sha"] = commit_sha or None
+    result["snapshot_path"] = snapshot_path or None
+    path = PurePosixPath(snapshot_path)
+    result["intent_reference_valid"] = bool(
+        SHA1_RE.fullmatch(commit_sha)
+        and snapshot_path
+        and not snapshot_path.startswith("/")
+        and ".." not in path.parts
+        and path.parts[:3] == SOURCE_PREFIX.parts
+        and snapshot_path.endswith("_source_snapshot.json")
+    )
+    return result
+
+
+def _apply_git_object_proof(
+    sources: Sequence[Mapping[str, Any]],
+    proof: Any,
+) -> list[dict[str, Any]]:
+    """Apply exact-object proof while preserving malformed retained bytes for Slice A."""
+    if proof is None:
+        proof = []
+    if not isinstance(proof, list) or any(not isinstance(item, dict) for item in proof):
+        raise CandidateError("exact Git-object retrieval proof must be a list of objects")
+    by_key: dict[tuple[int, int], list[Mapping[str, Any]]] = {}
+    for item in proof:
+        key = (
+            _positive_int(item.get("run_id"), "git-object-proof.run_id"),
+            _positive_int(item.get("run_attempt"), "git-object-proof.run_attempt"),
+        )
+        by_key.setdefault(key, []).append(item)
+
+    effective: list[dict[str, Any]] = []
+    for source in sources:
+        row = dict(source)
+        intent_value = row.get("publication_intent_bytes")
+        if row.get("conclusion") != EXPECTED_SUCCESS or not isinstance(intent_value, (bytes, bytearray)):
+            effective.append(row)
+            continue
+        snapshot_value = row.get("snapshot_bytes")
+        if not isinstance(snapshot_value, (bytes, bytearray)):
+            row["publication_intent_bytes"] = None
+            row["snapshot_bytes"] = None
+            effective.append(row)
+            continue
+
+        key = (int(row["run_id"]), int(row["run_attempt"]))
+        matches = by_key.get(key, [])
+        if len(matches) != 1:
+            row["publication_intent_bytes"] = None
+            row["snapshot_bytes"] = None
+            effective.append(row)
+            continue
+
+        item = matches[0]
+        intent = bytes(intent_value)
+        snapshot = bytes(snapshot_value)
+        reference = publication_intent_git_reference(intent)
+        for field in (
+            "publication_intent_sha256",
+            "intent_parse_succeeded",
+            "intent_reference_valid",
+            "snapshot_commit_sha",
+            "snapshot_path",
+        ):
+            if item.get(field) != reference[field]:
+                raise CandidateError(f"Git-object proof {field} differs from exact retained intent")
+        if _sha256(item.get("snapshot_sha256"), "git-object-proof.snapshot_sha256") != sha256_bytes(snapshot):
+            raise CandidateError("Git-object proof snapshot SHA-256 differs from exact retained bytes")
+
+        if reference["intent_reference_valid"]:
+            verified = all(
+                item.get(field) is True
+                for field in ("fetch_succeeded", "commit_present", "path_present", "bytes_match")
+            )
+            if not verified:
+                # A syntactically valid exact reference that cannot be proved is
+                # intentionally downgraded to Slice A unavailable-input evidence.
+                row["publication_intent_bytes"] = None
+                row["snapshot_bytes"] = None
+        # Malformed/incomplete intent bytes are deliberately preserved so Slice A
+        # emits a canonical source-input-unverifiable blocker whose fingerprint
+        # binds the exact intent and snapshot SHA-256 identities.
+        effective.append(row)
+    return effective
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

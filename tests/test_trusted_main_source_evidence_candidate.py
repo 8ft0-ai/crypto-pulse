@@ -61,6 +61,10 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         self.assertGreaterEqual(text.count('"cat-file", "-e"'), 2)
         self.assertGreaterEqual(text.count("cmp --silent"), 1)
         self.assertIn("bytes_match", text)
+        self.assertIn("intent_reference_valid", text)
+        self.assertGreaterEqual(text.count('"workflow_id": workflow_id'), 2)
+        self.assertGreaterEqual(text.count("ARTIFACT_NAME_RE.fullmatch"), 2)
+        self.assertIn("candidate-evidence.json", text)
         self.assertIn("--force-with-lease=", text)
         self.assertIn("verify-closure", text)
         self.assertGreaterEqual(text.count("verify-recoveries"), 3)
@@ -77,6 +81,7 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
     def test_population_closure_is_canonical_and_binds_complete_attempt_artifact_state(self) -> None:
         closure = candidate.build_source_population_closure(self.base_capture())
         self.assertEqual(closure["contract"], candidate.CLOSURE_CONTRACT)
+        self.assertEqual(closure["workflow_id"], 77)
         self.assertEqual(closure["discovered_run_ids"], [100])
         self.assertEqual(closure["retained_artifact_extension_run_ids"], [100])
         attempt = closure["runs"][0]["attempts"][0]
@@ -103,6 +108,12 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         duplicate["id"] = 9002
         capture["runs"][0]["artifacts"].append(duplicate)
         with self.assertRaisesRegex(candidate.CandidateError, "ambiguous exact artifact carrier"):
+            candidate.build_source_population_closure(capture)
+
+    def test_same_prefix_carrier_from_different_workflow_fails_closed(self) -> None:
+        capture = self.base_capture()
+        capture["runs"][0]["attempts"][0]["workflow_id"] = 88
+        with self.assertRaisesRegex(candidate.CandidateError, "workflow id does not match capture workflow"):
             candidate.build_source_population_closure(capture)
 
     def test_successful_unavailable_artifact_is_preserved_as_unavailable_source_input(self) -> None:
@@ -262,6 +273,14 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
                 candidate.verify_worktree(root, base, manifest)
 
     def test_exact_git_object_proof_fails_closed_without_complete_identity_proof(self) -> None:
+        intent = json.dumps(
+            {
+                "snapshot_commit_sha": "a" * 40,
+                "snapshot_path": "data/crypto/hourly/x_source_snapshot.json",
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+        snapshot = b"snapshot\n"
         source = {
             "repository": candidate.EXPECTED_REPOSITORY,
             "workflow_path": candidate.EXPECTED_WORKFLOW_PATH,
@@ -272,26 +291,88 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
             "run_attempt": 1,
             "workflow_head_sha": "a" * 40,
             "artifact_name": "deterministic-publication-intent-100-1",
-            "publication_intent_bytes": b"intent\n",
-            "snapshot_bytes": b"snapshot\n",
+            "publication_intent_bytes": intent,
+            "snapshot_bytes": snapshot,
         }
         unavailable = candidate._apply_git_object_proof([source], [])
         self.assertIsNone(unavailable[0]["publication_intent_bytes"])
         self.assertIsNone(unavailable[0]["snapshot_bytes"])
 
+        reference = candidate.publication_intent_git_reference(intent)
         complete = candidate._apply_git_object_proof(
             [source],
             [{
                 "run_id": 100,
                 "run_attempt": 1,
+                **reference,
+                "snapshot_sha256": hashlib.sha256(snapshot).hexdigest(),
                 "fetch_succeeded": True,
                 "commit_present": True,
                 "path_present": True,
                 "bytes_match": True,
             }],
         )
-        self.assertEqual(complete[0]["publication_intent_bytes"], b"intent\n")
-        self.assertEqual(complete[0]["snapshot_bytes"], b"snapshot\n")
+        self.assertEqual(complete[0]["publication_intent_bytes"], intent)
+        self.assertEqual(complete[0]["snapshot_bytes"], snapshot)
+
+    def test_malformed_retained_intent_produces_replayable_blocked_bundle(self) -> None:
+        capture = self.base_capture()
+        malformed_intent = b'{"snapshot_commit_sha":'
+        snapshot = b'{"fixture":"snapshot"}\n'
+        reference = candidate.publication_intent_git_reference(malformed_intent)
+        self.assertFalse(reference["intent_parse_succeeded"])
+        self.assertFalse(reference["intent_reference_valid"])
+        proof = [{
+            "run_id": 100,
+            "run_attempt": 1,
+            **reference,
+            "snapshot_sha256": hashlib.sha256(snapshot).hexdigest(),
+            "fetch_succeeded": False,
+            "commit_present": False,
+            "path_present": False,
+            "bytes_match": False,
+        }]
+        blocker = {
+            "blocker_class": "source-input-unverifiable",
+            "blocker_fingerprint": "e" * 64,
+        }
+        manifest = {
+            "contract": "trusted-main-source-evidence-accumulation/v1.1",
+            "repository": candidate.EXPECTED_REPOSITORY,
+            "base_sha": "b" * 40,
+            "base_tree_sha": "c" * 40,
+            "anchor_observation_hour_utc": "2026-08-27T00:00:00Z",
+            "window": {"start_utc": "2026-08-27T01:00:00Z", "end_utc": "2026-08-28T01:00:00Z", "hours": 25},
+            "hours": [],
+            "verified_source_inputs": [],
+            "supersession_records": [],
+            "operational_diagnostics": [],
+            "input_level_blockers": [blocker],
+            "hour_level_blockers": [],
+            "applied_recovery_decisions": [],
+            "blocking_findings": [blocker],
+            "added_paths": [],
+            "candidate_id": "d" * 64,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            artifact_root = root / "artifacts"
+            source_dir = artifact_root / "100/1"
+            (source_dir / "payload").mkdir(parents=True)
+            (source_dir / "deterministic-publication-intent.json").write_bytes(malformed_intent)
+            (source_dir / "payload/snapshot.json").write_bytes(snapshot)
+            bundle = root / "bundle"
+            with mock.patch.object(candidate.accumulation, "build_accumulation_manifest", return_value=manifest):
+                evidence = candidate.prepare_bundle(
+                    Path("."), "b" * 40, capture, artifact_root, [], bundle, 55, 3, proof
+                )
+                self.assertEqual(evidence["status"], "blocked")
+                self.assertEqual(
+                    (bundle / "raw-inputs/sources/100/1/deterministic-publication-intent.json").read_bytes(),
+                    malformed_intent,
+                )
+                replayed = candidate.replay_bundle(Path("."), "b" * 40, bundle)
+                self.assertEqual(replayed["candidate_id"], "d" * 64)
 
     def test_pr_body_contains_complete_source_only_evidence_contract(self) -> None:
         manifest = {

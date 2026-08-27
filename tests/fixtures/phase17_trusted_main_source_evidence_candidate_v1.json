@@ -50,6 +50,7 @@
         "run_id": 100
       }
     ],
+    "workflow_id": 77,
     "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
   },
   "changed_recovery": [
@@ -126,6 +127,7 @@
         "run_id": 100
       }
     ],
+    "workflow_id": 77,
     "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
   },
   "new_run_capture": {
@@ -217,6 +219,7 @@
         "run_id": 101
       }
     ],
+    "workflow_id": 77,
     "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
   },
   "prepared_recovery": [
