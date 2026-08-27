@@ -1,0 +1,961 @@
+name: Build trusted-main source-evidence candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact protected-main SHA used as the Slice B candidate base
+        required: true
+        type: string
+      recovery_comment_ids:
+        description: Optional comma/newline-separated top-level Phase 17 recovery comment IDs
+        required: false
+        default: ""
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: phase17-source-evidence-candidate
+  cancel-in-progress: false
+
+env:
+  SOURCE_WORKFLOW_PATH: .github/workflows/ingest-crypto-sources.yml
+  CANDIDATE_BRANCH: automation/source-evidence-accumulation
+  PREPARED_BUNDLE_NAME: trusted-main-source-evidence-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+
+jobs:
+  prepare:
+    name: Prepare immutable Slice B candidate evidence
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      status: ${{ steps.prepare.outputs.status }}
+      candidate_id: ${{ steps.prepare.outputs.candidate_id }}
+      added_count: ${{ steps.prepare.outputs.added_count }}
+    steps:
+      - name: Validate dispatch and protected-main identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+
+      - name: Check out exact candidate base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Derive exact anchor, target window and frozen census bounds
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python scripts/trusted_main_source_evidence_candidate.py window \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            > "$RUNNER_TEMP/window.json"
+          cat "$RUNNER_TEMP/window.json"
+
+      - name: Capture complete scheduled-run and retained-artifact population
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          expected = os.environ["EXPECTED_MAIN_SHA"]
+          window = json.loads((Path(os.environ["RUNNER_TEMP"]) / "window.json").read_text())
+          census = window["census"]
+          ARTIFACT_NAME_RE = re.compile(r"^deterministic-publication-intent-(\d+)-(\d+)$")
+
+          def gh_json(*args: str):
+              completed = subprocess.run(
+                  ["gh", "api", *args],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  text=True,
+              )
+              return json.loads(completed.stdout)
+
+          def paged(endpoint: str, **fields: str):
+              args = ["--method", "GET", "--paginate", "--slurp", endpoint]
+              for key, value in fields.items():
+                  args.extend(["-f", f"{key}={value}"])
+              value = gh_json(*args)
+              if not isinstance(value, list):
+                  raise RuntimeError(f"paginated response is not a page list: {endpoint}")
+              return value
+
+          workflow = gh_json(f"/repos/{repo}/actions/workflows/{os.environ['SOURCE_WORKFLOW_PATH']}")
+          workflow_id = int(workflow["id"])
+          created = f"{census['start_utc']}..{census['end_utc']}"
+          run_pages = paged(
+              f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
+              event="schedule",
+              created=created,
+              per_page="100",
+          )
+          census_runs = {}
+          for page in run_pages:
+              for run in page.get("workflow_runs", []):
+                  census_runs[int(run["id"])] = run
+
+          artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
+          extension_candidates = set()
+          for page in artifact_pages:
+              for artifact in page.get("artifacts", []):
+                  name = str(artifact.get("name", ""))
+                  match = ARTIFACT_NAME_RE.fullmatch(name)
+                  workflow_run = artifact.get("workflow_run") or {}
+                  if (
+                      match is not None
+                      and not bool(artifact.get("expired", False))
+                      and workflow_run.get("id")
+                      and int(match.group(1)) == int(workflow_run["id"])
+                  ):
+                      extension_candidates.add(int(workflow_run["id"]))
+
+          extension_ids = set()
+          for run_id in sorted(extension_candidates):
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+                  extension_ids.add(run_id)
+
+          discovered = sorted(set(census_runs) | extension_ids)
+          runs = []
+          for run_id in discovered:
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+                  raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
+              latest_attempt = int(latest["run_attempt"])
+              attempts = [
+                  gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}")
+                  for number in range(1, latest_attempt + 1)
+              ]
+              if any(
+                  int(attempt.get("workflow_id", 0) or 0) != workflow_id
+                  or str(attempt.get("event", "")) != "schedule"
+                  for attempt in attempts
+              ):
+                  raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
+              pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
+              artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
+              sources = []
+              if run_id in census_runs:
+                  sources.append("census")
+              if run_id in extension_ids:
+                  sources.append("retained-artifact-extension")
+              runs.append(
+                  {
+                      "run_id": run_id,
+                      "latest_run_attempt": latest_attempt,
+                      "discovery_sources": sources,
+                      "attempts": attempts,
+                      "artifacts": artifacts,
+                  }
+              )
+
+          capture = {
+              "repository": repo,
+              "workflow_path": os.environ["SOURCE_WORKFLOW_PATH"],
+              "workflow_id": workflow_id,
+              "expected_main_sha": expected,
+              "census": census,
+              "retained_artifact_extension_run_ids": sorted(extension_ids),
+              "runs": runs,
+          }
+          (Path(os.environ["RUNNER_TEMP"]) / "source-capture.json").write_text(
+              json.dumps(capture, sort_keys=True, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/trusted_main_source_evidence_candidate.py closure \
+            --capture "$RUNNER_TEMP/source-capture.json" \
+            --output "$RUNNER_TEMP/source-population-closure.json"
+
+      - name: Download retained exact attempt artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source-artifacts"
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          import zipfile
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          closure = json.loads((root / "source-population-closure.json").read_text())
+          artifact_root = root / "source-artifacts"
+          repo = os.environ["GITHUB_REPOSITORY"]
+          for run in closure["runs"]:
+              for attempt in run["attempts"]:
+                  carrier = attempt["artifact"]
+                  if carrier["availability"] != "retained" or carrier["artifact"] is None:
+                      continue
+                  artifact_id = int(carrier["artifact"]["id"])
+                  target = artifact_root / str(run["run_id"]) / str(attempt["run_attempt"])
+                  target.mkdir(parents=True, exist_ok=True)
+                  archive = target / "artifact.zip"
+                  try:
+                      with archive.open("wb") as stream:
+                          subprocess.run(
+                              ["gh", "api", f"/repos/{repo}/actions/artifacts/{artifact_id}/zip"],
+                              check=True,
+                              stdout=stream,
+                              stderr=subprocess.PIPE,
+                          )
+                      with zipfile.ZipFile(archive) as zipped:
+                          zipped.extractall(target)
+                  except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile):
+                      # Metadata can race retention/deletion. Missing exact bytes remain
+                      # a Slice A unavailable-input blocker rather than being dropped.
+                      for path in (target / "deterministic-publication-intent.json", target / "payload/snapshot.json"):
+                          path.unlink(missing_ok=True)
+                  finally:
+                      archive.unlink(missing_ok=True)
+          PY
+
+      - name: Materialise and prove exact recorded Git objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd() / "scripts"))
+          from trusted_main_source_evidence_candidate import publication_intent_git_reference
+
+          runner = Path(os.environ["RUNNER_TEMP"])
+          artifact_root = runner / "source-artifacts"
+          token = os.environ["GH_TOKEN"]
+          auth = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+          proof = []
+          for intent_path in sorted(artifact_root.glob("*/*/deterministic-publication-intent.json")):
+              snapshot_file = intent_path.parent / "payload/snapshot.json"
+              if not snapshot_file.is_file():
+                  continue
+              run_id = int(intent_path.parent.parent.name)
+              run_attempt = int(intent_path.parent.name)
+              intent_bytes = intent_path.read_bytes()
+              snapshot_bytes = snapshot_file.read_bytes()
+              reference = publication_intent_git_reference(intent_bytes)
+              row = {
+                  "run_id": run_id,
+                  "run_attempt": run_attempt,
+                  **reference,
+                  "snapshot_sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
+                  "fetch_succeeded": False,
+                  "commit_present": False,
+                  "path_present": False,
+                  "bytes_match": False,
+              }
+              if reference["intent_reference_valid"]:
+                  commit_sha = str(reference["snapshot_commit_sha"])
+                  snapshot_path = str(reference["snapshot_path"])
+                  fetched = subprocess.run(
+                      [
+                          "git",
+                          "-c",
+                          f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}",
+                          "fetch",
+                          "--no-tags",
+                          "origin",
+                          commit_sha,
+                      ],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.PIPE,
+                      check=False,
+                  )
+                  row["fetch_succeeded"] = fetched.returncode == 0
+                  if fetched.returncode == 0:
+                      commit_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"], check=False)
+                      row["commit_present"] = commit_probe.returncode == 0
+                      path_probe = subprocess.run(["git", "cat-file", "-e", f"{commit_sha}:{snapshot_path}"], check=False)
+                      row["path_present"] = path_probe.returncode == 0
+                      if path_probe.returncode == 0:
+                          exact = subprocess.run(
+                              ["git", "show", f"{commit_sha}:{snapshot_path}"],
+                              check=True,
+                              stdout=subprocess.PIPE,
+                          ).stdout
+                          row["bytes_match"] = exact == snapshot_bytes
+              proof.append(row)
+          (runner / "git-object-proof.json").write_text(
+              json.dumps(proof, sort_keys=True, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Capture explicitly supplied recovery carriers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          raw = os.environ.get("RECOVERY_COMMENT_IDS", "")
+          values = [item.strip() for item in re.split(r"[,\n]+", raw) if item.strip()]
+          ids = []
+          for value in values:
+              if not value.isdigit() or int(value) <= 0:
+                  raise SystemExit("recovery_comment_ids contains a non-positive integer")
+              number = int(value)
+              if number in ids:
+                  raise SystemExit("recovery_comment_ids contains a duplicate")
+              ids.append(number)
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          rows = []
+          for comment_id in ids:
+              completed = subprocess.run(
+                  ["gh", "api", f"/repos/{repo}/issues/comments/{comment_id}"],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  text=True,
+              )
+              comment = json.loads(completed.stdout)
+              issue_url = str(comment.get("issue_url", ""))
+              match = re.search(r"/issues/(\d+)$", issue_url)
+              if match is None:
+                  raise SystemExit("recovery carrier issue identity is ambiguous")
+              body = str(comment.get("body", "")).encode("utf-8")
+              rows.append(
+                  {
+                      "issue_number": int(match.group(1)),
+                      "comment_id": int(comment["id"]),
+                      "author_login": str((comment.get("user") or {}).get("login", "")),
+                      "body_base64": base64.b64encode(body).decode("ascii"),
+                      "body_sha256": hashlib.sha256(body).hexdigest(),
+                  }
+              )
+          Path(sys.argv[1]).write_text(
+              json.dumps(rows, sort_keys=True, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/recovery-capture.json"
+
+      - name: Build deterministic prepared bundle
+        id: prepare
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/prepared-bundle"
+          python scripts/trusted_main_source_evidence_candidate.py prepare \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --capture "$RUNNER_TEMP/source-capture.json" \
+            --artifact-root "$RUNNER_TEMP/source-artifacts" \
+            --recovery-capture "$RUNNER_TEMP/recovery-capture.json" \
+            --bundle-root "$bundle" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --git-object-proof "$RUNNER_TEMP/git-object-proof.json" \
+            > "$RUNNER_TEMP/prepare-result.json"
+          status="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$RUNNER_TEMP/prepare-result.json")"
+          candidate_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["candidate_id"])' "$RUNNER_TEMP/prepare-result.json")"
+          added_count="$(python -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["added_paths"]))' "$bundle/candidate-evidence.json")"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "candidate_id=$candidate_id" >> "$GITHUB_OUTPUT"
+          echo "added_count=$added_count" >> "$GITHUB_OUTPUT"
+
+      - name: Validate all materialised source additions
+        if: steps.prepare.outputs.status == 'candidate'
+        run: |
+          set -euo pipefail
+          python - <<'PY' > "$RUNNER_TEMP/additions.txt"
+          import json, os
+          from pathlib import Path
+          manifest = json.loads((Path(os.environ["RUNNER_TEMP"]) / "prepared-bundle/accumulation-manifest.json").read_text())
+          for row in manifest["added_paths"]:
+              print(row["path"])
+          PY
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            python scripts/validate_crypto_snapshot.py "$RUNNER_TEMP/prepared-bundle/$path"
+            python scripts/validate_crypto_observation_hour.py "$RUNNER_TEMP/prepared-bundle/$path"
+          done < "$RUNNER_TEMP/additions.txt"
+
+      - name: Independently replay prepared Slice A/helper state
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python scripts/trusted_main_source_evidence_candidate.py replay \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --bundle-root "$RUNNER_TEMP/prepared-bundle"
+
+      - name: Upload immutable prepared bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PREPARED_BUNDLE_NAME }}
+          path: ${{ runner.temp }}/prepared-bundle
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Fail closed on unrecovered blockers
+        if: steps.prepare.outputs.status == 'blocked'
+        run: |
+          echo "Slice B preparation contains unrecovered blocking findings." >&2
+          exit 1
+
+      - name: Record no-candidate result
+        if: steps.prepare.outputs.status == 'no-candidate'
+        run: echo "No source additions are eligible; no branch or PR mutation is required."
+
+  publish:
+    name: Publish disposable source-only staging candidate
+    needs: prepare
+    if: needs.prepare.outputs.status == 'candidate'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      issues: read
+      pull-requests: write
+    steps:
+      - name: Validate dispatch identity and current protected main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+
+      - name: Check out exact candidate base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_main_sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Download exact prepared bundle from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PREPARED_BUNDLE_NAME }}
+          path: ${{ runner.temp }}/prepared-bundle
+
+      - name: Re-materialise exact Git objects and replay prepared bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' > "$RUNNER_TEMP/git-object-inputs.tsv"
+          from __future__ import annotations
+          import json
+          import os
+          from pathlib import Path
+
+          bundle = Path(os.environ["RUNNER_TEMP"]) / "prepared-bundle"
+          source_rows = json.loads((bundle / "raw-inputs/source-inputs.json").read_text())
+          evidence = json.loads((bundle / "candidate-evidence.json").read_text())
+          by_key = {}
+          for row in source_rows:
+              key = (int(row["run_id"]), int(row["run_attempt"]))
+              if key in by_key:
+                  raise RuntimeError("duplicate bundled source identity")
+              by_key[key] = row
+          for proof in evidence.get("exact_git_object_retrieval", []):
+              if proof.get("intent_reference_valid") is not True:
+                  continue
+              if not all(proof.get(field) is True for field in ("fetch_succeeded", "commit_present", "path_present", "bytes_match")):
+                  continue
+              key = (int(proof["run_id"]), int(proof["run_attempt"]))
+              source = by_key.get(key)
+              if source is None:
+                  raise RuntimeError("Git-object proof source identity is missing from prepared bundle")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if not isinstance(snapshot_rel, str) or not snapshot_rel:
+                  raise RuntimeError("proved Git-object source has no bundled snapshot")
+              print("\t".join((str(proof["snapshot_commit_sha"]), str(proof["snapshot_path"]), str(bundle / snapshot_rel))))
+          PY
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          while IFS=$'\t' read -r commit_sha snapshot_path bundled_snapshot; do
+            [[ -n "$commit_sha" ]] || continue
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+              fetch --no-tags origin "$commit_sha"
+            git cat-file -e "$commit_sha^{commit}"
+            git cat-file -e "$commit_sha:$snapshot_path"
+            git show "$commit_sha:$snapshot_path" > "$RUNNER_TEMP/exact-object-snapshot.json"
+            cmp --silent "$bundled_snapshot" "$RUNNER_TEMP/exact-object-snapshot.json"
+          done < "$RUNNER_TEMP/git-object-inputs.tsv"
+          python scripts/trusted_main_source_evidence_candidate.py replay \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --bundle-root "$RUNNER_TEMP/prepared-bundle"
+
+      - name: Freshly reclassify exact Git objects before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd() / "scripts"))
+          import trusted_main_source_evidence_candidate as candidate
+
+          runner = Path(os.environ["RUNNER_TEMP"])
+          bundle = runner / "prepared-bundle"
+          replay_bundle = runner / "fresh-replay-bundle"
+          candidate.verify_bundle(bundle)
+
+          source_rows = json.loads((bundle / "raw-inputs/source-inputs.json").read_text())
+          evidence = json.loads((bundle / "candidate-evidence.json").read_text())
+          prepared_proof = evidence.get("exact_git_object_retrieval", [])
+          if not isinstance(prepared_proof, list) or any(not isinstance(row, dict) for row in prepared_proof):
+              raise RuntimeError("prepared exact Git-object proof is malformed")
+
+          by_key = {}
+          byte_keys = set()
+          for source in source_rows:
+              key = (int(source["run_id"]), int(source["run_attempt"]))
+              if key in by_key:
+                  raise RuntimeError("duplicate bundled source identity")
+              by_key[key] = source
+              intent_rel = source.get("publication_intent_path")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if intent_rel is not None or snapshot_rel is not None:
+                  if not isinstance(intent_rel, str) or not isinstance(snapshot_rel, str):
+                      raise RuntimeError("bundled source byte references are incomplete")
+                  byte_keys.add(key)
+
+          token = os.environ["GH_TOKEN"]
+          auth = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+          fresh_proof = []
+          seen = set()
+          reference_fields = (
+              "publication_intent_sha256",
+              "intent_parse_succeeded",
+              "intent_reference_valid",
+              "snapshot_commit_sha",
+              "snapshot_path",
+          )
+          for prepared in prepared_proof:
+              key = (int(prepared["run_id"]), int(prepared["run_attempt"]))
+              if key in seen:
+                  raise RuntimeError("duplicate prepared Git-object proof identity")
+              seen.add(key)
+              source = by_key.get(key)
+              if source is None:
+                  raise RuntimeError("Git-object proof source identity is missing from prepared bundle")
+              intent_rel = source.get("publication_intent_path")
+              snapshot_rel = source.get("snapshot_path_in_bundle")
+              if not isinstance(intent_rel, str) or not isinstance(snapshot_rel, str):
+                  raise RuntimeError("Git-object proof source has no exact bundled bytes")
+              intent_bytes = (bundle / intent_rel).read_bytes()
+              snapshot_bytes = (bundle / snapshot_rel).read_bytes()
+              reference = candidate.publication_intent_git_reference(intent_bytes)
+              for field in reference_fields:
+                  if prepared.get(field) != reference[field]:
+                      raise RuntimeError(f"prepared Git-object proof {field} differs from bundled intent")
+              if prepared.get("snapshot_sha256") != candidate.sha256_bytes(snapshot_bytes):
+                  raise RuntimeError("prepared Git-object proof snapshot hash differs from bundled bytes")
+
+              row = dict(prepared)
+              row.update(
+                  fetch_succeeded=False,
+                  commit_present=False,
+                  path_present=False,
+                  bytes_match=False,
+              )
+              if reference["intent_reference_valid"]:
+                  commit_sha = str(reference["snapshot_commit_sha"])
+                  snapshot_path = str(reference["snapshot_path"])
+                  fetched = subprocess.run(
+                      [
+                          "git",
+                          "-c",
+                          f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}",
+                          "fetch",
+                          "--no-tags",
+                          "origin",
+                          commit_sha,
+                      ],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.PIPE,
+                      check=False,
+                  )
+                  row["fetch_succeeded"] = fetched.returncode == 0
+                  if fetched.returncode == 0:
+                      commit_probe = subprocess.run(
+                          ["git", "cat-file", "-e", f"{commit_sha}^{{commit}}"],
+                          check=False,
+                      )
+                      row["commit_present"] = commit_probe.returncode == 0
+                      path_probe = subprocess.run(
+                          ["git", "cat-file", "-e", f"{commit_sha}:{snapshot_path}"],
+                          check=False,
+                      )
+                      row["path_present"] = path_probe.returncode == 0
+                      if path_probe.returncode == 0:
+                          exact = subprocess.run(
+                              ["git", "show", f"{commit_sha}:{snapshot_path}"],
+                              check=True,
+                              stdout=subprocess.PIPE,
+                          ).stdout
+                          row["bytes_match"] = exact == snapshot_bytes
+              fresh_proof.append(row)
+
+          if seen != byte_keys:
+              raise RuntimeError("fresh Git-object proof does not cover every bundled exact-byte source")
+
+          if replay_bundle.exists():
+              shutil.rmtree(replay_bundle)
+          shutil.copytree(bundle, replay_bundle)
+          replay_evidence = json.loads((replay_bundle / "candidate-evidence.json").read_text())
+          replay_evidence["exact_git_object_retrieval"] = fresh_proof
+          candidate._write_json(replay_bundle / "candidate-evidence.json", replay_evidence)
+          candidate._write_json(replay_bundle / "bundle-sha256.json", candidate._bundle_hashes(replay_bundle))
+          candidate.verify_bundle(replay_bundle)
+          PY
+          python scripts/trusted_main_source_evidence_candidate.py replay \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --bundle-root "$RUNNER_TEMP/fresh-replay-bundle"
+
+      - name: Install reusable GitHub capture helpers for this publish job
+        env:
+          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
+          from __future__ import annotations
+          import base64, hashlib, json, os, re, subprocess, sys
+          from pathlib import Path
+          raw = os.environ.get("RECOVERY_COMMENT_IDS", "")
+          values = [item.strip() for item in re.split(r"[,\n]+", raw) if item.strip()]
+          ids = []
+          for value in values:
+              if not value.isdigit() or int(value) <= 0 or int(value) in ids:
+                  raise SystemExit("invalid/duplicate recovery_comment_ids")
+              ids.append(int(value))
+          repo = os.environ["GITHUB_REPOSITORY"]
+          rows = []
+          for comment_id in ids:
+              completed = subprocess.run(["gh", "api", f"/repos/{repo}/issues/comments/{comment_id}"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+              comment = json.loads(completed.stdout)
+              match = re.search(r"/issues/(\d+)$", str(comment.get("issue_url", "")))
+              if match is None:
+                  raise SystemExit("recovery carrier issue identity is ambiguous")
+              body = str(comment.get("body", "")).encode("utf-8")
+              rows.append({
+                  "issue_number": int(match.group(1)),
+                  "comment_id": int(comment["id"]),
+                  "author_login": str((comment.get("user") or {}).get("login", "")),
+                  "body_base64": base64.b64encode(body).decode("ascii"),
+                  "body_sha256": hashlib.sha256(body).hexdigest(),
+              })
+          Path(sys.argv[1]).write_text(json.dumps(rows, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+          PY
+          cat > "$RUNNER_TEMP/capture-sources.py" <<'PY'
+          from __future__ import annotations
+          import json, os, re, subprocess, sys
+          from pathlib import Path
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          expected = os.environ["EXPECTED_MAIN_SHA"]
+          census = json.loads(Path(sys.argv[1]).read_text())["census"]
+          ARTIFACT_NAME_RE = re.compile(r"^deterministic-publication-intent-(\d+)-(\d+)$")
+
+          def gh_json(*args: str):
+              completed = subprocess.run(["gh", "api", *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+              return json.loads(completed.stdout)
+          def paged(endpoint: str, **fields: str):
+              args = ["--method", "GET", "--paginate", "--slurp", endpoint]
+              for key, value in fields.items():
+                  args.extend(["-f", f"{key}={value}"])
+              value = gh_json(*args)
+              if not isinstance(value, list):
+                  raise RuntimeError("paginated response is incomplete")
+              return value
+
+          workflow = gh_json(f"/repos/{repo}/actions/workflows/{os.environ['SOURCE_WORKFLOW_PATH']}")
+          workflow_id = int(workflow["id"])
+          created = f"{census['start_utc']}..{census['end_utc']}"
+          run_pages = paged(f"/repos/{repo}/actions/workflows/{workflow_id}/runs", event="schedule", created=created, per_page="100")
+          census_runs = {int(run["id"]): run for page in run_pages for run in page.get("workflow_runs", [])}
+          artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
+          extension_candidates = set()
+          for page in artifact_pages:
+              for artifact in page.get("artifacts", []):
+                  match = ARTIFACT_NAME_RE.fullmatch(str(artifact.get("name", "")))
+                  workflow_run = artifact.get("workflow_run") or {}
+                  if (
+                      match is not None
+                      and not bool(artifact.get("expired", False))
+                      and workflow_run.get("id")
+                      and int(match.group(1)) == int(workflow_run["id"])
+                  ):
+                      extension_candidates.add(int(workflow_run["id"]))
+          extension_ids = set()
+          for run_id in sorted(extension_candidates):
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+                  extension_ids.add(run_id)
+          runs = []
+          for run_id in sorted(set(census_runs) | extension_ids):
+              latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+                  raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
+              upper = int(latest["run_attempt"])
+              attempts = [gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}") for number in range(1, upper + 1)]
+              if any(
+                  int(attempt.get("workflow_id", 0) or 0) != workflow_id
+                  or str(attempt.get("event", "")) != "schedule"
+                  for attempt in attempts
+              ):
+                  raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
+              pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
+              artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
+              discovery = []
+              if run_id in census_runs: discovery.append("census")
+              if run_id in extension_ids: discovery.append("retained-artifact-extension")
+              runs.append({"run_id": run_id, "latest_run_attempt": upper, "discovery_sources": discovery, "attempts": attempts, "artifacts": artifacts})
+          capture = {
+              "repository": repo,
+              "workflow_path": os.environ["SOURCE_WORKFLOW_PATH"],
+              "workflow_id": workflow_id,
+              "expected_main_sha": expected,
+              "census": census,
+              "retained_artifact_extension_run_ids": sorted(extension_ids),
+              "runs": runs,
+          }
+          Path(sys.argv[2]).write_text(json.dumps(capture, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+          PY
+
+      - name: Build local disposable candidate commit from exact base
+        id: candidate
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          git checkout -B "$CANDIDATE_BRANCH" "$EXPECTED_MAIN_SHA"
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          root = Path.cwd()
+          bundle = Path(os.environ["RUNNER_TEMP"]) / "prepared-bundle"
+          manifest = json.loads((bundle / "accumulation-manifest.json").read_text())
+          for row in manifest["added_paths"]:
+              rel = Path(row["path"])
+              target = root / rel
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(bundle / rel, target)
+          PY
+          git add -- data/crypto/hourly
+          python scripts/trusted_main_source_evidence_candidate.py verify-worktree \
+            --repository-root . \
+            --base-sha "$EXPECTED_MAIN_SHA" \
+            --manifest "$RUNNER_TEMP/prepared-bundle/accumulation-manifest.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Stage Phase 17 source evidence candidate"
+          candidate_sha="$(git rev-parse HEAD)"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Repeat complete population census immediately before remote publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          python "$RUNNER_TEMP/capture-sources.py" \
+            "$RUNNER_TEMP/prepared-bundle/source-population-closure.json" \
+            "$RUNNER_TEMP/final-source-capture.json"
+          python scripts/trusted_main_source_evidence_candidate.py verify-closure \
+            --prepared "$RUNNER_TEMP/prepared-bundle/source-population-closure.json" \
+            --capture "$RUNNER_TEMP/final-source-capture.json"
+
+      - name: Final pre-push main and recovery freshness cut
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+        run: |
+          set -euo pipefail
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/pre-push-recoveries.json"
+          python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
+            --bundle-root "$RUNNER_TEMP/prepared-bundle" \
+            --current-capture "$RUNNER_TEMP/pre-push-recoveries.json"
+
+      - name: Push disposable candidate with exact force-with-lease
+        id: push
+        env:
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          remote_line="$(git ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH")"
+          if [[ -n "$remote_line" ]]; then
+            [[ "$(printf '%s\n' "$remote_line" | wc -l | tr -d ' ')" == "1" ]]
+            observed="${remote_line%%$'\t'*}"
+            [[ "$observed" =~ ^[0-9a-f]{40}$ ]]
+            git push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:$observed" \
+              origin "$CANDIDATE_SHA:refs/heads/$CANDIDATE_BRANCH"
+          else
+            git push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:" \
+              origin "$CANDIDATE_SHA:refs/heads/$CANDIDATE_BRANCH"
+          fi
+          pushed="$(git ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH" | cut -f1)"
+          [[ "$pushed" == "$CANDIDATE_SHA" ]]
+
+      - name: Recheck mutable authority after branch push and before PR mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+        run: |
+          set -euo pipefail
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/post-push-recoveries.json"
+          python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
+            --bundle-root "$RUNNER_TEMP/prepared-bundle" \
+            --current-capture "$RUNNER_TEMP/post-push-recoveries.json"
+
+      - name: Create or refresh exact source-only candidate PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          python scripts/trusted_main_source_evidence_candidate.py render-pr \
+            --manifest "$RUNNER_TEMP/prepared-bundle/accumulation-manifest.json" \
+            --evidence "$RUNNER_TEMP/prepared-bundle/candidate-evidence.json" \
+            --candidate-commit-sha "$CANDIDATE_SHA" \
+            --output "$RUNNER_TEMP/candidate-pr-body.md"
+          prs="$(gh pr list --state open --base main --head "$CANDIDATE_BRANCH" --limit 10 --json number)"
+          count="$(python -c 'import json,sys; print(len(json.loads(sys.argv[1])))' "$prs")"
+          if [[ "$count" == "0" ]]; then
+            url="$(gh pr create \
+              --base main \
+              --head "$CANDIDATE_BRANCH" \
+              --title "Phase 17 source-evidence accumulation candidate" \
+              --body-file "$RUNNER_TEMP/candidate-pr-body.md")"
+            pr_number="${url##*/}"
+          elif [[ "$count" == "1" ]]; then
+            pr_number="$(python -c 'import json,sys; print(json.loads(sys.argv[1])[0]["number"])' "$prs")"
+            gh pr edit "$pr_number" \
+              --title "Phase 17 source-evidence accumulation candidate" \
+              --body-file "$RUNNER_TEMP/candidate-pr-body.md"
+          else
+            echo "More than one open accumulation candidate PR exists." >&2
+            exit 1
+          fi
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Final post-PR identity and freshness proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          CANDIDATE_ID: ${{ needs.prepare.outputs.candidate_id }}
+          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/final-pr.json"
+          python scripts/trusted_main_source_evidence_candidate.py verify-pr \
+            --snapshot "$RUNNER_TEMP/final-pr.json" \
+            --expected-main-sha "$EXPECTED_MAIN_SHA" \
+            --candidate-commit-sha "$CANDIDATE_SHA" \
+            --candidate-id "$CANDIDATE_ID" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT"
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/final-recoveries.json"
+          python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
+            --bundle-root "$RUNNER_TEMP/prepared-bundle" \
+            --current-capture "$RUNNER_TEMP/final-recoveries.json"
+          echo "Fresh Slice B staging candidate publication proved for PR #$PR_NUMBER at $CANDIDATE_SHA."
