@@ -1,0 +1,231 @@
+{
+  "base_capture": {
+    "census": {
+      "end_utc": "2026-08-28T02:00:00Z",
+      "start_utc": "2026-07-27T01:00:00Z"
+    },
+    "expected_main_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "repository": "8ft0-ai/crypto-pulse",
+    "retained_artifact_extension_run_ids": [
+      100
+    ],
+    "runs": [
+      {
+        "artifacts": [
+          {
+            "created_at": "2026-08-27T01:14:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "expired": false,
+            "expires_at": "2026-09-10T01:14:00Z",
+            "id": 9001,
+            "name": "deterministic-publication-intent-100-1",
+            "size_in_bytes": 512,
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_run": {
+              "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "id": 100
+            }
+          }
+        ],
+        "attempts": [
+          {
+            "conclusion": "success",
+            "created_at": "2026-08-27T01:10:00Z",
+            "event": "schedule",
+            "head_branch": "main",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "id": 100,
+            "run_attempt": 1,
+            "run_started_at": "2026-08-27T01:11:00Z",
+            "status": "completed",
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_id": 77
+          }
+        ],
+        "discovery_sources": [
+          "census",
+          "retained-artifact-extension"
+        ],
+        "latest_run_attempt": 1,
+        "run_id": 100
+      }
+    ],
+    "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
+  },
+  "changed_recovery": [
+    {
+      "author_login": "8ft0-ai",
+      "body_base64": "eyJjb250cmFjdCI6InRydXN0ZWQtbWFpbi1zb3VyY2UtZXZpZGVuY2UtcmVjb3ZlcnktZGVjaXNpb24vdjEiLCJyZWFzb24iOiJmaXh0dXJlIn0g",
+      "body_sha256": "4fb8ea68e6262f0cd8d4a0cf58b2e2d2d8bfa7b9637b1aa8b03866f1bcc01a3f",
+      "comment_id": 7001,
+      "issue_number": 523
+    }
+  ],
+  "contract": "phase17-trusted-main-source-evidence-candidate-fixture/v1",
+  "higher_attempt_capture": {
+    "census": {
+      "end_utc": "2026-08-28T02:00:00Z",
+      "start_utc": "2026-07-27T01:00:00Z"
+    },
+    "expected_main_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "repository": "8ft0-ai/crypto-pulse",
+    "retained_artifact_extension_run_ids": [
+      100
+    ],
+    "runs": [
+      {
+        "artifacts": [
+          {
+            "created_at": "2026-08-27T01:14:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "expired": false,
+            "expires_at": "2026-09-10T01:14:00Z",
+            "id": 9001,
+            "name": "deterministic-publication-intent-100-1",
+            "size_in_bytes": 512,
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_run": {
+              "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "id": 100
+            }
+          }
+        ],
+        "attempts": [
+          {
+            "conclusion": "success",
+            "created_at": "2026-08-27T01:10:00Z",
+            "event": "schedule",
+            "head_branch": "main",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "id": 100,
+            "run_attempt": 1,
+            "run_started_at": "2026-08-27T01:11:00Z",
+            "status": "completed",
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_id": 77
+          },
+          {
+            "conclusion": "failure",
+            "created_at": "2026-08-27T01:10:00Z",
+            "event": "schedule",
+            "head_branch": "main",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "id": 100,
+            "run_attempt": 2,
+            "run_started_at": "2026-08-27T01:11:00Z",
+            "status": "completed",
+            "updated_at": "2026-08-27T02:14:00Z",
+            "workflow_id": 77
+          }
+        ],
+        "discovery_sources": [
+          "census",
+          "retained-artifact-extension"
+        ],
+        "latest_run_attempt": 2,
+        "run_id": 100
+      }
+    ],
+    "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
+  },
+  "new_run_capture": {
+    "census": {
+      "end_utc": "2026-08-28T02:00:00Z",
+      "start_utc": "2026-07-27T01:00:00Z"
+    },
+    "expected_main_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "repository": "8ft0-ai/crypto-pulse",
+    "retained_artifact_extension_run_ids": [
+      100
+    ],
+    "runs": [
+      {
+        "artifacts": [
+          {
+            "created_at": "2026-08-27T01:14:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "expired": false,
+            "expires_at": "2026-09-10T01:14:00Z",
+            "id": 9001,
+            "name": "deterministic-publication-intent-100-1",
+            "size_in_bytes": 512,
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_run": {
+              "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "id": 100
+            }
+          }
+        ],
+        "attempts": [
+          {
+            "conclusion": "success",
+            "created_at": "2026-08-27T01:10:00Z",
+            "event": "schedule",
+            "head_branch": "main",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "id": 100,
+            "run_attempt": 1,
+            "run_started_at": "2026-08-27T01:11:00Z",
+            "status": "completed",
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_id": 77
+          }
+        ],
+        "discovery_sources": [
+          "census",
+          "retained-artifact-extension"
+        ],
+        "latest_run_attempt": 1,
+        "run_id": 100
+      },
+      {
+        "artifacts": [
+          {
+            "created_at": "2026-08-27T01:14:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "expired": false,
+            "expires_at": "2026-09-10T01:14:00Z",
+            "id": 9002,
+            "name": "deterministic-publication-intent-101-1",
+            "size_in_bytes": 512,
+            "updated_at": "2026-08-27T01:14:00Z",
+            "workflow_run": {
+              "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+              "id": 101
+            }
+          }
+        ],
+        "attempts": [
+          {
+            "conclusion": "success",
+            "created_at": "2026-08-27T02:10:00Z",
+            "event": "schedule",
+            "head_branch": "main",
+            "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "id": 101,
+            "run_attempt": 1,
+            "run_started_at": "2026-08-27T02:11:00Z",
+            "status": "completed",
+            "updated_at": "2026-08-27T02:14:00Z",
+            "workflow_id": 77
+          }
+        ],
+        "discovery_sources": [
+          "census"
+        ],
+        "latest_run_attempt": 1,
+        "run_id": 101
+      }
+    ],
+    "workflow_path": ".github/workflows/ingest-crypto-sources.yml"
+  },
+  "prepared_recovery": [
+    {
+      "author_login": "8ft0-ai",
+      "body_base64": "eyJjb250cmFjdCI6InRydXN0ZWQtbWFpbi1zb3VyY2UtZXZpZGVuY2UtcmVjb3ZlcnktZGVjaXNpb24vdjEiLCJyZWFzb24iOiJmaXh0dXJlIn0=",
+      "body_sha256": "51934044a7f2c379d8cda7f11a0faffdf1fe80269a7c650fd28b69d14ca5083d",
+      "comment_id": 7001,
+      "issue_number": 523
+    }
+  ]
+}
