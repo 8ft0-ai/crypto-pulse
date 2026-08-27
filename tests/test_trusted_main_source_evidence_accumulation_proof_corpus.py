@@ -433,17 +433,31 @@ class Phase17TrustedMainSourceEvidenceProofTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
-    def test_trusted_path_conflict_binds_staged_and_trusted_identities(self) -> None:
+    def test_trusted_path_conflict_recovery_excludes_conflict_and_allows_later_valid(self) -> None:
         path, occupant = _snapshot(BASE_HOUR + timedelta(hours=1, minutes=17), invalid_hour=True)
         temporary, repo, base = self._seed(extra_base_files={path: occupant})
         try:
-            source = self._source(repo, base, 1, 2001, path_override=path)
-            manifest = build_accumulation_manifest(repo, base, [source])
-            blocker = manifest["blocking_findings"][0]
-            self.assertEqual(manifest["hours"][0]["disposition"], "path-conflict")
+            conflict = self._source(repo, base, 1, 2001, path_override=path)
+            later = self._source(repo, base, 2, 2002)
+            initial = build_accumulation_manifest(repo, base, [conflict, later])
+            blocker = initial["blocking_findings"][0]
+            self.assertEqual(initial["hours"][0]["disposition"], "path-conflict")
+            self.assertEqual(initial["hours"][1]["disposition"], "eligible")
+            self.assertEqual(initial["added_paths"], [])
             self.assertEqual(blocker["blocker_class"], "trusted-path-conflict")
             self.assertEqual(blocker["staged_snapshot_identity"]["path"], path)
             self.assertEqual(blocker["trusted_main_identity"]["base_sha"], base)
+            self.assertEqual(blocker["trusted_main_identity"]["path"], path)
+
+            recovery = self._recovery(blocker)
+            manifest = build_accumulation_manifest(repo, base, [conflict, later], [recovery], [523])
+            self.assertEqual(manifest["blocking_findings"], [])
+            self.assertEqual(manifest["hours"][0]["disposition"], "terminal-excluded")
+            self.assertEqual(manifest["hours"][1]["disposition"], "eligible")
+            self.assertEqual(len(manifest["added_paths"]), 1)
+            self.assertNotEqual(manifest["added_paths"][0]["path"], path)
+            self.assertEqual(manifest["added_paths"][0]["canonical_observation_hour_utc"], "2026-08-27T02:00:00Z")
+            self.assertEqual(_git(repo, "show", f"{base}:{path}"), occupant)
         finally:
             temporary.cleanup()
 
@@ -518,6 +532,45 @@ class Phase17TrustedMainSourceEvidenceProofTests(unittest.TestCase):
                     [row["blocker_class"] for row in manifest["blocking_findings"]],
                 )
                 self.assertEqual(manifest["added_paths"], [])
+        finally:
+            temporary.cleanup()
+
+    def test_recovery_is_rejected_after_current_main_reclassification_changes(self) -> None:
+        path, occupant = _snapshot(BASE_HOUR + timedelta(hours=1, minutes=17), invalid_hour=True)
+        temporary, repo, base = self._seed(extra_base_files={path: occupant})
+        try:
+            source = self._source(repo, base, 1, 2451, path_override=path)
+            initial = build_accumulation_manifest(repo, base, [source])
+            blocker = initial["blocking_findings"][0]
+            self.assertEqual(blocker["blocker_class"], "trusted-path-conflict")
+            recovery = self._recovery(blocker, comment_id=5439990004)
+
+            recovered = build_accumulation_manifest(repo, base, [source], [recovery], [523])
+            self.assertEqual(recovered["blocking_findings"], [])
+            self.assertEqual(recovered["hours"][0]["disposition"], "terminal-excluded")
+
+            changed_base = self._child_commit(
+                repo,
+                base,
+                {path: source["snapshot_bytes"]},
+                b"trust previously conflicting source bytes\n",
+            )
+            changed = build_accumulation_manifest(repo, changed_base, [source], [recovery], [523])
+            self.assertEqual(changed["anchor_observation_hour_utc"], "2026-08-27T01:00:00Z")
+            self.assertEqual(changed["applied_recovery_decisions"], [])
+            self.assertIn(
+                "verified-input-outside-window",
+                [row["kind"] for row in changed["operational_diagnostics"]],
+            )
+            self.assertIn(
+                "recovery-decision-invalid",
+                [row["blocker_class"] for row in changed["blocking_findings"]],
+            )
+            recovery_blocker = next(
+                row for row in changed["blocking_findings"] if row["blocker_class"] == "recovery-decision-invalid"
+            )
+            self.assertIn("stale", recovery_blocker["reason"])
+            self.assertEqual(changed["added_paths"], [])
         finally:
             temporary.cleanup()
 
