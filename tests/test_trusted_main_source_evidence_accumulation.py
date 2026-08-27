@@ -113,6 +113,15 @@ class TrustedMainSourceEvidenceAccumulationTests(unittest.TestCase):
         self.assertNotEqual(baseline["operational_diagnostics"], diagnostic_only["operational_diagnostics"])
         self.assertEqual(baseline["candidate_id"], diagnostic_only["candidate_id"])
 
+    def test_verified_outside_window_is_diagnostic_only_for_candidate_identity(self) -> None:
+        source = self._source(run_id=12)
+        outside = self._verified(source, "2026-08-28T02:00:00Z")
+        baseline = self._build([], [])
+        diagnostic_only = self._build([source], [outside])
+        self.assertNotEqual(baseline["operational_diagnostics"], diagnostic_only["operational_diagnostics"])
+        self.assertEqual(diagnostic_only["verified_source_inputs"], [])
+        self.assertEqual(baseline["candidate_id"], diagnostic_only["candidate_id"])
+
     def test_highest_successful_attempt_supersedes_lower_attempt(self) -> None:
         low = self._source(run_id=12, attempt=1)
         high = self._source(run_id=12, attempt=2)

@@ -646,6 +646,7 @@ def build_accumulation_manifest(
                     canonical_observation_hour_utc=candidate["canonical_observation_hour_utc"],
                 )
             )
+            continue
         verified.append(candidate)
 
     by_hour: dict[str, list[dict[str, Any]]] = {hour: [] for hour in window}
