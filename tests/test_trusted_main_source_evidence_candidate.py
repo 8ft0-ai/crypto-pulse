@@ -71,6 +71,27 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         self.assertIn("verify-pr", text)
         self.assertIn("retention-days: 14", text)
 
+    def test_workflow_resolves_source_workflow_by_filename_and_rebinds_exact_path(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("SOURCE_WORKFLOW_PATH: .github/workflows/ingest-crypto-sources.yml", text)
+        self.assertEqual(text.count('source_workflow_path = os.environ["SOURCE_WORKFLOW_PATH"]'), 2)
+        self.assertEqual(text.count("workflow_file = Path(source_workflow_path).name"), 2)
+        self.assertEqual(
+            text.count('workflow = gh_json(f"/repos/{repo}/actions/workflows/{workflow_file}")'),
+            2,
+        )
+        self.assertEqual(
+            text.count('if str(workflow.get("path", "")) != source_workflow_path:'),
+            2,
+        )
+        self.assertEqual(
+            text.count(
+                'raise RuntimeError("resolved ingestion workflow path does not match frozen workflow identity")'
+            ),
+            2,
+        )
+        self.assertNotIn("actions/workflows/{os.environ['SOURCE_WORKFLOW_PATH']}", text)
+
     def test_census_bounds_cover_full_rerun_horizon_without_creating_hour_authority(self) -> None:
         bounds = candidate.census_bounds(
             {"start_utc": "2026-08-27T01:00:00Z", "end_utc": "2026-08-28T01:00:00Z"}

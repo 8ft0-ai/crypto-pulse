@@ -120,7 +120,11 @@ jobs:
                   raise RuntimeError(f"paginated response is not a page list: {endpoint}")
               return value
 
-          workflow = gh_json(f"/repos/{repo}/actions/workflows/{os.environ['SOURCE_WORKFLOW_PATH']}")
+          source_workflow_path = os.environ["SOURCE_WORKFLOW_PATH"]
+          workflow_file = Path(source_workflow_path).name
+          workflow = gh_json(f"/repos/{repo}/actions/workflows/{workflow_file}")
+          if str(workflow.get("path", "")) != source_workflow_path:
+              raise RuntimeError("resolved ingestion workflow path does not match frozen workflow identity")
           workflow_id = int(workflow["id"])
           created = f"{census['start_utc']}..{census['end_utc']}"
           run_pages = paged(
@@ -757,7 +761,11 @@ jobs:
                   raise RuntimeError("paginated response is incomplete")
               return value
 
-          workflow = gh_json(f"/repos/{repo}/actions/workflows/{os.environ['SOURCE_WORKFLOW_PATH']}")
+          source_workflow_path = os.environ["SOURCE_WORKFLOW_PATH"]
+          workflow_file = Path(source_workflow_path).name
+          workflow = gh_json(f"/repos/{repo}/actions/workflows/{workflow_file}")
+          if str(workflow.get("path", "")) != source_workflow_path:
+              raise RuntimeError("resolved ingestion workflow path does not match frozen workflow identity")
           workflow_id = int(workflow["id"])
           created = f"{census['start_utc']}..{census['end_utc']}"
           run_pages = paged(f"/repos/{repo}/actions/workflows/{workflow_id}/runs", event="schedule", created=created, per_page="100")
