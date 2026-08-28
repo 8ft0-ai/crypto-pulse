@@ -880,21 +880,27 @@ jobs:
       - name: Push disposable candidate with exact force-with-lease
         id: push
         env:
+          GH_TOKEN: ${{ github.token }}
           CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
         run: |
           set -euo pipefail
-          remote_line="$(git ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH")"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          remote_line="$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH")"
           if [[ -n "$remote_line" ]]; then
             [[ "$(printf '%s\n' "$remote_line" | wc -l | tr -d ' ')" == "1" ]]
             observed="${remote_line%%$'\t'*}"
             [[ "$observed" =~ ^[0-9a-f]{40}$ ]]
-            git push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:$observed" \
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+              push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:$observed" \
               origin "$CANDIDATE_SHA:refs/heads/$CANDIDATE_BRANCH"
           else
-            git push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:" \
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+              push --force-with-lease="refs/heads/$CANDIDATE_BRANCH:" \
               origin "$CANDIDATE_SHA:refs/heads/$CANDIDATE_BRANCH"
           fi
-          pushed="$(git ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH" | cut -f1)"
+          pushed="$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            ls-remote --heads origin "refs/heads/$CANDIDATE_BRANCH" | cut -f1)"
           [[ "$pushed" == "$CANDIDATE_SHA" ]]
 
       - name: Recheck mutable authority after branch push and before PR mutation
