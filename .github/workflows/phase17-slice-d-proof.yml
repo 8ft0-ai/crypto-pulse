@@ -154,21 +154,67 @@ jobs:
           latest = entries[-1]
           if latest.get("slot_utc") != expected_end:
               raise SystemExit("newest public slot identity mismatch")
-          if latest.get("gap") is not None or not isinstance(latest.get("value"), dict):
-              raise SystemExit("newest public slot must be an asserted value")
+          if latest.get("value") is not None:
+              raise SystemExit("newest public slot must remain an explicit gap")
 
-          comparison = latest["value"].get("comparison")
-          current_evidence = comparison.get("current") if isinstance(comparison, dict) else None
+          gap = latest.get("gap")
+          if not isinstance(gap, dict) or set(gap) != {"reason", "comparison", "metric_evidence"}:
+              raise SystemExit("newest public gap shape mismatch")
+          if gap.get("reason") != "phase13-pair-semantics-incompatible":
+              raise SystemExit("newest public gap reason mismatch")
+          if gap.get("metric_evidence") is not None:
+              raise SystemExit("newest public gap must not invent metric evidence")
+
+          comparison = gap.get("comparison")
+          if not isinstance(comparison, dict):
+              raise SystemExit("newest public gap comparison is missing")
+          if comparison.get("comparison_status") != "pair-semantics-incompatible":
+              raise SystemExit("newest comparison status mismatch")
+          if comparison.get("current_slot_utc") != "2026-08-22T05:00:00Z":
+              raise SystemExit("newest comparison current slot mismatch")
+          if comparison.get("predecessor_slot_utc") != "2026-08-22T04:00:00Z":
+              raise SystemExit("newest comparison predecessor slot mismatch")
+          if comparison.get("actual_elapsed_seconds") != 3152:
+              raise SystemExit("newest comparison elapsed-seconds mismatch")
+          if comparison.get("metric_comparisons") != []:
+              raise SystemExit("newest comparison must not contain metric comparisons")
+          if comparison.get("source_availability_changes") != []:
+              raise SystemExit("newest comparison must not contain source availability changes")
+          if comparison.get("repository_context") != context:
+              raise SystemExit("newest comparison repository context mismatch")
+
+          comparison_id = comparison.get("comparison_id")
+          if not isinstance(comparison_id, str) or re.fullmatch(r"[0-9a-f]{64}", comparison_id) is None:
+              raise SystemExit("newest comparison_id is not a lower-case SHA-256")
+
           expected_current = {
               "path": "data/crypto/hourly/2026/08/22/1543_AEST_source_snapshot.json",
               "sha256": "8329c350dc6ec91e25c71cd257f53cf834dc414f7e2e0c98b4179f89614becda",
+              "schema_version": "0.2",
+              "generated_at_utc": "2026-08-22T05:43:36Z",
               "observation_hour_utc": "2026-08-22T05:00:00Z",
+              "quality_status": "valid-ok",
+              "non_blocking_warnings": [],
           }
-          if not isinstance(current_evidence, dict):
-              raise SystemExit("newest current evidence is missing")
-          for key, expected in expected_current.items():
-              if current_evidence.get(key) != expected:
-                  raise SystemExit(f"newest current evidence {key} mismatch")
+          expected_predecessor = {
+              "path": "data/crypto/hourly/2026/08/22/1451_AEST_source_snapshot.json",
+              "sha256": "b4d8185ce116a57aba23befe218098ef72b4b0cd74d37770bc131c37b3a0748c",
+              "schema_version": "0.2",
+              "generated_at_utc": "2026-08-22T04:51:04Z",
+              "observation_hour_utc": "2026-08-22T04:00:00Z",
+              "quality_status": "valid-ok",
+              "non_blocking_warnings": [],
+          }
+
+          for label, evidence, expected_identity in (
+              ("current", comparison.get("current"), expected_current),
+              ("predecessor", comparison.get("predecessor"), expected_predecessor),
+          ):
+              if not isinstance(evidence, dict):
+                  raise SystemExit(f"newest {label} evidence is missing")
+              for key, expected in expected_identity.items():
+                  if evidence.get(key) != expected:
+                      raise SystemExit(f"newest {label} evidence {key} mismatch")
           PY
 
       - name: Verify generated site and tracked cleanliness
