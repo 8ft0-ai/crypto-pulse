@@ -12,6 +12,8 @@ on:
         required: false
         default: ""
         type: string
+  schedule:
+    - cron: "47 0 * * *"
 
 permissions: {}
 
@@ -23,6 +25,8 @@ env:
   SOURCE_WORKFLOW_PATH: .github/workflows/ingest-crypto-sources.yml
   CANDIDATE_BRANCH: automation/source-evidence-accumulation
   PREPARED_BUNDLE_NAME: trusted-main-source-evidence-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+  EXPECTED_MAIN_SHA: ${{ github.event_name == 'schedule' && github.sha || inputs.expected_main_sha }}
+  RECOVERY_COMMENT_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.recovery_comment_ids || '' }}
 
 jobs:
   prepare:
@@ -41,20 +45,24 @@ jobs:
       - name: Validate dispatch and protected-main identity
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
-          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "schedule" ]]
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
           [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            [[ "$EXPECTED_MAIN_SHA" == "$GITHUB_SHA" ]]
+            [[ -z "$RECOVERY_COMMENT_IDS" ]]
+          fi
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
 
       - name: Check out exact candidate base
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.expected_main_sha }}
+          ref: ${{ env.EXPECTED_MAIN_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -71,7 +79,7 @@ jobs:
 
       - name: Derive exact anchor, target window and frozen census bounds
         env:
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python scripts/trusted_main_source_evidence_candidate.py window \
@@ -83,7 +91,7 @@ jobs:
       - name: Capture complete scheduled-run and retained-artifact population
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -341,7 +349,7 @@ jobs:
       - name: Capture explicitly supplied recovery carriers
         env:
           GH_TOKEN: ${{ github.token }}
-          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+          RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
           cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
@@ -402,7 +410,7 @@ jobs:
       - name: Build deterministic prepared bundle
         id: prepare
         env:
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/prepared-bundle"
@@ -443,7 +451,7 @@ jobs:
 
       - name: Independently replay prepared Slice A/helper state
         env:
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python scripts/trusted_main_source_evidence_candidate.py replay \
@@ -483,20 +491,24 @@ jobs:
       - name: Validate dispatch identity and current protected main
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
-          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "schedule" ]]
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
           [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            [[ "$EXPECTED_MAIN_SHA" == "$GITHUB_SHA" ]]
+            [[ -z "$RECOVERY_COMMENT_IDS" ]]
+          fi
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
 
       - name: Check out exact candidate base
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.expected_main_sha }}
+          ref: ${{ env.EXPECTED_MAIN_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -520,7 +532,7 @@ jobs:
       - name: Re-materialise exact Git objects and replay prepared bundle
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python - <<'PY' > "$RUNNER_TEMP/git-object-inputs.tsv"
@@ -570,7 +582,7 @@ jobs:
       - name: Freshly reclassify exact Git objects before publication
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -708,7 +720,7 @@ jobs:
 
       - name: Install reusable GitHub capture helpers for this publish job
         env:
-          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+          RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
           cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
@@ -823,7 +835,7 @@ jobs:
       - name: Build local disposable candidate commit from exact base
         id: candidate
         env:
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           git checkout -B "$CANDIDATE_BRANCH" "$EXPECTED_MAIN_SHA"
@@ -853,7 +865,7 @@ jobs:
       - name: Repeat complete population census immediately before remote publication
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
         run: |
           set -euo pipefail
           python "$RUNNER_TEMP/capture-sources.py" \
@@ -866,8 +878,8 @@ jobs:
       - name: Final pre-push main and recovery freshness cut
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
-          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
+          RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
@@ -906,8 +918,8 @@ jobs:
       - name: Recheck mutable authority after branch push and before PR mutation
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
-          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
+          RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
@@ -952,11 +964,11 @@ jobs:
       - name: Final post-PR identity and freshness proof
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
           CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           CANDIDATE_ID: ${{ needs.prepare.outputs.candidate_id }}
-          RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}
+          RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
           gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/final-pr.json"
