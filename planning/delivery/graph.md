@@ -66,6 +66,12 @@ flowchart LR
   run_32633849094["Workflow Run\nPublish Phase 16 reader experience to GitHub Pages"]
   artifact_phase16_reader_site["Artifact\nPublic Phase 16 reader-facing evidence surfaces"]
   boundary_phase16_authority_separation["Boundary\nReader presentation preserves evidence authority separation"]
+  phase_17["Phase\nPhase 17 — Trusted-main source-evidence accumulation and freshness"]
+  issue_523["Issue #523\nPhase 17 delivery control — trusted-main source-evidence accumulation"]
+  pr_535["PR #535\nPhase 17 source-evidence accumulation candidate"]
+  run_33333144803["Workflow Run\nPublish Phase 17 promoted source evidence through GitHub Pages"]
+  artifact_phase17_source_evidence_accumulator["Artifact\nTrusted-main source-evidence accumulator"]
+  boundary_phase17_candidate_refresh_no_auto_merge["Boundary\nDaily candidate refresh does not grant merge authority"]
 
   pre_phase_baseline -->|enabled formal phase delivery| phase_1
   issue_75 -->|controlled| phase_1
@@ -134,4 +140,12 @@ flowchart LR
   run_32633849094 -->|deployed exact reader surfaces| artifact_phase16_reader_site
   phase_16 -->|preserved authority separation| boundary_phase16_authority_separation
   phase_16 -->|preserved| boundary_no_committed_site
+  phase_16 -->|sparse trusted evidence motivated accumulation| phase_17
+  phase_12 -->|canonical observation-hour identity enabled accumulation| phase_17
+  phase_17 -->|governed by| issue_523
+  phase_17 -->|proved bounded real source promotion| pr_535
+  phase_17 -->|proved unchanged public chain| run_33333144803
+  phase_17 -->|implemented by| artifact_phase17_source_evidence_accumulator
+  phase_17 -->|preserved candidate-specific merge governance| boundary_phase17_candidate_refresh_no_auto_merge
+  phase_17 -->|preserved| boundary_no_committed_site
 ```

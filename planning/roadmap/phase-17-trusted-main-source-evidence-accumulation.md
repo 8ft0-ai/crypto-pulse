@@ -1,14 +1,14 @@
 # Phase 17 — Trusted-main source-evidence accumulation and freshness
 
-Status: selected; delivery has not started.
+Status: complete.
 
-This is a forward-looking roadmap spec. It promotes the freshly reviewed `trusted-main-source-evidence-accumulation/v1.1` contract from #516 without changing runtime behaviour by itself.
+This roadmap spec records the intended `trusted-main-source-evidence-accumulation/v1.1` boundary promoted from #516 and the final delivered disposition. Completed implementation/proof evidence is recorded in `planning/delivery/phase-17-trusted-main-source-evidence-accumulation.md` and the canonical GitHub history.
 
 ## Problem statement
 
 Phase 16 made sparse repository evidence truthful and reader-safe, but it deliberately left #497 T2 source-evidence accumulation outside scope. The hourly ingestion workflow can already produce and validate one canonical Phase-12 source snapshot per scheduled run, yet its mutable rolling branch is not trusted evidence authority and unmerged candidates are not retained as a useful adjacent population on protected `main`.
 
-The remaining problem is therefore not reader presentation and not automatic publication. It is how to accumulate exact already-generated, already-validated source evidence into bounded, reviewable source-only candidates so protected `main` can gain enough adjacent observations for the frozen Phase 13 / 15 / 16 temporal consumers to become useful without weakening repository authority.
+The remaining problem was therefore not reader presentation and not automatic publication. It was how to accumulate exact already-generated, already-validated source evidence into bounded, reviewable source-only candidates so protected `main` could gain enough adjacent observations for the frozen Phase 13 / 15 / 16 temporal consumers to become useful without weakening repository authority.
 
 ## Goal
 
@@ -65,9 +65,9 @@ deterministic-publication-intent-<run_id>-<run_attempt>/
   payload/snapshot.json
 ```
 
-For each candidate input, the accumulator must bind repository, workflow, event, run ID, run attempt, artifact identity, snapshot SHA-256, recorded snapshot commit/blob/path and current-main validator compatibility. Producer-time success is provenance evidence; current-main revalidation is the promotion compatibility gate.
+For each candidate input, the accumulator binds repository, workflow, event, run ID, run attempt, artifact identity, snapshot SHA-256, recorded snapshot commit/blob/path and current-main validator compatibility. Producer-time success is provenance evidence; current-main revalidation is the promotion compatibility gate.
 
-Only exact snapshot bytes that pass the frozen Phase-12 observation-hour validator establish canonical hour identity. Cron slots, scheduled timestamps, workflow timestamps, artifact upload time, commit/file timestamps, another run attempt or expected cadence must never be used to invent an hour.
+Only exact snapshot bytes that pass the frozen Phase-12 observation-hour validator establish canonical hour identity. Cron slots, scheduled timestamps, workflow timestamps, artifact upload time, commit/file timestamps, another run attempt or expected cadence are never used to invent an hour.
 
 For reruns of one run ID, only the highest successful attempt is eligible. Distinct successful run IDs resolving to the same actual canonical hour remain duplicate evidence and are never automatically ranked or elected.
 
@@ -112,7 +112,7 @@ Unsafe evidence blocks the candidate by default. A terminal exclusion can be app
 trusted-main-source-evidence-recovery-decision/v1
 ```
 
-The owner decision record is a top-level GitHub issue comment on the active Phase 17 delivery-control issue or an explicitly linked recovery issue. It is supplied explicitly to a manual recovery invocation; the accumulator must not discover or choose recovery authority automatically.
+The owner decision record is a top-level GitHub issue comment on the active Phase 17 delivery-control issue or an explicitly linked recovery issue. It is supplied explicitly to a manual recovery invocation; the accumulator does not discover or choose recovery authority automatically.
 
 The manifest binds the exact recovery comment ID, body hash, blocker fingerprint, strongest immutable input identities and canonical hour when one is provable. Edited, mismatched or stale recovery decisions are invalid. The exact input is reclassified against current protected `main` before recovery is applied.
 
@@ -147,7 +147,7 @@ Any base/head/candidate change invalidates previous substantive review. A candid
 - a separate owner merge decision is recorded after the approval;
 - merge uses an exact expected-head guard.
 
-No phase-level approval, old candidate review or future recurring-schedule authority substitutes for the candidate-specific merge decision.
+No phase-level approval, old candidate review or recurring-schedule authority substitutes for the candidate-specific merge decision.
 
 ## Freshness and retention
 
@@ -168,48 +168,58 @@ Phase 14 remains complete and inert at its existing control-plane boundary. #477
 
 ## Acceptance gates
 
-Phase 17 is complete only when all of the following have been proved under separate governed candidates where required:
+Phase 17 is complete because all of the following have been proved under separate governed candidates where required:
 
-- [ ] Slice A implements deterministic v1.1 accumulation/recovery logic and closed offline fixtures with stable repeat materialisation.
-- [ ] Exact input/run/attempt/artifact/snapshot binding and current-main compatibility validation are proved.
-- [ ] Failure-before-artifact, delayed-success, rerun-hour drift and same-hour distinct-run duplicate cases preserve snapshot-only hour authority.
-- [ ] Permanent invalid, duplicate, unavailable and path-conflict cases fail closed without recovery and permit later valid evidence only after an exact terminal exclusion.
-- [ ] Recovery drift is rejected and no synthetic cursor movement is possible.
-- [ ] Slice B provides a `workflow_dispatch`-only source candidate builder with explicit recovery-comment-ID input, no schedule and no merge capability.
-- [ ] Candidate construction is additions-only under `data/crypto/hourly/...`, deterministic from current main and invalidates review on refresh.
-- [ ] Slice C completes one separately authorised real candidate pilot of no more than 25 canonical hours through exact-head validation, fresh review and separate owner merge authority.
-- [ ] Slice D proves the exact merged source population through the unchanged Phase 13 / 15 / 16 consumer chain and existing Pages deployment path.
-- [ ] No Phase 14/#477 activation, model/provider work, report-generation authority or public `live/current/up to date` claim is introduced.
-- [ ] Slice E presents and records a separate owner decision on recurring candidate refresh; no recurring cadence is implied by earlier slices.
-- [ ] Close-out records exact implementation, validation, merged identities and preserved boundaries in `planning/delivery/` and the delivery ledger/graph metadata where applicable.
+- [x] Slice A implements deterministic v1.1 accumulation/recovery logic and closed offline fixtures with stable repeat materialisation.
+- [x] Exact input/run/attempt/artifact/snapshot binding and current-main compatibility validation are proved.
+- [x] Failure-before-artifact, delayed-success, rerun-hour drift and same-hour distinct-run duplicate cases preserve snapshot-only hour authority.
+- [x] Permanent invalid, duplicate, unavailable and path-conflict cases fail closed without recovery and permit later valid evidence only after an exact terminal exclusion.
+- [x] Recovery drift is rejected and no synthetic cursor movement is possible.
+- [x] Slice B first delivered a `workflow_dispatch`-only source candidate builder with explicit recovery-comment-ID input, no schedule and no merge capability.
+- [x] Candidate construction is additions-only under `data/crypto/hourly/...`, deterministic from current main and invalidates review on refresh.
+- [x] Slice C completes one separately authorised real candidate pilot of no more than 25 canonical hours through exact-head validation, fresh review and separate owner merge authority.
+- [x] Slice D proves the exact merged source population through the unchanged Phase 13 / 15 / 16 consumer chain and existing Pages deployment path.
+- [x] No Phase 14/#477 activation, model/provider work, report-generation authority or public `live/current/up to date` claim is introduced.
+- [x] Slice E presents and records a separate owner decision on recurring candidate refresh; the selected daily candidate refresh is separately implemented and merged without automatic merge capability.
+- [x] Close-out records exact implementation, validation, merged identities and preserved boundaries in `planning/delivery/` and the delivery ledger/graph metadata where applicable.
 
 ## Delivery sequence
 
 ### Slice A — deterministic accumulation contract and offline proof
 
-Implement the pure deterministic manifest/selection/recovery logic and closed fixtures. This slice has **no GitHub write path** and must include all decision-critical recovery/failure/delay/rerun proofs from the approved v1.1 design.
+Implemented the pure deterministic manifest/selection/recovery logic and closed fixtures with no GitHub write path.
 
 ### Slice B — manual source-only candidate builder
 
-Add one `workflow_dispatch` builder that gathers immutable scheduled-ingestion inputs, invokes the deterministic Slice A logic, emits the canonical manifest/artifact and opens or refreshes the disposable source-only candidate PR. Recovery comment IDs are explicit manual inputs. No schedule and no merge capability.
+Delivered the manual builder that gathers immutable scheduled-ingestion inputs, invokes Slice A, emits the canonical manifest/artifact and opens or refreshes the disposable source-only candidate PR. Recovery comment IDs remain explicit manual inputs and the workflow has no merge capability.
 
 ### Slice C — bounded real promotion pilot
 
-Freeze one exact real candidate of at most 25 canonical hours, validate and replay it, obtain a fresh exact-head review, obtain a separate owner merge decision, merge with expected-head guard and verify protected `main` source identities.
+The first separately authorised dispatch failed before canonical candidate evidence and its one-dispatch authority was consumed. After separately governed remediation, a fresh pilot produced PR #535. The reviewed candidate promoted 17 canonical hours with zero remaining blockers and merged to protected main as `877670ac6739fcfda1614c407a90c7417b1c7320` under a separate owner decision and expected-head guard.
 
 ### Slice D — consumer and public proof
 
-Replay the unchanged Phase 13 / 15 / 16 chain from the exact merged state and verify the existing Pages build/deploy artifact without changing renderer semantics merely to make temporal output appear fuller.
+The unchanged Phase 13 / 15 / 16 chain was replayed/proved from the promoted state. Pages run `33333144803` and live runs `33333182395` / `33333262565` proved the existing public path without changing renderer semantics to manufacture fuller evidence.
 
 ### Slice E — recurring refresh decision
 
-Only after Slice C/D proof, present a separate owner decision between:
+The separate owner decision selected **daily candidate refresh only**. PR #539 merged the exact `47 0 * * *` UTC schedule as `948ba28b965d9c3c9e5760af89f7367503f2a84f`. Manual `workflow_dispatch` remains available. Scheduled runs bind exact event `github.sha`, require live protected main to match, and receive no recovery-comment authority. Every candidate merge remains separately governed.
 
-- recommended: daily candidate refresh only;
-- alternative: remain manual `workflow_dispatch`;
-- reject: leave the accumulation capability inactive.
+## Delivered close-out disposition
 
-Even if recurring candidate refresh is later authorised, merge remains manually governed per exact candidate.
+```text
+Slice A: COMPLETE
+Slice B: COMPLETE
+Slice C: PASS — bounded real source-evidence promotion complete
+Slice D: PASS — unchanged consumer/public proof complete
+Slice E: DAILY_CANDIDATE_REFRESH — merged/configured on protected main
+Protected main before close-out record: 948ba28b965d9c3c9e5760af89f7367503f2a84f
+Phase 14/#477 activation: no
+Automatic candidate/source merge: no
+Successor phase selected: no
+```
+
+The completed management record lives at `planning/delivery/phase-17-trusted-main-source-evidence-accumulation.md`. The delivery ledger and compact graph record only the representative causal evidence; the full issue/PR/run/recovery trail remains canonical in GitHub.
 
 ## Risks and mitigations
 
@@ -231,21 +241,21 @@ Mitigation: recovery is durable owner control-plane input supplied explicitly to
 
 ### Risk: automation silently expands into publication authority
 
-Mitigation: initial builder is `workflow_dispatch` only, has no merge capability, leaves Phase 14/#477 inert and requires a later separate owner decision for any recurring refresh cadence.
+Mitigation: daily automation is limited to candidate refresh, has no merge capability, leaves Phase 14/#477 inert and does not substitute for candidate-specific review/owner merge authority.
 
 ## Definition of done
 
 The phase is complete when:
 
-- [ ] the Phase 17 parent delivery-control issue and linked slice/proof work are durable;
-- [ ] all required implementation candidates receive exact-head validation and fresh substantive review;
-- [ ] any source-evidence merge uses separate owner authority and exact-head guards;
-- [ ] one bounded real promotion and unchanged-consumer/public proof are complete;
-- [ ] the recurring refresh decision is separately recorded;
-- [ ] the completed Phase 17 delivery record is added under `planning/delivery/`;
-- [ ] `planning/delivery-log.md` and delivery metadata/graph are updated where applicable;
-- [ ] roadmap/backlog state accurately records the completed phase and any still-parked follow-on work;
-- [ ] generated `_site/` output is not committed.
+- [x] the Phase 17 parent delivery-control issue and linked slice/proof work are durable;
+- [x] all required implementation candidates receive exact-head validation and fresh substantive review;
+- [x] any source-evidence merge uses separate owner authority and exact-head guards;
+- [x] one bounded real promotion and unchanged-consumer/public proof are complete;
+- [x] the recurring refresh decision is separately recorded and its selected daily candidate-refresh implementation is separately validated/reviewed/merged;
+- [x] the completed Phase 17 delivery record is added under `planning/delivery/`;
+- [x] `planning/delivery-log.md` and delivery metadata/graph are updated where applicable;
+- [x] roadmap/backlog state accurately records the completed phase and still-parked follow-on work;
+- [x] generated `_site/` output is not committed.
 
 ## Governing evidence
 
@@ -254,6 +264,9 @@ The phase is complete when:
 - fresh substantive approval: #516 comment `5425040365` — `APPROVED`;
 - owner promotion/delivery authority: #516 comment `5425197783` — `ACCEPT`;
 - roadmap promotion control: #521;
-- roadmap promotion candidate: PR #522.
+- roadmap promotion candidate: PR #522;
+- parent delivery-control issue: #523;
+- exact close-out plan: #523 comment `5471702402` — `phase17-close-out-plan/v1`;
+- fresh close-out plan review: #523 comment `5471705380` — `APPROVED`.
 
-The roadmap promotion itself grants no source-evidence merge, recurring schedule, Phase 14 activation or #477 authority.
+The completed Phase 17 programme grants no Phase 14/#477 activation, model/provider/report-generation authority, automatic source-evidence merge or successor-phase authority.

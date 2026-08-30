@@ -485,3 +485,47 @@ Delivery notes:
 - The exact final merge was automatically built and deployed by Pages run `32633849094`; the required live Home, latest, Archive and temporal pages matched the deployed artifact byte-for-byte.
 - #497 T2, Phase 14/#477 operationalisation, additional temporal series/analytics, providers/models, forecasts/recommendations/signals and committed `_site/` remain outside scope.
 - No successor phase is selected by this close-out.
+
+## Phase 17 — Trusted-main source-evidence accumulation and freshness
+
+Status: complete.
+
+Primary outcome: immutable Phase-12-valid scheduled evidence can be deterministically accumulated into bounded source-only candidates, one separately governed real candidate has been promoted to protected `main` and proved through the unchanged Phase 13 / 15 / 16 public chain, and a daily candidate refresh is configured without automatic merge authority.
+
+```text
+Shaping/design issue: #516
+Roadmap promotion: #521 / PR #522
+Parent issue: #523
+Slice A implementation: PR #526
+Slice A merge: 7b3be90cbc274dd83b5d797a1a8b0b3b13fab72b
+Slice A exact-head validation: 33033349524
+Slice B implementation: PR #527
+Slice B merge: 244f6cfaf6e0a488a341340b0415f04a6a7f1888
+Slice B exact-head validation: 33112753553
+Initial Slice C dispatch: 33119675314 — consumed failure before canonical candidate evidence
+Slice C remediation: PR #528
+Successful source-evidence candidate: PR #535
+Successful candidate head: f7243428bce233e8bba7fdbc5e4e871ac26aae34
+Source-evidence merge: 877670ac6739fcfda1614c407a90c7417b1c7320
+Slice C candidate id: e02decaed27a95c4d416ca9f53366ad717ea186f4a3b89b55c39db38d9cf4256
+Slice D proof/Pages/live runs: 33307381837, 33333144803, 33333182395, 33333262565
+Slice D final disposition: #523 comment 5471238860 — PASS
+Slice E selection: #523 comment 5471296088 — DAILY_CANDIDATE_REFRESH
+Slice E implementation: PR #539
+Slice E exact-head validation: 33336540615
+Slice E merge/current pre-close-out main: 948ba28b965d9c3c9e5760af89f7367503f2a84f
+Daily candidate-refresh cron: 47 0 * * * UTC
+Delivery record: planning/delivery/phase-17-trusted-main-source-evidence-accumulation.md
+Delivery graph update: yes — enduring trusted-main accumulation and no-auto-merge boundary
+_site committed: no
+```
+
+Delivery notes:
+
+- The deterministic accumulation contract binds exact run/attempt/artifact/snapshot identities and derives canonical hours only from exact Phase-12-valid snapshot bytes; diagnostics and scheduler timing never invent source evidence.
+- The successful Slice C pilot promoted 17 exact eligible hours, retained 5 `no-promotable-observation` hours and 3 `terminal-excluded` hours, and ended with zero blocking findings. Recovery excluded exact unsafe evidence only; it did not promote excluded bytes, elect duplicate winners, reconstruct missing data or synthesize cursor movement.
+- Slice D independently proved the promoted source population through unchanged Phase 13 / 15 / 16 consumers and the existing Pages/live-verification path.
+- Slice E selected and merged daily candidate refresh only. Scheduled runs bind exact event `github.sha`, recheck live protected main and receive no recovery authority. Manual dispatch remains available for explicitly governed recovery input.
+- Every generated source-evidence candidate still requires exact-head validation, fresh substantive review, a separate owner merge decision and an expected-head merge guard before protected main can change.
+- Phase 14/#477, model/provider/report-generation authority, broader temporal/product scope, advice-like features and committed `_site/` remain outside Phase 17.
+- No successor phase is selected by this close-out.
