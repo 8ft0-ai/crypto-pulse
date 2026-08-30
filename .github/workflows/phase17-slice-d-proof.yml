@@ -1,0 +1,223 @@
+name: Phase 17 Slice D proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact protected-main SHA authorised for this proof run
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: phase17-slice-d-proof
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    name: Replay unchanged Phase 13/15/16 consumers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+
+    steps:
+      - name: Validate dispatch and protected-main identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$GITHUB_RUN_ATTEMPT" == "1" ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$EXPECTED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]
+          live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
+
+      - name: Check out exact protected main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.expected_main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact checkout, cleanliness, and frozen consumer blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_MAIN_SHA" ]]
+          git diff --exit-code
+          git diff --cached --exit-code
+          [[ -z "$(git status --porcelain --untracked-files=no)" ]]
+
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:$path")"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Frozen consumer blob mismatch for $path: expected $expected, got $actual" >&2
+              exit 1
+            fi
+          }
+
+          check_blob scripts/resolve_crypto_observation_hour_adjacency.py 4b82ef0241c51887cc117fb530f2c18ede0844a4
+          check_blob scripts/build_crypto_observation_hour_comparison_record.py 197a3a0920398d0bdfb17f837e968d178f2e6702
+          check_blob scripts/validate_crypto_observation_hour_comparison.py 3620615d627996733206f3f7105d9ffaba34c44b
+          check_blob scripts/crypto_observation_hour_series.py a6def5b2dba8e280497a59c1760b50c31747896b
+          check_blob scripts/build_crypto_observation_hour_series.py 9245068955d205f97ab8acc2c371b63b7a4d2743
+          check_blob scripts/validate_crypto_observation_hour_series.py 3bd5ef46ba54d84235fd157ba306e959d6616f1d
+          check_blob scripts/phase15_public_temporal_evidence.py f475c988374eea40feffe51ed7019dd1738da7cf
+          check_blob scripts/render_crypto_observation_hour_series.py bdc8e3ab066ada00fafb20af3d62b608bc62e4fb
+          check_blob site_generator/temporal_evidence.py 2c57741e63e4cc0c321e0ccec9908eaae236e530
+          check_blob site_generator/reader_evidence.py 1a9c0eff16e81e28dda07fedb5f52785ba2432e9
+          check_blob site_generator/pipeline.py c0a1ec3e8a3ac3a2945edfb5bb6950882726062a
+          check_blob site_generator/__main__.py 43de26c95629df50bd3757b6b7b084f7cbb1ffed
+
+          mkdir -p "$RUNNER_TEMP/phase17-slice-d-proof"
+          printf 'git diff: clean\ngit diff --cached: clean\ntracked status: clean\n' \
+            > "$RUNNER_TEMP/phase17-slice-d-proof/pre-tracked-clean.txt"
+
+      - name: Set up frozen Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements-dev.txt
+
+      - name: Replay unchanged public temporal evidence and build site
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/phase15_public_temporal_evidence.py "$GITHUB_WORKSPACE" "$EXPECTED_MAIN_SHA" \
+            > "$RUNNER_TEMP/phase15-public-temporal-evidence.json"
+          python -m site_generator
+
+      - name: Validate exact Phase 15 output
+        shell: bash
+        run: |
+          set -euo pipefail
+          TREE_SHA="$(git rev-parse HEAD^{tree})" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          record_path = Path(os.environ["RUNNER_TEMP"]) / "phase15-public-temporal-evidence.json"
+          record = json.loads(record_path.read_text(encoding="utf-8"))
+
+          expected_start = "2026-08-21T06:00:00Z"
+          expected_end = "2026-08-22T05:00:00Z"
+          expected_slots = []
+          current = datetime.fromisoformat(expected_start[:-1] + "+00:00").astimezone(timezone.utc)
+          end = datetime.fromisoformat(expected_end[:-1] + "+00:00").astimezone(timezone.utc)
+          while current <= end:
+              expected_slots.append(current.isoformat().replace("+00:00", "Z"))
+              current += timedelta(hours=1)
+
+          if record.get("schema_version") != "crypto-observation-hour-series/v1":
+              raise SystemExit("unexpected Phase 15 series schema")
+          if record.get("series_kind") != "metric" or record.get("series_key") != "BTC.price_usd":
+              raise SystemExit("unexpected public series identity")
+          if record.get("window") != {"start_utc": expected_start, "end_utc": expected_end}:
+              raise SystemExit("unexpected public temporal window")
+
+          entries = record.get("entries")
+          if not isinstance(entries, list) or len(entries) != 24:
+              raise SystemExit("expected exactly 24 public temporal slots")
+          if [entry.get("slot_utc") for entry in entries] != expected_slots:
+              raise SystemExit("public temporal slots are not the exact canonical sequence")
+
+          context = record.get("repository_context")
+          if not isinstance(context, dict):
+              raise SystemExit("repository context is missing")
+          if context.get("commit_sha") != os.environ["EXPECTED_MAIN_SHA"]:
+              raise SystemExit("repository commit identity mismatch")
+          if context.get("tree_sha") != os.environ["TREE_SHA"]:
+              raise SystemExit("repository tree identity mismatch")
+
+          series_id = record.get("series_id")
+          if not isinstance(series_id, str) or re.fullmatch(r"[0-9a-f]{64}", series_id) is None:
+              raise SystemExit("series_id is not a lower-case SHA-256")
+
+          latest = entries[-1]
+          if latest.get("slot_utc") != expected_end:
+              raise SystemExit("newest public slot identity mismatch")
+          if latest.get("gap") is not None or not isinstance(latest.get("value"), dict):
+              raise SystemExit("newest public slot must be an asserted value")
+
+          comparison = latest["value"].get("comparison")
+          current_evidence = comparison.get("current") if isinstance(comparison, dict) else None
+          expected_current = {
+              "path": "data/crypto/hourly/2026/08/22/1543_AEST_source_snapshot.json",
+              "sha256": "8329c350dc6ec91e25c71cd257f53cf834dc414f7e2e0c98b4179f89614becda",
+              "observation_hour_utc": "2026-08-22T05:00:00Z",
+          }
+          if not isinstance(current_evidence, dict):
+              raise SystemExit("newest current evidence is missing")
+          for key, expected in expected_current.items():
+              if current_evidence.get(key) != expected:
+                  raise SystemExit(f"newest current evidence {key} mismatch")
+          PY
+
+      - name: Verify generated site and tracked cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f _site/index.html
+          test -f _site/latest.html
+          test -f _site/archive/index.html
+          test -f _site/search.html
+          test -f _site/search-index.json
+          test -f _site/manifest.json
+          test -f _site/feed.xml
+
+          git diff --exit-code
+          git diff --cached --exit-code
+          [[ -z "$(git status --porcelain --untracked-files=no)" ]]
+
+          proof="$RUNNER_TEMP/phase17-slice-d-proof"
+          cp "$RUNNER_TEMP/phase15-public-temporal-evidence.json" \
+            "$proof/phase15-public-temporal-evidence.json"
+          {
+            printf 'commit_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'tree_sha=%s\n' "$(git rev-parse HEAD^{tree})"
+          } > "$proof/repository-identities.txt"
+          python --version > "$proof/python-version.txt" 2>&1
+          printf 'git diff: clean\ngit diff --cached: clean\ntracked status: clean\n' \
+            > "$proof/post-tracked-clean.txt"
+
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import os
+          from pathlib import Path
+
+          root = Path("_site")
+          output = Path(os.environ["RUNNER_TEMP"]) / "phase17-slice-d-proof" / "site-sha256.txt"
+          lines = []
+          for path in sorted(item for item in root.rglob("*") if item.is_file()):
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              lines.append(f"{digest}  {path.as_posix()}")
+          output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload bounded non-authoritative proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase17-slice-d-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/phase17-slice-d-proof
+          retention-days: 14
+          if-no-files-found: error
