@@ -25,11 +25,15 @@ def test_primary_headline_rejects_product_boundary_boilerplate():
     )
 
 
-def test_accessible_name_accepts_text_aria_or_title():
-    assert accessible_name_missing("", None, None)
-    assert not accessible_name_missing("Archive", None, None)
-    assert not accessible_name_missing("", "Open archive", None)
-    assert not accessible_name_missing("", None, "Open archive")
+def test_accessible_name_visible_control_requires_text_aria_or_title():
+    assert accessible_name_missing("", None, None, visible=True)
+    assert not accessible_name_missing("Archive", None, None, visible=True)
+    assert not accessible_name_missing("", "Open archive", None, visible=True)
+    assert not accessible_name_missing("", None, "Open archive", visible=True)
+
+
+def test_accessible_name_hidden_control_is_not_reported():
+    assert not accessible_name_missing("", None, None, visible=False)
 
 
 def test_normalise_axe_results_preserves_actionable_node_evidence():

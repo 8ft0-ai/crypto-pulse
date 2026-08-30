@@ -40,8 +40,16 @@ def primary_headline_is_boilerplate(text: str) -> bool:
     return any(marker in lowered for marker in DISCLAIMER_MARKERS)
 
 
-def accessible_name_missing(role_text: str, aria_label: str | None, title: str | None) -> bool:
-    """Return whether an interactive control lacks any accessible naming signal."""
+def accessible_name_missing(
+    role_text: str,
+    aria_label: str | None,
+    title: str | None,
+    *,
+    visible: bool = True,
+) -> bool:
+    """Return whether a visible interactive control lacks any accessible naming signal."""
+    if not visible:
+        return False
     return not any((role_text or "").strip() for role_text in (role_text, aria_label or "", title or ""))
 
 
@@ -101,9 +109,25 @@ def _capture_page(page: Any, name: str, url: str, output: Path, axe_source: str)
     headings = page.locator("h1").all_inner_texts()
     skip_links = page.locator('a[href^="#"]').all_inner_texts()
     controls = page.locator("a, button").evaluate_all(
-        "els => els.map(el => ({text: (el.innerText || '').trim(), aria: el.getAttribute('aria-label'), title: el.getAttribute('title')}))"
+        """els => els.map(el => ({
+          text: (el.innerText || '').trim(),
+          aria: el.getAttribute('aria-label'),
+          title: el.getAttribute('title'),
+          visible: typeof el.checkVisibility === 'function'
+            ? el.checkVisibility()
+            : !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
+        }))"""
     )
-    unnamed = [control for control in controls if accessible_name_missing(control["text"], control["aria"], control["title"])]
+    unnamed = [
+        control
+        for control in controls
+        if accessible_name_missing(
+            control["text"],
+            control["aria"],
+            control["title"],
+            visible=control["visible"],
+        )
+    ]
 
     page.add_script_tag(content=axe_source)
     raw_axe = page.evaluate(
