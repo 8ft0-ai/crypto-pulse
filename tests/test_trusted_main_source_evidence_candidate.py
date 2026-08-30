@@ -29,9 +29,15 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
     def base_capture(self) -> dict[str, object]:
         return copy.deepcopy(self.fixture["base_capture"])
 
-    def test_workflow_is_manual_only_with_exact_two_job_permissions_and_concurrency(self) -> None:
+    def test_workflow_has_daily_and_manual_triggers_with_exact_two_job_permissions_and_concurrency(self) -> None:
         workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
-        self.assertEqual(set(workflow["on"]), {"workflow_dispatch"})
+        self.assertEqual(set(workflow["on"]), {"workflow_dispatch", "schedule"})
+        self.assertEqual(workflow["on"]["schedule"], [{"cron": "47 0 * * *"}])
+        dispatch_inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+        self.assertEqual(set(dispatch_inputs), {"expected_main_sha", "recovery_comment_ids"})
+        self.assertEqual(dispatch_inputs["expected_main_sha"]["required"], "true")
+        self.assertEqual(dispatch_inputs["recovery_comment_ids"]["required"], "false")
+        self.assertEqual(dispatch_inputs["recovery_comment_ids"]["default"], "")
         self.assertEqual(set(workflow["jobs"]), {"prepare", "publish"})
         self.assertEqual(
             workflow["jobs"]["prepare"]["permissions"],
@@ -50,6 +56,30 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("enable-auto-merge", text)
         self.assertIn("persist-credentials: false", text)
+
+    def test_daily_schedule_binds_exact_event_sha_and_disables_recovery(self) -> None:
+        workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        env = workflow["env"]
+        self.assertEqual(
+            env["EXPECTED_MAIN_SHA"],
+            "${{ github.event_name == 'schedule' && github.sha || inputs.expected_main_sha }}",
+        )
+        self.assertEqual(
+            env["RECOVERY_COMMENT_IDS"],
+            "${{ github.event_name == 'workflow_dispatch' && inputs.recovery_comment_ids || '' }}",
+        )
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(
+            text.count('[[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "schedule" ]]'),
+            2,
+        )
+        self.assertEqual(text.count('if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then'), 2)
+        self.assertEqual(text.count('[[ "$GITHUB_SHA" == "$EXPECTED_MAIN_SHA" ]]'), 2)
+        self.assertEqual(text.count('[[ -z "$RECOVERY_COMMENT_IDS" ]]'), 2)
+        self.assertNotIn("EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}", text)
+        self.assertNotIn("RECOVERY_COMMENT_IDS: ${{ inputs.recovery_comment_ids }}", text)
+        self.assertIn("EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}", text)
+        self.assertIn("RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}", text)
 
     def test_workflow_contains_exact_main_object_replay_and_freshness_guards(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
