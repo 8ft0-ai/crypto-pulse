@@ -26,8 +26,14 @@ A roadmap phase spec should explain intended work before delivery. A delivery re
 | Phase 4 — Live-site provenance UX | The generated site leads with provenance, generation boundaries and schema-aware report presentation. | [phase-04-live-site-provenance-ux.md](phase-04-live-site-provenance-ux.md) |
 | Phase 6 — Deterministic claim selection | Repository code compiles, ranks, reconstructs, validates and renders claim candidates without an LLM; deterministic selection remains the sole active selector after the bounded model comparison was closed. | [phase-06-deterministic-claim-selection.md](phase-06-deterministic-claim-selection.md) |
 | Phase 9 — GPT-OSS quality and stability comparison | The governed GPT-OSS/DeepInfra comparison ends `no-stable-material-uplift`; deterministic selection remains the sole active selector and the temporary paid workflow is archived. | [phase-09-gpt-oss-quality-comparison.md](phase-09-gpt-oss-quality-comparison.md) |
+| Phase 10 — Deterministic previous-hour comparison engine | Repository code produces deterministic fail-closed exact previous-hour comparison evidence under the frozen 3,600-second contract. | [phase-10-previous-hour-comparison.md](phase-10-previous-hour-comparison.md) |
+| Phase 11 — Deterministic temporal visualisation | Repository code materialises, validates and deterministically renders repository-bound temporal series entirely offline. | [phase-11-deterministic-temporal-visualisation.md](phase-11-deterministic-temporal-visualisation.md) |
+| Phase 12 — Canonical observation-hour evidence | Future source snapshots preserve actual timing while adding separately validated canonical containing-hour identity. | [phase-12-canonical-observation-hour-evidence.md](phase-12-canonical-observation-hour-evidence.md) |
+| Phase 13 — Deterministic observation-hour comparison and temporal evidence | Phase-12 slot identity is consumed through exact adjacent-hour comparison and deterministic repository-bound temporal-series evidence. | [phase-13-observation-hour-temporal-evidence.md](phase-13-observation-hour-temporal-evidence.md) |
 | Phase 14 — Deterministic site publication | Reviewed deterministic publication control plane and App/protection boundary delivered at a safe inert boundary; live stale-base proof, pilot and recurring activation deferred. | [phase-14-deterministic-site-publication.md](phase-14-deterministic-site-publication.md) |
 | Phase 15 — Public deterministic temporal evidence | One validated repository-bound `BTC.price_usd` 24-slot temporal-evidence surface is published through the existing site pipeline with explicit gaps/provenance and demo/non-advice framing. | [phase-15-public-deterministic-temporal-evidence.md](phase-15-public-deterministic-temporal-evidence.md) |
+| Phase 16 — Reader-facing evidence experience | Home, Most recent, Temporal evidence and Archive present one coherent reader experience while preserving distinct repository-owned evidence authorities. | [phase-16-reader-facing-evidence-experience.md](phase-16-reader-facing-evidence-experience.md) |
+| Phase 17 — Trusted-main source-evidence accumulation and freshness | Immutable Phase-12-valid evidence can be accumulated into bounded source-only candidates, a real candidate has been promoted/proved, and daily candidate refresh is configured without automatic merge authority. | [phase-17-trusted-main-source-evidence-accumulation.md](phase-17-trusted-main-source-evidence-accumulation.md) |
 
 Phase 1 remains the first formal phase-managed delivery phase. The pre-phase baseline is a historical record, not Phase 0.
 
@@ -39,7 +45,13 @@ Phase 9 is recorded without backfilling unrelated Phase 7 or Phase 8 delivery re
 
 Phase 14 is recorded as complete at the safe inert control-plane boundary. Its delivery record explicitly preserves the unachieved live stale-base race, live pilot and recurring activation as deferred work rather than representing them as successful delivery.
 
-Phase 15 is recorded as complete after the reviewed Slice 3 state was automatically deployed by the existing Pages workflow and the exact deployed artifact was verified. The record keeps Phase 14/#477 operationalisation and broader temporal-product work separately parked and selects no successor phase.
+Phase 15 is recorded as complete after the reviewed Slice 3 state was automatically deployed by the existing Pages workflow and the exact deployed artifact was verified. The record keeps Phase 14/#477 operationalisation and broader temporal-product work separately parked.
+
+Phase 16 is recorded as complete after the final reader-facing integration was automatically deployed and the required public surfaces matched the deployed artifact byte-for-byte.
+
+Phase 17 is recorded as complete after deterministic accumulation/recovery, the source-only candidate builder, one bounded real protected-main promotion, unchanged consumer/public proof and a separately governed daily candidate-refresh decision/implementation. The daily schedule may refresh a disposable candidate only; candidate/source merge authority remains exact-head and human-governed.
+
+No successor phase is selected by the Phase 17 close-out.
 
 ## Structured delivery graph
 
@@ -74,7 +86,7 @@ python scripts/render_delivery_graph.py
 
 Phase 4, Phase 6, Phase 9 and Phase 14 explicitly record delivery-graph updates as not applicable under the compact causal-modelling rules. Their delivery records and the chronological ledger remain the management-level navigation for those phases. Phase 14 remains absent from the causal graph because it closes with publication activation disabled and adds no newly operational live publication stage.
 
-Phase 15 is represented compactly because it closes the Phase 13 public-integration boundary and adds a durable public temporal-evidence surface. The graph intentionally keeps only representative parent/proof/artifact/boundary nodes rather than every Phase 15 child PR and evidence record.
+Phase 15 is represented compactly because it closes the Phase 13 public-integration boundary and adds a durable public temporal-evidence surface. Phase 16 is represented because it adds an enduring reader-projection layer over those evidence authorities. Phase 17 is represented because it materially extends the trusted source-evidence spine and establishes the lasting boundary that recurring candidate refresh does not imply recurring merge authority. The graph intentionally keeps representative proof/artefact/boundary nodes rather than implementation or recovery inventories.
 
 ## Completed-phase record shape
 

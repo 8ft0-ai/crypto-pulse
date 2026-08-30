@@ -395,6 +395,46 @@ nodes:
     title: Reader presentation preserves evidence authority separation
     summary: Report chronology, current deterministic observation, archived report content and the Phase 15 temporal record remain distinct; Phase 16 adds no evidence accumulation, publication activation, model authority, advice or committed generated site output.
 
+  - id: phase-17
+    type: phase
+    title: Phase 17 — Trusted-main source-evidence accumulation and freshness
+    status: complete
+    summary: Immutable Phase-12-valid scheduled evidence can be accumulated into bounded source-only candidates, separately promoted to protected main, consumed by unchanged temporal/public readers, and refreshed daily without automatic merge authority.
+    record: planning/delivery/phase-17-trusted-main-source-evidence-accumulation.md
+
+  - id: issue-523
+    type: issue
+    title: Phase 17 delivery control — trusted-main source-evidence accumulation
+    number: 523
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/523
+    status: closed
+
+  - id: pr-535
+    type: pull_request
+    title: Phase 17 source-evidence accumulation candidate
+    number: 535
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/535
+    status: merged
+    merge_commit: 877670ac6739fcfda1614c407a90c7417b1c7320
+
+  - id: run-33333144803
+    type: workflow_run
+    title: Publish Phase 17 promoted source evidence through GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/33333144803
+    conclusion: success
+
+  - id: artifact-phase17-source-evidence-accumulator
+    type: artifact
+    title: Trusted-main source-evidence accumulator
+    path: scripts/trusted_main_source_evidence_accumulation.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-phase17-candidate-refresh-no-auto-merge
+    type: boundary
+    title: Daily candidate refresh does not grant merge authority
+    summary: Scheduled automation may create or refresh a disposable source-only candidate, but each protected-main source-evidence merge still requires exact-head validation, fresh review, separate owner authority and an expected-head guard.
+
 edges:
   - from: pre-phase-baseline
     to: phase-1
@@ -727,6 +767,46 @@ edges:
     label: preserved authority separation
 
   - from: phase-16
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-16
+    to: phase-17
+    type: motivated
+    label: sparse trusted evidence motivated accumulation
+
+  - from: phase-12
+    to: phase-17
+    type: enabled
+    label: canonical observation-hour identity enabled accumulation
+
+  - from: phase-17
+    to: issue-523
+    type: depends_on
+    label: governed by
+
+  - from: phase-17
+    to: pr-535
+    type: proved_by
+    label: proved bounded real source promotion
+
+  - from: phase-17
+    to: run-33333144803
+    type: proved_by
+    label: proved unchanged public chain
+
+  - from: phase-17
+    to: artifact-phase17-source-evidence-accumulator
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-17
+    to: boundary-phase17-candidate-refresh-no-auto-merge
+    type: preserved
+    label: preserved candidate-specific merge governance
+
+  - from: phase-17
     to: boundary-no-committed-site
     type: preserved
     label: preserved
