@@ -48,7 +48,7 @@ def _x(index: int, count: int) -> Decimal:
     return LEFT + (RIGHT - LEFT) * Decimal(index) / Decimal(count - 1)
 
 
-def _number(value: Any) -> Decimal:
+def _number_for_series(value: Any, series_key: str) -> Decimal:
     if isinstance(value, bool) or value is None or not isinstance(value, (int, float, str)):
         raise Phase15PublicTemporalEvidenceError("validated metric datum must be numeric")
     if isinstance(value, float) and not math.isfinite(value):
@@ -61,9 +61,13 @@ def _number(value: Any) -> Decimal:
         raise Phase15PublicTemporalEvidenceError("validated metric datum must be finite")
     if result <= 0:
         raise Phase15PublicTemporalEvidenceError(
-            f"validated {PUBLIC_SERIES_KEY} datum must be strictly positive"
+            f"validated {series_key} datum must be strictly positive"
         )
     return result
+
+
+def _number(value: Any) -> Decimal:
+    return _number_for_series(value, PUBLIC_SERIES_KEY)
 
 
 def _display(value: Any) -> str:
@@ -93,7 +97,10 @@ def _is_degraded(entry: dict[str, Any]) -> bool:
     )
 
 
-def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
+def _segments_for_series(
+    entries: list[dict[str, Any]],
+    series_key: str,
+) -> list[list[int]]:
     """Group asserted values without ever bridging a gap or discontinuity."""
     output: list[list[int]] = []
     current: list[int] = []
@@ -103,7 +110,7 @@ def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
                 output.append(current)
                 current = []
             continue
-        _number(entry["value"].get("datum"))
+        _number_for_series(entry["value"].get("datum"), series_key)
         continuity = entry.get("continuity", {}).get("status")
         if not current:
             current = [index]
@@ -117,8 +124,18 @@ def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
     return output
 
 
-def _reader_projection(record: dict[str, Any]) -> dict[str, Any]:
-    """Project reader summary state from the already validated 24-slot record."""
+def _segments(entries: list[dict[str, Any]]) -> list[list[int]]:
+    return _segments_for_series(entries, PUBLIC_SERIES_KEY)
+
+
+def _reader_projection_for_series(
+    record: dict[str, Any],
+    series_key: str,
+) -> dict[str, Any]:
+    """Project reader summary state from one already validated 24-slot record."""
+    if record.get("series_key") != series_key:
+        raise Phase15PublicTemporalEvidenceError("reader projection series identity mismatch")
+
     entries = record["entries"]
     value_count = 0
     degraded_value_count = 0
@@ -130,7 +147,7 @@ def _reader_projection(record: dict[str, Any]) -> dict[str, Any]:
     for index, entry in enumerate(entries):
         value = entry.get("value")
         if isinstance(value, dict):
-            _number(value.get("datum"))
+            _number_for_series(value.get("datum"), series_key)
             value_count += 1
             if _is_degraded(entry):
                 degraded_value_count += 1
@@ -174,10 +191,22 @@ def _reader_projection(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
+def _reader_projection(record: dict[str, Any]) -> dict[str, Any]:
+    """Project reader summary state from the already validated 24-slot record."""
+    return _reader_projection_for_series(record, PUBLIC_SERIES_KEY)
+
+
+def _metric_svg_for_series(
+    record: dict[str, Any],
+    projection: dict[str, Any],
+    series_key: str,
+    *,
+    title_id_prefix: str,
+    title_text: str,
+) -> str:
     entries = record["entries"]
     values = [
-        _number(entry["value"]["datum"])
+        _number_for_series(entry["value"]["datum"], series_key)
         for entry in entries
         if isinstance(entry.get("value"), dict)
     ]
@@ -191,9 +220,9 @@ def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
             return (TOP + BOTTOM) / 2
         return BOTTOM - (value - lo) / (hi - lo) * (BOTTOM - TOP)
 
-    title_id = f"phase15-title-{record['series_id'][:12]}"
-    desc_id = f"phase15-desc-{record['series_id'][:12]}"
-    segments = _segments(entries)
+    title_id = f"{title_id_prefix}-title-{record['series_id'][:12]}"
+    desc_id = f"{title_id_prefix}-desc-{record['series_id'][:12]}"
+    segments = _segments_for_series(entries, series_key)
     segment_for = {
         index: number for number, segment in enumerate(segments) for index in segment
     }
@@ -201,7 +230,7 @@ def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
 
     parts = [
         f'<svg width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-labelledby="{title_id} {desc_id}" data-visual-mode="{visual_mode}" data-segment-count="{len(segments)}">',
-        f'<title id="{title_id}">{_esc(PUBLIC_SERIES_KEY)} public temporal evidence</title>',
+        f'<title id="{title_id}">{_esc(title_text)}</title>',
         f'<desc id="{desc_id}">Twenty-four canonical UTC-hour slots from validated Phase 13 repository evidence. Dashed markers are explicit gaps, squares are degraded-backed values, and lines join only exact Phase 13 continuity.</desc>',
         '<line x1="80" y1="330" x2="930" y2="330" stroke="currentColor"/>',
         '<line x1="80" y1="70" x2="80" y2="330" stroke="currentColor"/>',
@@ -213,7 +242,7 @@ def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
         parts.append(f'<g class="metric-segment" data-segment="{segment_number}">')
         if len(segment) > 1:
             points = [
-                f'{_coord(_x(index, len(entries)))} {_coord(y(_number(entries[index]["value"]["datum"])))}'
+                f'{_coord(_x(index, len(entries)))} {_coord(y(_number_for_series(entries[index]["value"]["datum"], series_key)))}'
                 for index in segment
             ]
             parts.append(
@@ -234,7 +263,7 @@ def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
             )
             continue
         value = entry["value"]
-        ypos = y(_number(value["datum"]))
+        ypos = y(_number_for_series(value["datum"], series_key))
         title = (
             f'{entry["slot_utc"]}: {_display(value["datum"])}; '
             f'continuity={entry["continuity"]["status"]}; '
@@ -257,7 +286,20 @@ def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
     return "".join(parts)
 
 
-def _reader_summary(projection: dict[str, Any]) -> str:
+def _metric_svg(record: dict[str, Any], projection: dict[str, Any]) -> str:
+    return _metric_svg_for_series(
+        record,
+        projection,
+        PUBLIC_SERIES_KEY,
+        title_id_prefix="phase15",
+        title_text=f"{PUBLIC_SERIES_KEY} public temporal evidence",
+    )
+
+
+def _reader_summary_for_series(
+    projection: dict[str, Any],
+    series_key: str,
+) -> str:
     gap_reasons = projection["gap_reasons"]
     if gap_reasons:
         gap_html = "".join(
@@ -269,7 +311,7 @@ def _reader_summary(projection: dict[str, Any]) -> str:
 
     if projection["value_count"] == 0:
         chart_note = (
-            "No asserted BTC.price_usd values exist in this 24-slot record, "
+            f"No asserted {series_key} values exist in this 24-slot record, "
             "so no chart or numeric extrema are rendered."
         )
     elif projection["continuous_pair_count"] == 0:
@@ -308,11 +350,22 @@ def _reader_summary(projection: dict[str, Any]) -> str:
 """
 
 
-def _evidence_table(record: dict[str, Any]) -> str:
+def _reader_summary(projection: dict[str, Any]) -> str:
+    return _reader_summary_for_series(projection, PUBLIC_SERIES_KEY)
+
+
+def _evidence_table_for_series(
+    record: dict[str, Any],
+    series_key: str,
+    value_column_label: str,
+) -> str:
+    if record.get("series_key") != series_key:
+        raise Phase15PublicTemporalEvidenceError("evidence table series identity mismatch")
+
     headings = (
         "Slot UTC",
         "State",
-        "Exact BTC price USD",
+        value_column_label,
         "Continuity evidence",
         "Comparison status",
         "Comparison ID",
@@ -351,7 +404,7 @@ def _evidence_table(record: dict[str, Any]) -> str:
     return (
         '<div class="temporal-evidence-table-wrap">'
         '<table class="temporal-evidence-table">'
-        f"<caption>Complete {PUBLIC_SLOT_COUNT}-slot repository evidence for {_esc(PUBLIC_SERIES_KEY)}</caption>"
+        f"<caption>Complete {PUBLIC_SLOT_COUNT}-slot repository evidence for {_esc(series_key)}</caption>"
         "<thead><tr>"
         + "".join(f'<th scope="col">{_esc(heading)}</th>' for heading in headings)
         + "</tr></thead><tbody>"
@@ -360,12 +413,34 @@ def _evidence_table(record: dict[str, Any]) -> str:
     )
 
 
-def _render_validated_public_series(record: dict[str, Any]) -> str:
-    """Pure deterministic renderer for an already validated Phase 15-shaped record."""
-    projection = _reader_projection(record)
-    svg = _metric_svg(record, projection)
+def _evidence_table(record: dict[str, Any]) -> str:
+    return _evidence_table_for_series(
+        record,
+        PUBLIC_SERIES_KEY,
+        "Exact BTC price USD",
+    )
+
+
+def _render_validated_price_series(
+    record: dict[str, Any],
+    series_key: str,
+    *,
+    title_id_prefix: str,
+    chart_title: str,
+    value_column_label: str,
+    section_class: str,
+    contract_version: str,
+) -> str:
+    projection = _reader_projection_for_series(record, series_key)
+    svg = _metric_svg_for_series(
+        record,
+        projection,
+        series_key,
+        title_id_prefix=title_id_prefix,
+        title_text=chart_title,
+    )
     caption = (
-        f'Deterministic repository-bound temporal evidence for {PUBLIC_SERIES_KEY}, '
+        f"Deterministic repository-bound temporal evidence for {series_key}, "
         f'from {record["window"]["start_utc"]} through {record["window"]["end_utc"]}. '
         "Every value and gap is reproduced from the validated Phase 13 record. "
         "No interpolation, aggregation, smoothing, backfill, carry-forward, gap bridging, "
@@ -380,28 +455,41 @@ def _render_validated_public_series(record: dict[str, Any]) -> str:
     )
     empty_state = (
         '<div class="temporal-empty-state" role="status">'
-        "No asserted BTC.price_usd values are available in this validated 24-slot repository window. "
+        f"No asserted {series_key} values are available in this validated 24-slot repository window. "
         "All retained gap evidence remains inspectable below."
         "</div>"
         if projection["value_count"] == 0
         else ""
     )
     return (
-        f'<section class="phase15-public-temporal-evidence" '
-        f'data-contract-version="phase15-public-temporal-evidence/v1" '
+        f'<section class="{_esc(section_class)}" '
+        f'data-contract-version="{_esc(contract_version)}" '
         f'data-schema-version="{_esc(record["schema_version"])}" '
         f'data-series-kind="{_esc(record["series_kind"])}" '
         f'data-series-key="{_esc(record["series_key"])}" '
         f'data-series-id="{_esc(record["series_id"])}">'
-        + _reader_summary(projection)
+        + _reader_summary_for_series(projection, series_key)
         + empty_state
         + figure
         + '<section class="temporal-evidence-inspect" aria-label="Inspect the temporal evidence">'
         + "<h2>Inspect the evidence</h2>"
         + "<p>The complete validated 24-slot record remains available below, including exact gaps, continuity and repository evidence identities.</p>"
-        + _evidence_table(record)
+        + _evidence_table_for_series(record, series_key, value_column_label)
         + "</section>"
         + "</section>\n"
+    )
+
+
+def _render_validated_public_series(record: dict[str, Any]) -> str:
+    """Pure deterministic renderer for an already validated Phase 15-shaped record."""
+    return _render_validated_price_series(
+        record,
+        PUBLIC_SERIES_KEY,
+        title_id_prefix="phase15",
+        chart_title=f"{PUBLIC_SERIES_KEY} public temporal evidence",
+        value_column_label="Exact BTC price USD",
+        section_class="phase15-public-temporal-evidence",
+        contract_version="phase15-public-temporal-evidence/v1",
     )
 
 
