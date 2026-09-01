@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 import copy
 import io
 import json
@@ -20,6 +20,23 @@ from cryptopulse_operator.evidence import Evidence, Status
 MAIN_SHA = "1" * 40
 MAIN_TREE = "2" * 40
 SERIES_KEYS = ("BTC.price_usd", "ETH.price_usd", "SOL.price_usd")
+_MISSING_MODULE = object()
+
+
+@contextmanager
+def isolated_modules(names):
+    """Restore only the selected module names touched by a loader test."""
+    saved = {name: sys.modules.get(name, _MISSING_MODULE) for name in names}
+    for name in names:
+        sys.modules.pop(name, None)
+    try:
+        yield
+    finally:
+        for name in names:
+            sys.modules.pop(name, None)
+        for name, module in saved.items():
+            if module is not _MISSING_MODULE:
+                sys.modules[name] = module
 
 
 def trusted_gate(*, commit_sha=MAIN_SHA, tree_sha=MAIN_TREE):
@@ -195,8 +212,7 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
     def test_preloaded_transitive_repository_module_blocks_authoritative_execution(self):
         names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
         names.add("crypto_observation_hour_series")
-        saved = {name: sys.modules.pop(name) for name in names if name in sys.modules}
-        try:
+        with isolated_modules(names):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 scripts = root / "scripts"
@@ -206,11 +222,8 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
 
                 poisoned = ModuleType("crypto_observation_hour_series")
                 poisoned.__file__ = "/tmp/poisoned/crypto_observation_hour_series.py"
+                sys.modules["crypto_observation_hour_series"] = poisoned
                 with (
-                    patch.dict(
-                        sys.modules,
-                        {"crypto_observation_hour_series": poisoned},
-                    ),
                     patch.object(
                         phase18_usefulness,
                         "runtime_gate",
@@ -224,19 +237,16 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
                 ):
                     result = phase18_usefulness.run(object(), FakeGitHub())
 
-            self.assertEqual(result.status, Status.ERROR)
-            self.assertEqual(
-                result.findings[-1]["code"],
-                "phase18-contract-load-failed",
-            )
-            self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
-        finally:
-            sys.modules.update(saved)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "phase18-contract-load-failed",
+        )
+        self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
 
     def test_contract_loader_rejects_wrong_direct_module_origin(self):
         names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
-        saved = {name: sys.modules.pop(name) for name in names if name in sys.modules}
-        try:
+        with isolated_modules(names):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 scripts = root / "scripts"
@@ -244,24 +254,23 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
                 for name in names:
                     (scripts / f"{name}.py").write_text("# fixture\n", encoding="utf-8")
 
-                def fake_import(name):
-                    origin = scripts / f"{name}.py"
-                    if name == "phase18_multi_asset_temporal_evidence":
-                        origin = root / "outside.py"
-                    return SimpleNamespace(__file__=str(origin))
+                actual_module_origin = phase18_usefulness._module_origin
+
+                def fake_origin(module):
+                    if getattr(module, "__name__", None) == "phase18_multi_asset_temporal_evidence":
+                        return (root / "outside.py").resolve()
+                    return actual_module_origin(module)
 
                 with patch.object(
-                    phase18_usefulness.importlib,
-                    "import_module",
-                    side_effect=fake_import,
+                    phase18_usefulness,
+                    "_module_origin",
+                    side_effect=fake_origin,
                 ):
                     with self.assertRaisesRegex(
                         RuntimeError,
                         "repository contract module origin mismatch",
                     ):
                         phase18_usefulness._load_contracts(root)
-        finally:
-            sys.modules.update(saved)
 
     def test_incomplete_and_untrusted_runtime_statuses_propagate(self):
         for status in (Status.INCOMPLETE, Status.ERROR):
