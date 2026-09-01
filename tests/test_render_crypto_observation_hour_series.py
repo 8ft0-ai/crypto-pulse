@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -16,9 +17,12 @@ from render_crypto_observation_hour_series import (  # noqa: E402
     HEIGHT,
     WIDTH,
     _reader_projection,
+    _render_validated_price_series,
     _render_validated_public_series,
     render_observation_hour_series,
 )
+
+PRE_REFACTOR_BTC_RENDERER_SHA256 = "6d5b36546d4f160693c55e51b49aaa5adf5290864c9b32ae2a5b98e61df875df"
 
 
 def _slot(base: datetime, index: int) -> str:
@@ -176,6 +180,24 @@ class Phase15RendererTests(unittest.TestCase):
         self.assertIn("Inspect the evidence", first)
         for forbidden in ("<script", "<canvas", "http://", "https://"):
             self.assertNotIn(forbidden, first.lower())
+
+    def test_pre_refactor_btc_output_bytes_and_generic_wrapper_remain_exact(self) -> None:
+        record = _record()
+        legacy = _render_validated_public_series(record)
+        self.assertEqual(
+            hashlib.sha256(legacy.encode()).hexdigest(),
+            PRE_REFACTOR_BTC_RENDERER_SHA256,
+        )
+        generic_btc = _render_validated_price_series(
+            record,
+            "BTC.price_usd",
+            title_id_prefix="phase15",
+            chart_title="BTC.price_usd public temporal evidence",
+            value_column_label="Exact BTC price USD",
+            section_class="phase15-public-temporal-evidence",
+            contract_version="phase15-public-temporal-evidence/v1",
+        )
+        self.assertEqual(generic_btc, legacy)
 
     def test_zero_values_render_truthful_empty_state_without_svg_or_synthetic_extrema(self) -> None:
         record = _record()
