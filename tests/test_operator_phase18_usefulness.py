@@ -4,7 +4,8 @@ import io
 import json
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+import tempfile
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -191,6 +192,77 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         self.assertEqual(result.status, Status.ERROR)
         loader.assert_not_called()
 
+    def test_preloaded_transitive_repository_module_blocks_authoritative_execution(self):
+        names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
+        names.add("crypto_observation_hour_series")
+        saved = {name: sys.modules.pop(name) for name in names if name in sys.modules}
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                scripts = root / "scripts"
+                scripts.mkdir()
+                for name in names:
+                    (scripts / f"{name}.py").write_text("# fixture\n", encoding="utf-8")
+
+                poisoned = ModuleType("crypto_observation_hour_series")
+                poisoned.__file__ = "/tmp/poisoned/crypto_observation_hour_series.py"
+                with (
+                    patch.dict(
+                        sys.modules,
+                        {"crypto_observation_hour_series": poisoned},
+                    ),
+                    patch.object(
+                        phase18_usefulness,
+                        "runtime_gate",
+                        return_value=trusted_gate(),
+                    ),
+                    patch.object(
+                        phase18_usefulness,
+                        "runtime_root",
+                        return_value=root,
+                    ),
+                ):
+                    result = phase18_usefulness.run(object(), FakeGitHub())
+
+            self.assertEqual(result.status, Status.ERROR)
+            self.assertEqual(
+                result.findings[-1]["code"],
+                "phase18-contract-load-failed",
+            )
+            self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
+        finally:
+            sys.modules.update(saved)
+
+    def test_contract_loader_rejects_wrong_direct_module_origin(self):
+        names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
+        saved = {name: sys.modules.pop(name) for name in names if name in sys.modules}
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                scripts = root / "scripts"
+                scripts.mkdir()
+                for name in names:
+                    (scripts / f"{name}.py").write_text("# fixture\n", encoding="utf-8")
+
+                def fake_import(name):
+                    origin = scripts / f"{name}.py"
+                    if name == "phase18_multi_asset_temporal_evidence":
+                        origin = root / "outside.py"
+                    return SimpleNamespace(__file__=str(origin))
+
+                with patch.object(
+                    phase18_usefulness.importlib,
+                    "import_module",
+                    side_effect=fake_import,
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "repository contract module origin mismatch",
+                    ):
+                        phase18_usefulness._load_contracts(root)
+        finally:
+            sys.modules.update(saved)
+
     def test_incomplete_and_untrusted_runtime_statuses_propagate(self):
         for status in (Status.INCOMPLETE, Status.ERROR):
             with self.subTest(status=status):
@@ -260,12 +332,18 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         self.assertEqual(result.status, Status.INCOMPLETE)
         self.assertEqual(result.local["USEFULNESS_GATE"], "INCOMPLETE")
 
-    def test_validator_failure_cannot_pass(self):
-        contracts, _ = fake_contracts(validator_error=True)
+    def test_validator_failure_stops_before_unvalidated_evidence_is_derived(self):
+        contracts, calls = fake_contracts(validator_error=True)
         result = self.run_with(contracts)
         self.assertEqual(result.status, Status.FAIL)
         self.assertEqual(result.local["phase18_replay_validation"], "FAIL")
         self.assertEqual(result.local["USEFULNESS_GATE"], "FAIL")
+        self.assertEqual(calls["phase18_build_commits"], [MAIN_SHA])
+        self.assertEqual(calls["phase15_build_commits"], [])
+        self.assertEqual(calls["projection_keys"], [])
+        self.assertEqual(calls["rendered"], 0)
+        self.assertNotIn("bundle_canonical_identity_or_sha256", result.local)
+        self.assertNotIn("BTC_asserted_slots", result.local)
 
     def test_independent_rebuild_mismatch_fails(self):
         changed = base_bundle()

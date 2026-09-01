@@ -17,7 +17,7 @@ from ..runtime import runtime_root
 
 COMMAND = "phase18-usefulness"
 TARGET = {"kind": "phase18-usefulness"}
-_MODULE_NAMES = (
+_CONTRACT_MODULE_NAMES = (
     "phase18_multi_asset_temporal_evidence",
     "phase15_public_temporal_evidence",
     "render_crypto_observation_hour_series",
@@ -49,28 +49,70 @@ def _evidence(
     )
 
 
+def _module_origin(module: Any) -> Path:
+    origin = getattr(module, "__file__", None)
+    if not isinstance(origin, str):
+        raise RuntimeError("repository script module origin is unavailable")
+    return Path(origin).resolve()
+
+
 def _load_contracts(root: Path) -> dict[str, Any]:
-    """Load repository Phase 15/18 modules only after exact-main trust succeeds."""
+    """Load exact-checkout repository contracts only after exact-main trust succeeds."""
     scripts = (root / "scripts").resolve()
     if not scripts.is_dir():
         raise RuntimeError("repository scripts directory is unavailable")
+
+    repository_module_names = {
+        path.stem
+        for path in scripts.glob("*.py")
+        if path.is_file()
+    }
+    preloaded = sorted(
+        name for name in repository_module_names if name in sys.modules
+    )
+    if preloaded:
+        raise RuntimeError(
+            "repository script module loaded before exact-main trust: "
+            + ", ".join(preloaded)
+        )
+
     script_text = str(scripts)
-    inserted = script_text not in sys.path
-    if inserted:
-        sys.path.insert(0, script_text)
+    sys.path.insert(0, script_text)
     try:
+        importlib.invalidate_caches()
+        loaded = {
+            name: importlib.import_module(name)
+            for name in _CONTRACT_MODULE_NAMES
+        }
+
+        for module_name, module in loaded.items():
+            expected = (scripts / f"{module_name}.py").resolve()
+            if _module_origin(module) != expected:
+                raise RuntimeError(
+                    f"repository contract module origin mismatch: {module_name}"
+                )
+
+        for module_name in repository_module_names:
+            module = sys.modules.get(module_name)
+            if module is None:
+                continue
+            expected = (scripts / f"{module_name}.py").resolve()
+            if _module_origin(module) != expected:
+                raise RuntimeError(
+                    f"repository transitive module origin mismatch: {module_name}"
+                )
+
         return {
-            "phase18": importlib.import_module("phase18_multi_asset_temporal_evidence"),
-            "phase15": importlib.import_module("phase15_public_temporal_evidence"),
-            "reader": importlib.import_module("render_crypto_observation_hour_series"),
-            "renderer": importlib.import_module("render_phase18_multi_asset_temporal_evidence"),
+            "phase18": loaded["phase18_multi_asset_temporal_evidence"],
+            "phase15": loaded["phase15_public_temporal_evidence"],
+            "reader": loaded["render_crypto_observation_hour_series"],
+            "renderer": loaded["render_phase18_multi_asset_temporal_evidence"],
         }
     finally:
-        if inserted:
-            try:
-                sys.path.remove(script_text)
-            except ValueError:
-                pass
+        try:
+            sys.path.remove(script_text)
+        except ValueError:
+            pass
 
 
 def _gate_failure(
@@ -198,12 +240,21 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
 
     try:
         validated = phase18.validate_multi_asset_temporal_evidence(root, bundle)
-        replay_ok = True
     except Exception:
-        validated = bundle
-        replay_ok = False
-        findings.append({"code": "phase18-replay-validation-failed"})
-    assertions.append({"name": "phase18-replay-validation", "holds": replay_ok})
+        return _evidence(
+            runtime=gate.runtime,
+            remote=remote,
+            local={
+                "phase18_replay_validation": "FAIL",
+                "USEFULNESS_GATE": Status.FAIL.value,
+            },
+            status=Status.FAIL,
+            complete=True,
+            assertions=assertions
+            + [{"name": "phase18-replay-validation", "holds": False}],
+            findings=[{"code": "phase18-replay-validation-failed"}],
+        )
+    assertions.append({"name": "phase18-replay-validation", "holds": True})
 
     canonical_first = phase18.canonical_bundle_bytes(validated)
     bundle_sha256 = hashlib.sha256(canonical_first).hexdigest()
@@ -276,15 +327,21 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
     assertions.extend(pair_assertions)
     for item in pair_assertions:
         if not item["holds"]:
-            findings.append({"code": "phase18-continuous-pair-unavailable", "series_key": item["name"].split("-continuous", 1)[0]})
+            findings.append(
+                {
+                    "code": "phase18-continuous-pair-unavailable",
+                    "series_key": item["name"].split("-continuous", 1)[0],
+                }
+            )
 
     render_first = render_second = None
     renderer_deterministic = False
     try:
-        if replay_ok:
-            render_first = renderer.render_multi_asset_temporal_evidence(root, validated)
-            render_second = renderer.render_multi_asset_temporal_evidence(root, validated)
-            renderer_deterministic = render_first.encode("utf-8") == render_second.encode("utf-8")
+        render_first = renderer.render_multi_asset_temporal_evidence(root, validated)
+        render_second = renderer.render_multi_asset_temporal_evidence(root, validated)
+        renderer_deterministic = (
+            render_first.encode("utf-8") == render_second.encode("utf-8")
+        )
     except Exception:
         renderer_deterministic = False
     assertions.append({"name": "renderer-deterministic", "holds": renderer_deterministic})
@@ -313,7 +370,7 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
         "window_start_utc": window.get("start_utc") if isinstance(window, dict) else None,
         "window_end_utc": window.get("end_utc") if isinstance(window, dict) else None,
         "series_order": list(actual_order),
-        "phase18_replay_validation": "PASS" if replay_ok else "FAIL",
+        "phase18_replay_validation": "PASS",
         "independent_bundle_reproduction": "PASS" if rebuild_ok else "FAIL",
         "phase15_btc_compatibility": "PASS" if phase15_ok else "FAIL",
         "renderer_sha256_first": renderer_sha256_first,
