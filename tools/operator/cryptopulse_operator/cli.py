@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from .commands import auth, candidate, ci, contracts, doctor, environment, live, pages, protection, provenance, publication, review_pack, snapshot
+from .commands import auth, candidate, ci, contracts, doctor, environment, live, pages, phase18_usefulness, protection, provenance, publication, review_pack, snapshot
 from .evidence import EXIT_CODE, Evidence
 from .github_read import GitHubReader
 from .process import ProcessRunner
@@ -79,6 +79,9 @@ def parser() -> argparse.ArgumentParser:
     provenance_command = sub.add_parser("provenance")
     _output_options(provenance_command)
 
+    phase18_usefulness_command = sub.add_parser("phase18-usefulness")
+    _output_options(phase18_usefulness_command)
+
     contracts_command = sub.add_parser("contracts")
     _output_options(contracts_command)
 
@@ -124,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         evidence = live.run(runner, github)
     elif args.command == "provenance":
         evidence = provenance.run(runner, github)
+    elif args.command == "phase18-usefulness":
+        evidence = phase18_usefulness.run(runner, github)
     else:
         evidence = contracts.run(runner, github)
     if args.evidence:
