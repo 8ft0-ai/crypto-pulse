@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from cryptopulse_operator import cli
 from cryptopulse_operator.commands import phase18_usefulness
 from cryptopulse_operator.evidence import Evidence, Status
+from cryptopulse_operator.process import ProcessRunner
 
 
 MAIN_SHA = "1" * 40
@@ -104,7 +105,14 @@ def fake_contracts(
     phase15_match=True,
     render_values=None,
     validator_error=False,
+    first_build_error=False,
     materialised=True,
+    second_build_error=False,
+    second_materialised=True,
+    phase15_error=False,
+    phase15_materialised=True,
+    projection_error=False,
+    render_error=False,
 ):
     pair_counts = dict(pair_counts or {key: 2 for key in SERIES_KEYS})
     first = base_bundle()
@@ -123,10 +131,16 @@ def fake_contracts(
     def build_phase18(_root, commit_sha):
         calls["phase18_build_commits"].append(commit_sha)
         build_count["value"] += 1
-        if not materialised and build_count["value"] == 1:
-            return None
         if build_count["value"] == 1:
+            if first_build_error:
+                raise RuntimeError("first build failed")
+            if not materialised:
+                return None
             return copy.deepcopy(first)
+        if second_build_error:
+            raise RuntimeError("second build failed")
+        if not second_materialised:
+            return None
         if second_bundle is not None:
             return copy.deepcopy(second_bundle)
         return copy.deepcopy(first)
@@ -147,6 +161,10 @@ def fake_contracts(
 
     def build_phase15(_root, commit_sha):
         calls["phase15_build_commits"].append(commit_sha)
+        if phase15_error:
+            raise RuntimeError("phase15 failed")
+        if not phase15_materialised:
+            return None
         record = copy.deepcopy(first["series"][0])
         if not phase15_match:
             record["series_key"] = "BTC.other"
@@ -162,6 +180,8 @@ def fake_contracts(
 
     def project(_member, series_key):
         calls["projection_keys"].append(series_key)
+        if projection_error:
+            raise RuntimeError("projection failed")
         return {
             "value_count": 7,
             "continuous_pair_count": pair_counts[series_key],
@@ -169,10 +189,14 @@ def fake_contracts(
 
     reader = SimpleNamespace(_reader_projection_for_series=project)
 
-    render_queue = list(render_values or ["<section>same</section>", "<section>same</section>"])
+    render_queue = list(
+        render_values or ["<section>same</section>", "<section>same</section>"]
+    )
 
     def render(_root, _bundle):
         calls["rendered"] += 1
+        if render_error:
+            raise RuntimeError("render failed")
         return render_queue.pop(0) if render_queue else "<section>same</section>"
 
     renderer = SimpleNamespace(render_multi_asset_temporal_evidence=render)
@@ -184,17 +208,44 @@ def fake_contracts(
     }, calls
 
 
-class Phase18UsefulnessCommandTests(unittest.TestCase):
-    def run_with(self, contracts, *, gate=None, github=None):
-        gate = gate or trusted_gate()
-        github = github or FakeGitHub()
-        with (
-            patch.object(phase18_usefulness, "runtime_gate", return_value=gate),
-            patch.object(phase18_usefulness, "_load_contracts", return_value=contracts),
-            patch.object(phase18_usefulness, "runtime_root", return_value=Path("/trusted/repo")),
-        ):
-            return phase18_usefulness.run(object(), github)
+class GitRepositoryFixture:
+    def __init__(self, testcase):
+        self.testcase = testcase
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.scripts = self.root / "scripts"
+        self.scripts.mkdir()
+        self.runner = ProcessRunner()
+        if not self.runner.has_executable("git"):
+            testcase.skipTest("git executable unavailable")
+        for name in {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }:
+            (self.scripts / f"{name}.py").write_text(
+                f'NAME = "{name}"\n',
+                encoding="utf-8",
+            )
+        self._git("init")
+        self._git("config", "user.name", "CryptoPulse test")
+        self._git("config", "user.email", "cryptopulse-test@example.invalid")
+        self._git("add", "scripts")
+        self._git("commit", "-m", "fixture")
 
+    def _git(self, *args):
+        result = self.runner.git(["-C", str(self.root), *args])
+        self.testcase.assertEqual(
+            result.returncode,
+            0,
+            msg=f"git {' '.join(args)} failed: {result.stderr}",
+        )
+        return result
+
+    def close(self):
+        self.temp.cleanup()
+
+
+class Phase18ContractLoaderTests(unittest.TestCase):
     def test_runtime_gate_blocks_before_repository_modules_load(self):
         loader = Mock()
         with (
@@ -210,16 +261,13 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         loader.assert_not_called()
 
     def test_preloaded_transitive_repository_module_blocks_authoritative_execution(self):
-        names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
-        names.add("crypto_observation_hour_series")
-        with isolated_modules(names):
-            with tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                scripts = root / "scripts"
-                scripts.mkdir()
-                for name in names:
-                    (scripts / f"{name}.py").write_text("# fixture\n", encoding="utf-8")
-
+        fixture = GitRepositoryFixture(self)
+        names = {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }
+        try:
+            with isolated_modules(names):
                 poisoned = ModuleType("crypto_observation_hour_series")
                 poisoned.__file__ = "/tmp/poisoned/crypto_observation_hour_series.py"
                 sys.modules["crypto_observation_hour_series"] = poisoned
@@ -232,35 +280,89 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
                     patch.object(
                         phase18_usefulness,
                         "runtime_root",
-                        return_value=root,
+                        return_value=fixture.root,
                     ),
                 ):
-                    result = phase18_usefulness.run(object(), FakeGitHub())
+                    result = phase18_usefulness.run(fixture.runner, FakeGitHub())
+        finally:
+            fixture.close()
 
         self.assertEqual(result.status, Status.ERROR)
-        self.assertEqual(
-            result.findings[-1]["code"],
-            "phase18-contract-load-failed",
-        )
+        self.assertEqual(result.findings[-1]["code"], "phase18-contract-load-failed")
         self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
 
+    def test_real_deferred_loader_accepts_exact_regular_head_blobs(self):
+        fixture = GitRepositoryFixture(self)
+        names = {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }
+        try:
+            with isolated_modules(names):
+                contracts = phase18_usefulness._load_contracts(
+                    fixture.root,
+                    fixture.runner,
+                )
+                self.assertEqual(
+                    set(contracts),
+                    {"phase18", "phase15", "reader", "renderer"},
+                )
+        finally:
+            fixture.close()
+
+    def test_skip_worktree_modified_contract_is_rejected(self):
+        fixture = GitRepositoryFixture(self)
+        target = "scripts/phase18_multi_asset_temporal_evidence.py"
+        try:
+            fixture._git("update-index", "--skip-worktree", target)
+            (fixture.root / target).write_text("NAME = 'poisoned'\n", encoding="utf-8")
+            status = fixture._git("status", "--porcelain=v1", "--untracked-files=all")
+            self.assertEqual(status.stdout.strip(), "")
+            with self.assertRaisesRegex(RuntimeError, "hidden index state|bytes differ"):
+                phase18_usefulness._load_contracts(fixture.root, fixture.runner)
+        finally:
+            fixture.close()
+
+    def test_untracked_repository_shadow_is_rejected(self):
+        fixture = GitRepositoryFixture(self)
+        try:
+            (fixture.scripts / "shadow.py").write_text("POISON = True\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "untracked repository scripts"):
+                phase18_usefulness._load_contracts(fixture.root, fixture.runner)
+        finally:
+            fixture.close()
+
+    def test_ignored_bytecode_shadow_is_rejected(self):
+        fixture = GitRepositoryFixture(self)
+        try:
+            (fixture.root / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+            fixture._git("add", ".gitignore")
+            fixture._git("commit", "-m", "ignore bytecode")
+            cache = fixture.scripts / "__pycache__"
+            cache.mkdir()
+            (cache / "phase18_multi_asset_temporal_evidence.cpython-312.pyc").write_bytes(
+                b"not-real-bytecode"
+            )
+            with self.assertRaisesRegex(RuntimeError, "ignored repository scripts"):
+                phase18_usefulness._load_contracts(fixture.root, fixture.runner)
+        finally:
+            fixture.close()
+
     def test_contract_loader_rejects_wrong_direct_module_origin(self):
-        names = set(phase18_usefulness._CONTRACT_MODULE_NAMES)
-        with isolated_modules(names):
-            with tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                scripts = root / "scripts"
-                scripts.mkdir()
-                for name in names:
-                    (scripts / f"{name}.py").write_text("# fixture\n", encoding="utf-8")
+        fixture = GitRepositoryFixture(self)
+        names = {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }
+        actual_module_origin = phase18_usefulness._module_origin
 
-                actual_module_origin = phase18_usefulness._module_origin
+        def fake_origin(module):
+            if getattr(module, "__name__", None) == "phase18_multi_asset_temporal_evidence":
+                return (fixture.root / "outside.py").resolve()
+            return actual_module_origin(module)
 
-                def fake_origin(module):
-                    if getattr(module, "__name__", None) == "phase18_multi_asset_temporal_evidence":
-                        return (root / "outside.py").resolve()
-                    return actual_module_origin(module)
-
+        try:
+            with isolated_modules(names):
                 with patch.object(
                     phase18_usefulness,
                     "_module_origin",
@@ -270,7 +372,28 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
                         RuntimeError,
                         "repository contract module origin mismatch",
                     ):
-                        phase18_usefulness._load_contracts(root)
+                        phase18_usefulness._load_contracts(
+                            fixture.root,
+                            fixture.runner,
+                        )
+        finally:
+            fixture.close()
+
+
+class Phase18UsefulnessCommandTests(unittest.TestCase):
+    def run_with(self, contracts, *, gate=None, github=None):
+        gate = gate or trusted_gate()
+        github = github or FakeGitHub()
+        with (
+            patch.object(phase18_usefulness, "runtime_gate", return_value=gate),
+            patch.object(phase18_usefulness, "_load_contracts", return_value=contracts),
+            patch.object(
+                phase18_usefulness,
+                "runtime_root",
+                return_value=Path("/trusted/repo"),
+            ),
+        ):
+            return phase18_usefulness.run(object(), github)
 
     def test_incomplete_and_untrusted_runtime_statuses_propagate(self):
         for status in (Status.INCOMPLETE, Status.ERROR):
@@ -290,7 +413,10 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         ):
             result = phase18_usefulness.run(object(), FakeGitHub())
         self.assertEqual(result.status, Status.ERROR)
-        self.assertEqual(result.findings[-1]["code"], "runtime-not-current-protected-main")
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "runtime-not-current-protected-main",
+        )
         loader.assert_not_called()
 
     def test_tree_mismatch_cannot_execute_authoritative_proof(self):
@@ -303,7 +429,10 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         ):
             result = phase18_usefulness.run(object(), FakeGitHub())
         self.assertEqual(result.status, Status.ERROR)
-        self.assertEqual(result.findings[-1]["code"], "runtime-tree-not-current-protected-main")
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "runtime-tree-not-current-protected-main",
+        )
         loader.assert_not_called()
 
     def test_unprotected_main_cannot_execute_authoritative_proof(self):
@@ -335,38 +464,90 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
             self.assertEqual(result.local[f"{symbol}_asserted_slots"], 7)
             self.assertEqual(result.local[f"{symbol}_continuous_pairs"], 2)
 
-    def test_incomplete_materialisation_cannot_pass(self):
+    def test_first_materialisation_unavailable_is_incomplete(self):
         contracts, _ = fake_contracts(materialised=False)
         result = self.run_with(contracts)
         self.assertEqual(result.status, Status.INCOMPLETE)
         self.assertEqual(result.local["USEFULNESS_GATE"], "INCOMPLETE")
 
-    def test_validator_failure_stops_before_unvalidated_evidence_is_derived(self):
+    def test_first_materialisation_exception_is_error(self):
+        contracts, _ = fake_contracts(first_build_error=True)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
+
+    def test_validator_exception_is_error_and_stops_downstream_derivation(self):
         contracts, calls = fake_contracts(validator_error=True)
         result = self.run_with(contracts)
-        self.assertEqual(result.status, Status.FAIL)
-        self.assertEqual(result.local["phase18_replay_validation"], "FAIL")
-        self.assertEqual(result.local["USEFULNESS_GATE"], "FAIL")
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(result.local["phase18_replay_validation"], "ERROR")
+        self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
         self.assertEqual(calls["phase18_build_commits"], [MAIN_SHA])
         self.assertEqual(calls["phase15_build_commits"], [])
         self.assertEqual(calls["projection_keys"], [])
         self.assertEqual(calls["rendered"], 0)
         self.assertNotIn("bundle_canonical_identity_or_sha256", result.local)
-        self.assertNotIn("BTC_asserted_slots", result.local)
 
-    def test_independent_rebuild_mismatch_fails(self):
+    def test_second_materialisation_exception_is_error(self):
+        contracts, _ = fake_contracts(second_build_error=True)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "independent-bundle-reproduction-error",
+        )
+
+    def test_second_materialisation_unavailable_is_incomplete(self):
+        contracts, _ = fake_contracts(second_materialised=False)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.INCOMPLETE)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "independent-bundle-reproduction-unavailable",
+        )
+
+    def test_independent_rebuild_mismatch_is_completed_fail(self):
         changed = base_bundle()
         changed["bundle_id"] = "b" * 64
         contracts, _ = fake_contracts(second_bundle=changed)
         result = self.run_with(contracts)
         self.assertEqual(result.status, Status.FAIL)
+        self.assertTrue(result.completeness["complete"])
         self.assertEqual(result.local["independent_bundle_reproduction"], "FAIL")
 
-    def test_phase15_btc_mismatch_fails(self):
+    def test_phase15_exception_is_error(self):
+        contracts, _ = fake_contracts(phase15_error=True)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "phase15-btc-compatibility-error",
+        )
+
+    def test_phase15_unavailable_is_incomplete(self):
+        contracts, _ = fake_contracts(phase15_materialised=False)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.INCOMPLETE)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "phase15-btc-evidence-unavailable",
+        )
+
+    def test_phase15_btc_mismatch_is_completed_fail(self):
         contracts, _ = fake_contracts(phase15_match=False)
         result = self.run_with(contracts)
         self.assertEqual(result.status, Status.FAIL)
+        self.assertTrue(result.completeness["complete"])
         self.assertEqual(result.local["phase15_btc_compatibility"], "FAIL")
+
+    def test_projection_exception_is_error(self):
+        contracts, _ = fake_contracts(projection_error=True)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "phase18-reader-projection-error",
+        )
 
     def test_each_series_requires_a_continuous_pair(self):
         for failed_key in SERIES_KEYS:
@@ -376,17 +557,28 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
                 contracts, _ = fake_contracts(pair_counts=counts)
                 result = self.run_with(contracts)
                 self.assertEqual(result.status, Status.FAIL)
+                self.assertTrue(result.completeness["complete"])
                 self.assertEqual(
                     result.local[f"{failed_key.split('.', 1)[0]}_continuous_pairs"],
                     0,
                 )
 
-    def test_repeated_render_digest_mismatch_fails(self):
+    def test_renderer_exception_is_error(self):
+        contracts, _ = fake_contracts(render_error=True)
+        result = self.run_with(contracts)
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(
+            result.findings[-1]["code"],
+            "phase18-renderer-execution-error",
+        )
+
+    def test_repeated_render_digest_mismatch_is_completed_fail(self):
         contracts, _ = fake_contracts(
             render_values=["<section>first</section>", "<section>second</section>"]
         )
         result = self.run_with(contracts)
         self.assertEqual(result.status, Status.FAIL)
+        self.assertTrue(result.completeness["complete"])
         self.assertFalse(result.local["renderer_deterministic"])
         self.assertNotEqual(
             result.local["renderer_sha256_first"],

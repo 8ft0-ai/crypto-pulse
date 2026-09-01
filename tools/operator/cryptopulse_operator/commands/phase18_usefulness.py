@@ -56,17 +56,119 @@ def _module_origin(module: Any) -> Path:
     return Path(origin).resolve()
 
 
-def _load_contracts(root: Path) -> dict[str, Any]:
-    """Load exact-checkout repository contracts only after exact-main trust succeeds."""
-    scripts = (root / "scripts").resolve()
-    if not scripts.is_dir():
-        raise RuntimeError("repository scripts directory is unavailable")
+def _git_output(runner: ProcessRunner, root: Path, args: list[str], label: str) -> str:
+    result = runner.git(["-C", str(root), *args])
+    if result.returncode != 0:
+        raise RuntimeError(f"unable to establish {label}")
+    return result.stdout
 
-    repository_module_names = {
-        path.stem
-        for path in scripts.glob("*.py")
-        if path.is_file()
-    }
+
+def _verified_repository_module_names(root: Path, runner: ProcessRunner) -> set[str]:
+    """Bind executable repository scripts to exact regular HEAD blobs."""
+    scripts_path = root / "scripts"
+    if scripts_path.is_symlink() or not scripts_path.is_dir():
+        raise RuntimeError("repository scripts directory is unavailable or unsafe")
+    scripts = scripts_path.resolve()
+
+    tree_text = _git_output(
+        runner,
+        root,
+        ["ls-tree", "-r", "HEAD", "--", "scripts"],
+        "repository script tree",
+    )
+    tracked: dict[str, tuple[str, str]] = {}
+    for line in tree_text.splitlines():
+        if not line:
+            continue
+        try:
+            metadata, path = line.split("\t", 1)
+            mode, object_type, blob_sha = metadata.split(" ", 2)
+        except ValueError as exc:
+            raise RuntimeError("repository script tree entry is malformed") from exc
+        if not path.startswith("scripts/") or not path.endswith(".py"):
+            continue
+        if mode not in {"100644", "100755"} or object_type != "blob":
+            raise RuntimeError(f"repository script is not a regular tracked blob: {path}")
+        tracked[path] = (mode, blob_sha)
+
+    if not tracked:
+        raise RuntimeError("repository script set is unavailable")
+
+    flags_text = _git_output(
+        runner,
+        root,
+        ["ls-files", "-v", "--", "scripts"],
+        "repository script index flags",
+    )
+    seen_flagged_paths: set[str] = set()
+    for line in flags_text.splitlines():
+        if len(line) < 3:
+            continue
+        prefix, path = line[:2], line[2:]
+        if not path.endswith(".py"):
+            continue
+        seen_flagged_paths.add(path)
+        if prefix != "H ":
+            raise RuntimeError(f"repository script has hidden index state: {path}")
+    if seen_flagged_paths != set(tracked):
+        raise RuntimeError("repository script index/tree set mismatch")
+
+    for args, label in (
+        (
+            ["ls-files", "--others", "--exclude-standard", "--", "scripts"],
+            "untracked repository scripts",
+        ),
+        (
+            ["ls-files", "--others", "--ignored", "--exclude-standard", "--", "scripts"],
+            "ignored repository scripts",
+        ),
+    ):
+        extra_text = _git_output(runner, root, args, label)
+        extras = [
+            line
+            for line in extra_text.splitlines()
+            if line
+            and (
+                line.endswith((".py", ".pyc", ".so", ".pyd", ".dylib"))
+                or "/__pycache__/" in line
+            )
+        ]
+        if extras:
+            raise RuntimeError(f"{label} are present")
+
+    repository_module_names: set[str] = set()
+    for path, (_mode, expected_blob) in sorted(tracked.items()):
+        relative = Path(path)
+        if relative.parent != Path("scripts"):
+            continue
+        candidate = root / relative
+        if candidate.is_symlink() or not candidate.is_file():
+            raise RuntimeError(f"repository script working-tree path is unsafe: {path}")
+        try:
+            candidate.resolve().relative_to(scripts)
+        except ValueError as exc:
+            raise RuntimeError(f"repository script escapes trusted checkout: {path}") from exc
+        actual = runner.git(
+            ["-C", str(root), "hash-object", "--no-filters", path]
+        )
+        if actual.returncode != 0 or actual.stdout.strip() != expected_blob:
+            raise RuntimeError(f"repository script bytes differ from HEAD: {path}")
+        repository_module_names.add(relative.stem)
+
+    missing = sorted(set(_CONTRACT_MODULE_NAMES) - repository_module_names)
+    if missing:
+        raise RuntimeError(
+            "required repository contract module is not a tracked HEAD blob: "
+            + ", ".join(missing)
+        )
+    return repository_module_names
+
+
+def _load_contracts(root: Path, runner: ProcessRunner) -> dict[str, Any]:
+    """Load repository contracts only after exact-main and exact-blob trust succeeds."""
+    repository_module_names = _verified_repository_module_names(root, runner)
+    scripts = (root / "scripts").resolve()
+
     preloaded = sorted(
         name for name in repository_module_names if name in sys.modules
     )
@@ -77,6 +179,8 @@ def _load_contracts(root: Path) -> dict[str, Any]:
         )
 
     script_text = str(scripts)
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
     sys.path.insert(0, script_text)
     try:
         importlib.invalidate_caches()
@@ -102,6 +206,10 @@ def _load_contracts(root: Path) -> dict[str, Any]:
                     f"repository transitive module origin mismatch: {module_name}"
                 )
 
+        # Recheck exact bytes after imports so proof execution never continues
+        # after an ordinary working-tree change during loading.
+        _verified_repository_module_names(root, runner)
+
         return {
             "phase18": loaded["phase18_multi_asset_temporal_evidence"],
             "phase15": loaded["phase15_public_temporal_evidence"],
@@ -109,6 +217,7 @@ def _load_contracts(root: Path) -> dict[str, Any]:
             "renderer": loaded["render_phase18_multi_asset_temporal_evidence"],
         }
     finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
         try:
             sys.path.remove(script_text)
         except ValueError:
@@ -131,6 +240,34 @@ def _gate_failure(
         complete=False,
         assertions=list(gate.assertions) + list(assertions or []),
         findings=list(gate.findings) + [{"code": finding}],
+    )
+
+
+def _proof_stop(
+    gate: Any,
+    *,
+    remote: dict[str, Any],
+    local: dict[str, Any],
+    assertions: list[dict[str, Any]],
+    findings: list[dict[str, Any]],
+    status: Status,
+    finding: str,
+    assertion_name: str | None = None,
+) -> Evidence:
+    stopped_assertions = list(assertions)
+    if assertion_name is not None:
+        stopped_assertions.append({"name": assertion_name, "holds": False})
+    stopped_findings = list(findings) + [{"code": finding}]
+    stopped_local = dict(local)
+    stopped_local["USEFULNESS_GATE"] = status.value
+    return _evidence(
+        runtime=gate.runtime,
+        remote=remote,
+        local=stopped_local,
+        status=status,
+        complete=False,
+        assertions=stopped_assertions,
+        findings=stopped_findings,
     )
 
 
@@ -196,7 +333,7 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
 
     root = runtime_root().resolve()
     try:
-        contracts = _load_contracts(root)
+        contracts = _load_contracts(root, runner)
     except Exception:
         return _gate_failure(
             gate,
@@ -213,62 +350,105 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
     commit_sha = main["sha"]
     assertions = list(gate.assertions) + exact_assertions
     findings: list[dict[str, Any]] = []
+    local: dict[str, Any] = {}
 
     try:
         bundle = phase18.build_multi_asset_temporal_evidence(root, commit_sha)
     except Exception:
-        return _evidence(
-            runtime=gate.runtime,
+        return _proof_stop(
+            gate,
             remote=remote,
-            local={"USEFULNESS_GATE": Status.ERROR.value},
-            status=Status.ERROR,
-            complete=False,
+            local=local,
             assertions=assertions,
-            findings=[{"code": "phase18-materialisation-failed"}],
+            findings=findings,
+            status=Status.ERROR,
+            finding="phase18-materialisation-failed",
+            assertion_name="phase18-materialised",
         )
     if bundle is None:
-        return _evidence(
-            runtime=gate.runtime,
+        return _proof_stop(
+            gate,
             remote=remote,
-            local={"USEFULNESS_GATE": Status.INCOMPLETE.value},
+            local=local,
+            assertions=assertions,
+            findings=findings,
             status=Status.INCOMPLETE,
-            complete=False,
-            assertions=assertions + [{"name": "phase18-materialised", "holds": False}],
-            findings=[{"code": "phase18-evidence-unavailable"}],
+            finding="phase18-evidence-unavailable",
+            assertion_name="phase18-materialised",
         )
     assertions.append({"name": "phase18-materialised", "holds": True})
 
     try:
         validated = phase18.validate_multi_asset_temporal_evidence(root, bundle)
     except Exception:
-        return _evidence(
-            runtime=gate.runtime,
+        local["phase18_replay_validation"] = "ERROR"
+        return _proof_stop(
+            gate,
             remote=remote,
-            local={
-                "phase18_replay_validation": "FAIL",
-                "USEFULNESS_GATE": Status.FAIL.value,
-            },
-            status=Status.FAIL,
-            complete=True,
-            assertions=assertions
-            + [{"name": "phase18-replay-validation", "holds": False}],
-            findings=[{"code": "phase18-replay-validation-failed"}],
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="phase18-replay-validation-error",
+            assertion_name="phase18-replay-validation",
         )
     assertions.append({"name": "phase18-replay-validation", "holds": True})
+    local["phase18_replay_validation"] = "PASS"
 
-    canonical_first = phase18.canonical_bundle_bytes(validated)
+    try:
+        canonical_first = phase18.canonical_bundle_bytes(validated)
+    except Exception:
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="phase18-canonicalisation-failed",
+        )
     bundle_sha256 = hashlib.sha256(canonical_first).hexdigest()
 
     try:
         rebuilt = phase18.build_multi_asset_temporal_evidence(root, commit_sha)
-        rebuild_ok = (
-            rebuilt is not None
-            and phase18.canonical_bundle_bytes(rebuilt) == canonical_first
-        )
     except Exception:
-        rebuilt = None
-        rebuild_ok = False
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="independent-bundle-reproduction-error",
+            assertion_name="independent-bundle-reproduction",
+        )
+    if rebuilt is None:
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.INCOMPLETE,
+            finding="independent-bundle-reproduction-unavailable",
+            assertion_name="independent-bundle-reproduction",
+        )
+    try:
+        rebuilt_bytes = phase18.canonical_bundle_bytes(rebuilt)
+    except Exception:
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="independent-bundle-canonicalisation-failed",
+            assertion_name="independent-bundle-reproduction",
+        )
+    rebuild_ok = rebuilt_bytes == canonical_first
     assertions.append({"name": "independent-bundle-reproduction", "holds": rebuild_ok})
+    local["independent_bundle_reproduction"] = "PASS" if rebuild_ok else "FAIL"
     if not rebuild_ok:
         findings.append({"code": "independent-bundle-reproduction-mismatch"})
 
@@ -284,46 +464,102 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
     if not order_ok:
         findings.append({"code": "phase18-series-order-mismatch"})
 
-    phase15_ok = False
     try:
         phase15_btc = phase15.build_public_temporal_evidence(root, commit_sha)
-        if phase15_btc is not None and isinstance(series, list) and series:
+    except Exception:
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="phase15-btc-compatibility-error",
+            assertion_name="phase15-btc-compatibility",
+        )
+    if phase15_btc is None:
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.INCOMPLETE,
+            finding="phase15-btc-evidence-unavailable",
+            assertion_name="phase15-btc-compatibility",
+        )
+    if not isinstance(series, list) or not series:
+        phase15_ok = False
+    else:
+        try:
             phase15_ok = (
                 phase15.canonical_public_evidence_bytes(phase15_btc)
                 == phase15.canonical_public_evidence_bytes(series[0])
             )
-    except Exception:
-        phase15_ok = False
+        except Exception:
+            return _proof_stop(
+                gate,
+                remote=remote,
+                local=local,
+                assertions=assertions,
+                findings=findings,
+                status=Status.ERROR,
+                finding="phase15-btc-canonicalisation-failed",
+                assertion_name="phase15-btc-compatibility",
+            )
     assertions.append({"name": "phase15-btc-compatibility", "holds": phase15_ok})
+    local["phase15_btc_compatibility"] = "PASS" if phase15_ok else "FAIL"
     if not phase15_ok:
         findings.append({"code": "phase15-btc-compatibility-mismatch"})
 
     projections: dict[str, dict[str, Any]] = {}
-    projection_ok = order_ok
     if order_ok:
         try:
             for member, series_key in zip(series, expected_order):
-                projections[series_key] = reader._reader_projection_for_series(member, series_key)
+                projection = reader._reader_projection_for_series(member, series_key)
+                if not isinstance(projection, dict):
+                    raise RuntimeError("reader projection is not an object")
+                pair_count = projection.get("continuous_pair_count")
+                value_count = projection.get("value_count")
+                if (
+                    not isinstance(pair_count, int)
+                    or isinstance(pair_count, bool)
+                    or pair_count < 0
+                    or not isinstance(value_count, int)
+                    or isinstance(value_count, bool)
+                    or value_count < 0
+                ):
+                    raise RuntimeError("reader projection counts are invalid")
+                projections[series_key] = projection
         except Exception:
-            projection_ok = False
+            return _proof_stop(
+                gate,
+                remote=remote,
+                local=local,
+                assertions=assertions,
+                findings=findings,
+                status=Status.ERROR,
+                finding="phase18-reader-projection-error",
+                assertion_name="reader-projection-reused",
+            )
+        projection_ok = True
+    else:
+        projection_ok = False
     assertions.append({"name": "reader-projection-reused", "holds": projection_ok})
     if not projection_ok:
-        findings.append({"code": "phase18-reader-projection-failed"})
+        findings.append({"code": "phase18-reader-projection-unavailable"})
 
     pair_assertions: list[dict[str, Any]] = []
-    if projection_ok:
-        for series_key in expected_order:
-            pair_assertions.append(
-                {
-                    "name": f"{series_key}-continuous-pair-available",
-                    "holds": projections[series_key]["continuous_pair_count"] > 0,
-                }
-            )
-    else:
-        for series_key in expected_order:
-            pair_assertions.append(
-                {"name": f"{series_key}-continuous-pair-available", "holds": False}
-            )
+    for series_key in expected_order:
+        pair_assertions.append(
+            {
+                "name": f"{series_key}-continuous-pair-available",
+                "holds": (
+                    projection_ok
+                    and projections[series_key]["continuous_pair_count"] > 0
+                ),
+            }
+        )
     assertions.extend(pair_assertions)
     for item in pair_assertions:
         if not item["holds"]:
@@ -334,50 +570,48 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
                 }
             )
 
-    render_first = render_second = None
-    renderer_deterministic = False
     try:
         render_first = renderer.render_multi_asset_temporal_evidence(root, validated)
         render_second = renderer.render_multi_asset_temporal_evidence(root, validated)
-        renderer_deterministic = (
-            render_first.encode("utf-8") == render_second.encode("utf-8")
-        )
+        if not isinstance(render_first, str) or not isinstance(render_second, str):
+            raise RuntimeError("renderer output is not text")
+        renderer_sha256_first = hashlib.sha256(render_first.encode("utf-8")).hexdigest()
+        renderer_sha256_second = hashlib.sha256(render_second.encode("utf-8")).hexdigest()
     except Exception:
-        renderer_deterministic = False
+        return _proof_stop(
+            gate,
+            remote=remote,
+            local=local,
+            assertions=assertions,
+            findings=findings,
+            status=Status.ERROR,
+            finding="phase18-renderer-execution-error",
+            assertion_name="renderer-deterministic",
+        )
+
+    renderer_deterministic = renderer_sha256_first == renderer_sha256_second
     assertions.append({"name": "renderer-deterministic", "holds": renderer_deterministic})
     if not renderer_deterministic:
         findings.append({"code": "phase18-renderer-not-deterministic"})
-
-    renderer_sha256_first = (
-        hashlib.sha256(render_first.encode("utf-8")).hexdigest()
-        if isinstance(render_first, str)
-        else None
-    )
-    renderer_sha256_second = (
-        hashlib.sha256(render_second.encode("utf-8")).hexdigest()
-        if isinstance(render_second, str)
-        else None
-    )
 
     mandatory_holds = all(item["holds"] for item in assertions[len(gate.assertions):])
     status = Status.PASS if mandatory_holds else Status.FAIL
 
     window = validated.get("window") if isinstance(validated, dict) else {}
-    local: dict[str, Any] = {
-        "phase18_contract": getattr(phase18, "PHASE18_CONTRACT_VERSION", None),
-        "bundle_id": validated.get("bundle_id") if isinstance(validated, dict) else None,
-        "bundle_canonical_identity_or_sha256": bundle_sha256,
-        "window_start_utc": window.get("start_utc") if isinstance(window, dict) else None,
-        "window_end_utc": window.get("end_utc") if isinstance(window, dict) else None,
-        "series_order": list(actual_order),
-        "phase18_replay_validation": "PASS",
-        "independent_bundle_reproduction": "PASS" if rebuild_ok else "FAIL",
-        "phase15_btc_compatibility": "PASS" if phase15_ok else "FAIL",
-        "renderer_sha256_first": renderer_sha256_first,
-        "renderer_sha256_second": renderer_sha256_second,
-        "renderer_deterministic": renderer_deterministic,
-        "USEFULNESS_GATE": status.value,
-    }
+    local.update(
+        {
+            "phase18_contract": getattr(phase18, "PHASE18_CONTRACT_VERSION", None),
+            "bundle_id": validated.get("bundle_id") if isinstance(validated, dict) else None,
+            "bundle_canonical_identity_or_sha256": bundle_sha256,
+            "window_start_utc": window.get("start_utc") if isinstance(window, dict) else None,
+            "window_end_utc": window.get("end_utc") if isinstance(window, dict) else None,
+            "series_order": list(actual_order),
+            "renderer_sha256_first": renderer_sha256_first,
+            "renderer_sha256_second": renderer_sha256_second,
+            "renderer_deterministic": renderer_deterministic,
+            "USEFULNESS_GATE": status.value,
+        }
+    )
     for series_key in expected_order:
         symbol = series_key.split(".", 1)[0]
         projection = projections.get(series_key, {})
