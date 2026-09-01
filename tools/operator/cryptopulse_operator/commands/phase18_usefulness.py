@@ -63,8 +63,47 @@ def _git_output(runner: ProcessRunner, root: Path, args: list[str], label: str) 
     return result.stdout
 
 
-def _verified_repository_module_names(root: Path, runner: ProcessRunner) -> set[str]:
-    """Bind executable repository scripts to exact regular HEAD blobs."""
+def _trusted_checkout_identity(
+    root: Path,
+    runner: ProcessRunner,
+    *,
+    expected_commit_sha: str | None = None,
+    expected_tree_sha: str | None = None,
+) -> tuple[str, str]:
+    """Require checkout identity to remain bound to the established trusted commit/tree."""
+    commit_sha = _git_output(
+        runner,
+        root,
+        ["rev-parse", "HEAD"],
+        "repository checkout commit",
+    ).strip()
+    tree_sha = _git_output(
+        runner,
+        root,
+        ["rev-parse", "HEAD^{tree}"],
+        "repository checkout tree",
+    ).strip()
+    if expected_commit_sha is not None and commit_sha != expected_commit_sha:
+        raise RuntimeError("repository checkout commit moved after exact-main trust")
+    if expected_tree_sha is not None and tree_sha != expected_tree_sha:
+        raise RuntimeError("repository checkout tree moved after exact-main trust")
+    return commit_sha, tree_sha
+
+
+def _verified_repository_module_names(
+    root: Path,
+    runner: ProcessRunner,
+    *,
+    expected_commit_sha: str | None = None,
+    expected_tree_sha: str | None = None,
+) -> set[str]:
+    """Bind executable repository scripts to exact regular trusted-commit blobs."""
+    trusted_commit, _trusted_tree = _trusted_checkout_identity(
+        root,
+        runner,
+        expected_commit_sha=expected_commit_sha,
+        expected_tree_sha=expected_tree_sha,
+    )
     scripts_path = root / "scripts"
     if scripts_path.is_symlink() or not scripts_path.is_dir():
         raise RuntimeError("repository scripts directory is unavailable or unsafe")
@@ -73,7 +112,7 @@ def _verified_repository_module_names(root: Path, runner: ProcessRunner) -> set[
     tree_text = _git_output(
         runner,
         root,
-        ["ls-tree", "-r", "HEAD", "--", "scripts"],
+        ["ls-tree", "-r", trusted_commit, "--", "scripts"],
         "repository script tree",
     )
     tracked: dict[str, tuple[str, str]] = {}
@@ -152,21 +191,38 @@ def _verified_repository_module_names(root: Path, runner: ProcessRunner) -> set[
             ["-C", str(root), "hash-object", "--no-filters", path]
         )
         if actual.returncode != 0 or actual.stdout.strip() != expected_blob:
-            raise RuntimeError(f"repository script bytes differ from HEAD: {path}")
+            raise RuntimeError(f"repository script bytes differ from trusted commit: {path}")
         repository_module_names.add(relative.stem)
 
     missing = sorted(set(_CONTRACT_MODULE_NAMES) - repository_module_names)
     if missing:
         raise RuntimeError(
-            "required repository contract module is not a tracked HEAD blob: "
+            "required repository contract module is not a tracked trusted-commit blob: "
             + ", ".join(missing)
         )
     return repository_module_names
 
 
-def _load_contracts(root: Path, runner: ProcessRunner) -> dict[str, Any]:
+def _load_contracts(
+    root: Path,
+    runner: ProcessRunner,
+    *,
+    expected_commit_sha: str | None = None,
+    expected_tree_sha: str | None = None,
+) -> dict[str, Any]:
     """Load repository contracts only after exact-main and exact-blob trust succeeds."""
-    repository_module_names = _verified_repository_module_names(root, runner)
+    trusted_commit, trusted_tree = _trusted_checkout_identity(
+        root,
+        runner,
+        expected_commit_sha=expected_commit_sha,
+        expected_tree_sha=expected_tree_sha,
+    )
+    repository_module_names = _verified_repository_module_names(
+        root,
+        runner,
+        expected_commit_sha=trusted_commit,
+        expected_tree_sha=trusted_tree,
+    )
     scripts = (root / "scripts").resolve()
 
     preloaded = sorted(
@@ -206,9 +262,15 @@ def _load_contracts(root: Path, runner: ProcessRunner) -> dict[str, Any]:
                     f"repository transitive module origin mismatch: {module_name}"
                 )
 
-        # Recheck exact bytes after imports so proof execution never continues
-        # after an ordinary working-tree change during loading.
-        _verified_repository_module_names(root, runner)
+        # Recheck the immutable checkout identity and exact script bytes after
+        # imports so a moved HEAD or ordinary working-tree change cannot be
+        # accepted as authoritative protected-main proof code.
+        _verified_repository_module_names(
+            root,
+            runner,
+            expected_commit_sha=trusted_commit,
+            expected_tree_sha=trusted_tree,
+        )
 
         return {
             "phase18": loaded["phase18_multi_asset_temporal_evidence"],
@@ -333,7 +395,12 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
 
     root = runtime_root().resolve()
     try:
-        contracts = _load_contracts(root, runner)
+        contracts = _load_contracts(
+            root,
+            runner,
+            expected_commit_sha=main["sha"],
+            expected_tree_sha=main["tree_sha"],
+        )
     except Exception:
         return _gate_failure(
             gate,

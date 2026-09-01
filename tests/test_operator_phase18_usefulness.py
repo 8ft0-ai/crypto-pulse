@@ -310,6 +310,60 @@ class Phase18ContractLoaderTests(unittest.TestCase):
         finally:
             fixture.close()
 
+    def test_head_move_after_remote_gate_blocks_before_repository_import(self):
+        fixture = GitRepositoryFixture(self)
+        names = {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }
+        trusted_sha = fixture._git("rev-parse", "HEAD").stdout.strip()
+        trusted_tree = fixture._git("rev-parse", "HEAD^{tree}").stdout.strip()
+        importer = Mock(side_effect=AssertionError("candidate repository code imported"))
+
+        class MovingGitHub:
+            def main_branch(self):
+                target = fixture.scripts / "phase18_multi_asset_temporal_evidence.py"
+                target.write_text("raise RuntimeError('candidate executed')\n", encoding="utf-8")
+                fixture._git("add", str(target.relative_to(fixture.root)))
+                fixture._git("commit", "-m", "candidate checkout move")
+                return {
+                    "sha": trusted_sha,
+                    "tree_sha": trusted_tree,
+                    "protected": True,
+                    "required_checks": [],
+                }
+
+        try:
+            with (
+                isolated_modules(names),
+                patch.object(
+                    phase18_usefulness,
+                    "runtime_gate",
+                    return_value=trusted_gate(
+                        commit_sha=trusted_sha,
+                        tree_sha=trusted_tree,
+                    ),
+                ),
+                patch.object(
+                    phase18_usefulness,
+                    "runtime_root",
+                    return_value=fixture.root,
+                ),
+                patch.object(
+                    phase18_usefulness.importlib,
+                    "import_module",
+                    importer,
+                ),
+            ):
+                result = phase18_usefulness.run(fixture.runner, MovingGitHub())
+        finally:
+            fixture.close()
+
+        self.assertEqual(result.status, Status.ERROR)
+        self.assertEqual(result.findings[-1]["code"], "phase18-contract-load-failed")
+        self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
+        importer.assert_not_called()
+
     def test_skip_worktree_modified_contract_is_rejected(self):
         fixture = GitRepositoryFixture(self)
         target = "scripts/phase18_multi_asset_temporal_evidence.py"
