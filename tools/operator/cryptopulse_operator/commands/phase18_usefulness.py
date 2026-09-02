@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import importlib.abc
+import importlib.util
 from pathlib import Path
 import sys
 from typing import Any
@@ -22,6 +24,12 @@ _CONTRACT_MODULE_NAMES = (
     "phase15_public_temporal_evidence",
     "render_crypto_observation_hour_series",
     "render_phase18_multi_asset_temporal_evidence",
+)
+_EXPECTED_PHASE18_CONTRACT = "phase18-public-multi-asset-price-evidence/v1"
+_EXPECTED_PUBLIC_SERIES_KEYS = (
+    "BTC.price_usd",
+    "ETH.price_usd",
+    "SOL.price_usd",
 )
 
 
@@ -54,6 +62,47 @@ def _module_origin(module: Any) -> Path:
     if not isinstance(origin, str):
         raise RuntimeError("repository script module origin is unavailable")
     return Path(origin).resolve()
+
+
+class _TrustedScriptLoader(importlib.abc.Loader):
+    """Execute one repository module from source captured from a trusted Git blob."""
+
+    def __init__(self, module_name: str, source: str, origin: Path) -> None:
+        self._module_name = module_name
+        self._source = source
+        self._origin = origin
+
+    def create_module(self, spec: Any) -> None:
+        return None
+
+    def exec_module(self, module: Any) -> None:
+        module.__file__ = str(self._origin)
+        code = compile(self._source, str(self._origin), "exec")
+        exec(code, module.__dict__)
+
+
+class _TrustedScriptFinder(importlib.abc.MetaPathFinder):
+    """Resolve tracked repository script modules only from immutable captured blobs."""
+
+    def __init__(self, sources: dict[str, tuple[str, Path]]) -> None:
+        self._sources = dict(sources)
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: Any = None,
+        target: Any = None,
+    ) -> Any:
+        entry = self._sources.get(fullname)
+        if entry is None:
+            return None
+        source, origin = entry
+        loader = _TrustedScriptLoader(fullname, source, origin)
+        return importlib.util.spec_from_loader(
+            fullname,
+            loader,
+            origin=str(origin),
+        )
 
 
 def _git_output(runner: ProcessRunner, root: Path, args: list[str], label: str) -> str:
@@ -96,6 +145,7 @@ def _verified_repository_module_names(
     *,
     expected_commit_sha: str | None = None,
     expected_tree_sha: str | None = None,
+    trusted_sources: dict[str, tuple[str, Path]] | None = None,
 ) -> set[str]:
     """Bind executable repository scripts to exact regular trusted-commit blobs."""
     trusted_commit, _trusted_tree = _trusted_checkout_identity(
@@ -192,7 +242,16 @@ def _verified_repository_module_names(
         )
         if actual.returncode != 0 or actual.stdout.strip() != expected_blob:
             raise RuntimeError(f"repository script bytes differ from trusted commit: {path}")
-        repository_module_names.add(relative.stem)
+        module_name = relative.stem
+        repository_module_names.add(module_name)
+        if trusted_sources is not None:
+            source = _git_output(
+                runner,
+                root,
+                ["cat-file", "blob", expected_blob],
+                f"trusted repository script blob: {path}",
+            )
+            trusted_sources[module_name] = (source, candidate.resolve())
 
     missing = sorted(set(_CONTRACT_MODULE_NAMES) - repository_module_names)
     if missing:
@@ -217,11 +276,13 @@ def _load_contracts(
         expected_commit_sha=expected_commit_sha,
         expected_tree_sha=expected_tree_sha,
     )
+    trusted_sources: dict[str, tuple[str, Path]] = {}
     repository_module_names = _verified_repository_module_names(
         root,
         runner,
         expected_commit_sha=trusted_commit,
         expected_tree_sha=trusted_tree,
+        trusted_sources=trusted_sources,
     )
     scripts = (root / "scripts").resolve()
 
@@ -234,10 +295,10 @@ def _load_contracts(
             + ", ".join(preloaded)
         )
 
-    script_text = str(scripts)
     previous_dont_write_bytecode = sys.dont_write_bytecode
+    finder = _TrustedScriptFinder(trusted_sources)
     sys.dont_write_bytecode = True
-    sys.path.insert(0, script_text)
+    sys.meta_path.insert(0, finder)
     try:
         importlib.invalidate_caches()
         loaded = {
@@ -262,9 +323,9 @@ def _load_contracts(
                     f"repository transitive module origin mismatch: {module_name}"
                 )
 
-        # Recheck the immutable checkout identity and exact script bytes after
-        # imports so a moved HEAD or ordinary working-tree change cannot be
-        # accepted as authoritative protected-main proof code.
+        # The executable source was captured from immutable trusted-commit blobs
+        # before import. Recheck checkout/work-tree state after import as a final
+        # fail-closed hygiene check, but never execute source reopened by pathname.
         _verified_repository_module_names(
             root,
             runner,
@@ -281,7 +342,7 @@ def _load_contracts(
     finally:
         sys.dont_write_bytecode = previous_dont_write_bytecode
         try:
-            sys.path.remove(script_text)
+            sys.meta_path.remove(finder)
         except ValueError:
             pass
 
@@ -419,6 +480,24 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
     findings: list[dict[str, Any]] = []
     local: dict[str, Any] = {}
 
+    phase18_contract = getattr(phase18, "PHASE18_CONTRACT_VERSION", None)
+    contract_ok = phase18_contract == _EXPECTED_PHASE18_CONTRACT
+    assertions.append({"name": "phase18-contract-version", "holds": contract_ok})
+    if not contract_ok:
+        findings.append({"code": "phase18-contract-version-mismatch"})
+
+    public_series_keys = getattr(phase18, "PUBLIC_SERIES_KEYS", None)
+    implementation_order = (
+        tuple(public_series_keys)
+        if isinstance(public_series_keys, (tuple, list))
+        and all(isinstance(key, str) for key in public_series_keys)
+        else ()
+    )
+    series_contract_ok = implementation_order == _EXPECTED_PUBLIC_SERIES_KEYS
+    assertions.append({"name": "phase18-public-series-contract", "holds": series_contract_ok})
+    if not series_contract_ok:
+        findings.append({"code": "phase18-public-series-contract-mismatch"})
+
     try:
         bundle = phase18.build_multi_asset_temporal_evidence(root, commit_sha)
     except Exception:
@@ -520,7 +599,7 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
         findings.append({"code": "independent-bundle-reproduction-mismatch"})
 
     series = validated.get("series") if isinstance(validated, dict) else None
-    expected_order = tuple(phase18.PUBLIC_SERIES_KEYS)
+    expected_order = _EXPECTED_PUBLIC_SERIES_KEYS
     actual_order = (
         tuple(member.get("series_key") for member in series)
         if isinstance(series, list) and all(isinstance(member, dict) for member in series)
@@ -667,7 +746,7 @@ def run(runner: ProcessRunner, github: GitHubReader) -> Evidence:
     window = validated.get("window") if isinstance(validated, dict) else {}
     local.update(
         {
-            "phase18_contract": getattr(phase18, "PHASE18_CONTRACT_VERSION", None),
+            "phase18_contract": phase18_contract,
             "bundle_id": validated.get("bundle_id") if isinstance(validated, dict) else None,
             "bundle_canonical_identity_or_sha256": bundle_sha256,
             "window_start_utc": window.get("start_utc") if isinstance(window, dict) else None,

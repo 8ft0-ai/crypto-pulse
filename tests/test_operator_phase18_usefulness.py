@@ -364,6 +364,43 @@ class Phase18ContractLoaderTests(unittest.TestCase):
         self.assertEqual(result.local["USEFULNESS_GATE"], "ERROR")
         importer.assert_not_called()
 
+    def test_worktree_change_after_blob_capture_never_executes_changed_source(self):
+        fixture = GitRepositoryFixture(self)
+        names = {
+            *phase18_usefulness._CONTRACT_MODULE_NAMES,
+            "crypto_observation_hour_series",
+        }
+        target = fixture.scripts / "phase18_multi_asset_temporal_evidence.py"
+        sentinel = fixture.root / "working-tree-payload-executed"
+        real_import_module = phase18_usefulness.importlib.import_module
+        mutated = {"done": False}
+
+        def mutate_then_import(name, package=None):
+            if not mutated["done"]:
+                mutated["done"] = True
+                target.write_text(
+                    "from pathlib import Path\n"
+                    f"Path({str(sentinel)!r}).write_text('executed', encoding='utf-8')\n",
+                    encoding="utf-8",
+                )
+            return real_import_module(name, package)
+
+        try:
+            with (
+                isolated_modules(names),
+                patch.object(
+                    phase18_usefulness.importlib,
+                    "import_module",
+                    side_effect=mutate_then_import,
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "bytes differ from trusted commit"):
+                    phase18_usefulness._load_contracts(fixture.root, fixture.runner)
+        finally:
+            fixture.close()
+
+        self.assertFalse(sentinel.exists())
+
     def test_skip_worktree_modified_contract_is_rejected(self):
         fixture = GitRepositoryFixture(self)
         target = "scripts/phase18_multi_asset_temporal_evidence.py"
@@ -517,6 +554,32 @@ class Phase18UsefulnessCommandTests(unittest.TestCase):
         for symbol in ("BTC", "ETH", "SOL"):
             self.assertEqual(result.local[f"{symbol}_asserted_slots"], 7)
             self.assertEqual(result.local[f"{symbol}_continuous_pairs"], 2)
+
+    def test_frozen_phase18_contract_rejects_self_consistent_implementation_drift(self):
+        drift_cases = (
+            ("contract-version", "phase18-public-multi-asset-price-evidence/v2", SERIES_KEYS),
+            ("sol-removed", base_bundle()["contract"], SERIES_KEYS[:2]),
+            (
+                "reordered",
+                base_bundle()["contract"],
+                ("ETH.price_usd", "BTC.price_usd", "SOL.price_usd"),
+            ),
+            (
+                "unexpected-fourth",
+                base_bundle()["contract"],
+                (*SERIES_KEYS, "DOGE.price_usd"),
+            ),
+        )
+        for label, contract_version, implementation_keys in drift_cases:
+            with self.subTest(case=label):
+                contracts, _ = fake_contracts()
+                contracts["phase18"].PHASE18_CONTRACT_VERSION = contract_version
+                contracts["phase18"].PUBLIC_SERIES_KEYS = implementation_keys
+                result = self.run_with(contracts)
+                self.assertEqual(result.status, Status.FAIL)
+                self.assertTrue(result.completeness["complete"])
+                self.assertEqual(result.local["series_order"], list(SERIES_KEYS))
+                self.assertEqual(result.local["USEFULNESS_GATE"], "FAIL")
 
     def test_first_materialisation_unavailable_is_incomplete(self):
         contracts, _ = fake_contracts(materialised=False)
