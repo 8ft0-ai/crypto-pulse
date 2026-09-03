@@ -18,9 +18,12 @@ from crypto_observation_hour_series import (
 )
 from resolve_crypto_observation_hour_adjacency import (
     ObservationHourPopulationError,
+    ObservationHourReplayContext,
+    ObservationHourReplayContextError,
     _canonical_slot,
     _parse_slot,
     load_observation_hour_population,
+    prepare_observation_hour_replay_context,
 )
 
 PUBLIC_TEMPORAL_EVIDENCE_CONTRACT_VERSION = "phase15-public-temporal-evidence/v1"
@@ -36,22 +39,32 @@ class Phase15PublicTemporalEvidenceError(ValueError):
 def select_public_temporal_evidence_window(
     repository_root: Path,
     commit_sha: str,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, str] | None:
     """Select the deterministic 24-slot public window from Phase 13 participation.
 
     The anchor is the maximum canonical participating observation hour in the
     immutable commit. Zero participation intentionally yields no assertion.
     """
-    try:
-        population = load_observation_hour_population(Path(repository_root), commit_sha)
-    except ObservationHourPopulationError as exc:
-        raise Phase15PublicTemporalEvidenceError("candidate-set-unorderable") from exc
+    if replay_context is not None:
+        if not replay_context.matches(Path(repository_root), commit_sha):
+            raise Phase15PublicTemporalEvidenceError("candidate-set-unorderable")
+        hours = replay_context.observation_hours()
+    else:
+        try:
+            population = load_observation_hour_population(
+                Path(repository_root), commit_sha
+            )
+        except ObservationHourPopulationError as exc:
+            raise Phase15PublicTemporalEvidenceError("candidate-set-unorderable") from exc
+        hours = tuple(population)
 
-    if not population:
+    if not hours:
         return None
 
     try:
-        end = max(_parse_slot(slot) for slot in population)
+        end = max(_parse_slot(slot) for slot in hours)
     except ValueError as exc:
         raise Phase15PublicTemporalEvidenceError("candidate-set-unorderable") from exc
     start = end - timedelta(hours=PUBLIC_SLOT_COUNT - 1)
@@ -91,22 +104,69 @@ def _enforce_public_series_shape(record: Any) -> dict[str, Any]:
 def build_public_temporal_evidence(
     repository_root: Path,
     commit_sha: str,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, Any] | None:
     """Build the exact Phase 13 series selected by the Phase 15 contract."""
     root = Path(repository_root)
-    window = select_public_temporal_evidence_window(root, commit_sha)
+    context = replay_context
+    if context is not None and not context.matches(root, commit_sha):
+        raise Phase15PublicTemporalEvidenceError("candidate-set-unorderable")
+
+    if context is None:
+        try:
+            context = prepare_observation_hour_replay_context(root, commit_sha)
+        except RuntimeError as exc:
+            raise Phase15PublicTemporalEvidenceError(
+                "immutable replay execution failed"
+            ) from exc
+        except ObservationHourReplayContextError as exc:
+            if exc.resolution_status == "candidate-set-unorderable":
+                raise Phase15PublicTemporalEvidenceError(
+                    "candidate-set-unorderable"
+                ) from exc
+            if exc.resolution_status != "validation-contract-mismatch":
+                raise Phase15PublicTemporalEvidenceError(
+                    "replay context preparation failed"
+                ) from exc
+            # Preserve legacy validation-contract behaviour: window selection is
+            # population-only and the resulting Phase 13 series retains explicit
+            # validation-contract gaps rather than changing the public contract.
+            context = None
+
+    window = select_public_temporal_evidence_window(
+        root,
+        commit_sha,
+        replay_context=context,
+    )
     if window is None:
         return None
     try:
-        record = build_observation_hour_series(
-            root,
-            commit_sha,
-            PUBLIC_SERIES_KIND,
-            PUBLIC_SERIES_KEY,
-            window["start_utc"],
-            window["end_utc"],
-        )
-        validate_observation_hour_series(root, record)
+        if context is None:
+            record = build_observation_hour_series(
+                root,
+                commit_sha,
+                PUBLIC_SERIES_KIND,
+                PUBLIC_SERIES_KEY,
+                window["start_utc"],
+                window["end_utc"],
+            )
+            validate_observation_hour_series(root, record)
+        else:
+            record = build_observation_hour_series(
+                root,
+                commit_sha,
+                PUBLIC_SERIES_KIND,
+                PUBLIC_SERIES_KEY,
+                window["start_utc"],
+                window["end_utc"],
+                replay_context=context,
+            )
+            validate_observation_hour_series(
+                root,
+                record,
+                replay_context=context,
+            )
     except ObservationHourSeriesError as exc:
         raise Phase15PublicTemporalEvidenceError(
             "Phase 13 series construction or immutable replay validation failed"

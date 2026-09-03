@@ -349,6 +349,8 @@ class Phase13ObservationHourTemporalProofTests(unittest.TestCase):
     def test_metric_unavailable_and_invalid_states_are_closed_gaps(self) -> None:
         identity = METRIC_IDENTITIES["BTC.price_usd"]
         context = {"commit_sha": "b" * 40}
+        replay_context = mock.Mock()
+        replay_context.matches.return_value = True
         for state, expected in self.corpus["adapter_cases"]["metric_gap_map"].items():
             comparison = {
                 "comparison_status": "comparison-available",
@@ -381,6 +383,7 @@ class Phase13ObservationHourTemporalProofTests(unittest.TestCase):
                         "BTC.price_usd",
                         "2026-01-01T00:00:00Z",
                         "2026-01-01T00:00:00Z",
+                        replay_context=replay_context,
                     )
                 entry = record["entries"][0]
                 self.assertIsNone(entry["value"])

@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import copy
+from dataclasses import dataclass, field
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -26,6 +29,10 @@ SNAPSHOT_PREFIX = PurePosixPath("data/crypto/hourly")
 SNAPSHOT_SUFFIX = "_source_snapshot.json"
 OBSERVATION_HOUR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$")
 GIT_SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
+
+_GIT_CANDIDATES = ("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git")
+_GIT_TIMEOUT_SECONDS = 30
+_SAFE_PATH = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 
 PINNED_REFS = {
     "snapshot_validator": {
@@ -55,17 +62,69 @@ class ObservationHourPopulationError(ValueError):
     """Raised when the immutable Phase 13 participating population is unorderable."""
 
 
+class ObservationHourReplayContextError(ValueError):
+    """Raised when an exact-commit replay context cannot be prepared safely."""
+
+    def __init__(
+        self,
+        resolution_status: str,
+        repository_context: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(resolution_status)
+        self.resolution_status = resolution_status
+        self.repository_context = (
+            copy.deepcopy(repository_context) if repository_context is not None else None
+        )
+
+
 def _git_blob_sha(raw: bytes) -> str:
     return hashlib.sha1(f"blob {len(raw)}\0".encode("ascii") + raw).hexdigest()
 
 
+def _git_executable() -> str:
+    for candidate in _GIT_CANDIDATES:
+        path = Path(candidate)
+        if path.is_file() and os.access(path, os.X_OK):
+            return candidate
+    raise RuntimeError("approved git executable is unavailable")
+
+
+def _git_environment() -> dict[str, str]:
+    base = dict(os.environ)
+    for key in tuple(base):
+        if key.startswith("GIT_") or key.startswith("DYLD_") or key in {
+            "LD_PRELOAD",
+            "LD_LIBRARY_PATH",
+            "PYTHONPATH",
+            "PYTHONHOME",
+            "GH_CONFIG_DIR",
+            "GH_HOST",
+            "BASH_ENV",
+            "ENV",
+            "CDPATH",
+        }:
+            base.pop(key, None)
+    base["PYTHONNOUSERSITE"] = "1"
+    base["PYTHONDONTWRITEBYTECODE"] = "1"
+    base["PATH"] = _SAFE_PATH
+    return base
+
+
 def _git(repository_root: Path, *args: str) -> bytes:
-    completed = subprocess.run(
-        ["git", "-C", str(repository_root), *args],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    executable = _git_executable()
+    try:
+        completed = subprocess.run(
+            [executable, "-C", str(repository_root), *args],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=_git_environment(),
+            shell=False,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("git subprocess timed out") from exc
     if completed.returncode != 0:
         detail = completed.stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(detail or f"git {' '.join(args)} failed")
@@ -128,11 +187,12 @@ def _context_template() -> dict[str, Any]:
 
 
 def _runtime_module_matches(module: Any, expected_blob: str) -> bool:
+    path = Path(module.__file__ or "")
     try:
-        path = Path(module.__file__ or "")
-        return _git_blob_sha(path.read_bytes()) == expected_blob
-    except OSError:
-        return False
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError("trusted runtime validation module could not be read") from exc
+    return _git_blob_sha(raw) == expected_blob
 
 
 def _resolve_repository_context(
@@ -161,8 +221,8 @@ def _resolve_repository_context(
         ):
             return context, None
         config_bytes = _git(root, "cat-file", "blob", f"{resolved}:{PINNED_REFS['config']['path']}")
-    except (OSError, RuntimeError, UnicodeDecodeError):
-        return context, None
+    except (OSError, RuntimeError, UnicodeDecodeError) as exc:
+        raise RuntimeError("immutable repository context could not be established") from exc
 
     runtime_pairs = (
         (snapshot_validator, PINNED_REFS["snapshot_validator"]["git_blob_sha"]),
@@ -178,7 +238,9 @@ def _resolve_repository_context(
             config_path = Path(tmp) / "crypto_sources.yml"
             config_path.write_bytes(config_bytes)
             config = load_config(config_path)
-    except (OSError, ValidationError):
+    except OSError as exc:
+        raise RuntimeError("pinned replay config could not be loaded") from exc
+    except ValidationError:
         return context, None
     return context, config
 
@@ -224,6 +286,39 @@ def _canonical_slot(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _load_observation_hour_population_exact(
+    repository_root: Path,
+    commit_sha: str,
+) -> dict[str, list[tuple[str, bytes, dict[str, Any]]]]:
+    indexed: dict[str, list[tuple[str, bytes, dict[str, Any]]]] = {}
+    try:
+        for path in _candidate_paths(repository_root, commit_sha):
+            raw = _bytes_at_commit(repository_root, commit_sha, path)
+            payload = _parse_payload(raw)
+            if payload is None:
+                if b'"observation_hour_utc"' in raw:
+                    raise ObservationHourPopulationError(
+                        f"asserted observation-hour candidate is malformed: {path}"
+                    )
+                continue
+            run = payload.get("run")
+            if not isinstance(run, dict) or "observation_hour_utc" not in run:
+                continue
+            slot_value = run.get("observation_hour_utc")
+            try:
+                canonical = _canonical_slot(_parse_slot(slot_value))
+            except ValueError as exc:
+                raise ObservationHourPopulationError(
+                    f"asserted observation-hour candidate is unorderable: {path}"
+                ) from exc
+            indexed.setdefault(canonical, []).append((path, raw, payload))
+        return indexed
+    except ObservationHourPopulationError:
+        raise
+    except (OSError, RuntimeError, UnicodeDecodeError) as exc:
+        raise RuntimeError("observation-hour candidate set could not be enumerated") from exc
+
+
 def load_observation_hour_population(
     repository_root: Path,
     commit_sha: str,
@@ -247,35 +342,95 @@ def load_observation_hour_population(
         resolved = _git_text(root, "rev-parse", "--verify", f"{commit_sha}^{{commit}}").lower()
         if resolved != commit_sha:
             raise ObservationHourPopulationError("commit does not resolve exactly")
-
-        indexed: dict[str, list[tuple[str, bytes, dict[str, Any]]]] = {}
-        for path in _candidate_paths(root, resolved):
-            raw = _bytes_at_commit(root, resolved, path)
-            payload = _parse_payload(raw)
-            if payload is None:
-                if b'"observation_hour_utc"' in raw:
-                    raise ObservationHourPopulationError(
-                        f"asserted observation-hour candidate is malformed: {path}"
-                    )
-                continue
-            run = payload.get("run")
-            if not isinstance(run, dict) or "observation_hour_utc" not in run:
-                continue
-            slot_value = run.get("observation_hour_utc")
-            try:
-                canonical = _canonical_slot(_parse_slot(slot_value))
-            except ValueError as exc:
-                raise ObservationHourPopulationError(
-                    f"asserted observation-hour candidate is unorderable: {path}"
-                ) from exc
-            indexed.setdefault(canonical, []).append((path, raw, payload))
-        return indexed
+        return _load_observation_hour_population_exact(root, resolved)
     except ObservationHourPopulationError:
         raise
     except (OSError, RuntimeError, UnicodeDecodeError) as exc:
         raise ObservationHourPopulationError(
             "observation-hour candidate set could not be enumerated"
         ) from exc
+
+
+@dataclass
+class ObservationHourReplayContext:
+    """One immutable repository replay snapshot with bounded derived caches."""
+
+    repository_root: Path
+    commit_sha: str
+    tree_sha: str
+    _repository_context: dict[str, Any]
+    _config: dict[str, Any]
+    _population: dict[str, list[tuple[str, bytes, dict[str, Any]]]]
+    _payloads_by_path: dict[str, dict[str, Any]]
+    _comparison_cache: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def matches(self, repository_root: Path, commit_sha: str) -> bool:
+        try:
+            root = Path(repository_root).resolve(strict=True)
+        except OSError:
+            return False
+        return root == self.repository_root and commit_sha == self.commit_sha
+
+    def repository_context(self) -> dict[str, Any]:
+        return copy.deepcopy(self._repository_context)
+
+    def observation_hours(self) -> tuple[str, ...]:
+        return tuple(self._population)
+
+    def payload_for_path(self, path: str) -> dict[str, Any] | None:
+        payload = self._payloads_by_path.get(path)
+        return copy.deepcopy(payload) if payload is not None else None
+
+    def cached_comparison(self, slot_utc: str) -> dict[str, Any] | None:
+        record = self._comparison_cache.get(slot_utc)
+        return copy.deepcopy(record) if record is not None else None
+
+    def cache_comparison(self, slot_utc: str, record: dict[str, Any]) -> None:
+        self._comparison_cache[slot_utc] = copy.deepcopy(record)
+
+
+def prepare_observation_hour_replay_context(
+    repository_root: Path,
+    commit_sha: str,
+) -> ObservationHourReplayContext:
+    """Capture one exact-commit Phase 13 replay context and population."""
+    root = Path(repository_root)
+    context, config = _resolve_repository_context(root, commit_sha)
+    if config is None:
+        raise ObservationHourReplayContextError(
+            "validation-contract-mismatch", context
+        )
+    exact_commit = context.get("commit_sha")
+    tree_sha = context.get("tree_sha")
+    if exact_commit != commit_sha or not isinstance(tree_sha, str):
+        raise ObservationHourReplayContextError(
+            "validation-contract-mismatch", context
+        )
+    try:
+        root = root.resolve(strict=True)
+        population = _load_observation_hour_population_exact(root, exact_commit)
+    except ObservationHourPopulationError as exc:
+        raise ObservationHourReplayContextError(
+            "candidate-set-unorderable", context
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            "repository root could not be resolved during replay preparation"
+        ) from exc
+    payloads_by_path = {
+        path: payload
+        for items in population.values()
+        for path, _raw, payload in items
+    }
+    return ObservationHourReplayContext(
+        repository_root=root,
+        commit_sha=exact_commit,
+        tree_sha=tree_sha,
+        _repository_context=copy.deepcopy(context),
+        _config=config,
+        _population=population,
+        _payloads_by_path=payloads_by_path,
+    )
 
 
 def _parse_local_timestamp(value: Any) -> datetime:
@@ -356,6 +511,8 @@ def resolve_observation_hour_adjacency(
     repository_root: Path,
     commit_sha: str,
     current_slot_utc: str,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, Any]:
     """Resolve current H and predecessor H-1h from one immutable Git tree."""
 
@@ -374,21 +531,22 @@ def resolve_observation_hour_adjacency(
         "actual_elapsed_seconds": None,
     }
 
-    context, config = _resolve_repository_context(Path(repository_root), commit_sha)
-    result["repository_context"] = context
-    if config is None:
+    if replay_context is None:
+        try:
+            replay_context = prepare_observation_hour_replay_context(
+                Path(repository_root), commit_sha
+            )
+        except ObservationHourReplayContextError as exc:
+            if exc.repository_context is not None:
+                result["repository_context"] = exc.repository_context
+            result["resolution_status"] = exc.resolution_status
+            return result
+    elif not replay_context.matches(Path(repository_root), commit_sha):
         return result
-    exact_commit = context["commit_sha"]
-    assert isinstance(exact_commit, str)
 
-    try:
-        indexed = load_observation_hour_population(Path(repository_root), exact_commit)
-    except ObservationHourPopulationError:
-        result["resolution_status"] = "candidate-set-unorderable"
-        return result
-
-    current_items = indexed.get(current_slot_utc, [])
-    predecessor_items = indexed.get(predecessor_slot_utc, [])
+    result["repository_context"] = replay_context.repository_context()
+    current_items = replay_context._population.get(current_slot_utc, [])
+    predecessor_items = replay_context._population.get(predecessor_slot_utc, [])
     result["current_candidates"] = [
         _raw_identity(path, raw, payload) for path, raw, payload in current_items
     ]
@@ -410,7 +568,7 @@ def resolve_observation_hour_adjacency(
         return result
     try:
         result["current"] = _validated_identity(
-            current_path, current_raw, current_payload, config
+            current_path, current_raw, current_payload, replay_context._config
         )
     except ValidationError:
         result["resolution_status"] = "current-invalid"
@@ -432,7 +590,7 @@ def resolve_observation_hour_adjacency(
         return result
     try:
         result["predecessor"] = _validated_identity(
-            predecessor_path, predecessor_raw, predecessor_payload, config
+            predecessor_path, predecessor_raw, predecessor_payload, replay_context._config
         )
     except ValidationError:
         result["resolution_status"] = "predecessor-invalid"
@@ -453,8 +611,11 @@ __all__ = [
     "ADJACENCY_POLICY_VERSION",
     "OBSERVATION_HOUR_CONTRACT_VERSION",
     "ObservationHourPopulationError",
+    "ObservationHourReplayContext",
+    "ObservationHourReplayContextError",
     "PINNED_REFS",
     "SEMANTIC_CONTRACT_VERSION",
     "load_observation_hour_population",
+    "prepare_observation_hour_replay_context",
     "resolve_observation_hour_adjacency",
 ]

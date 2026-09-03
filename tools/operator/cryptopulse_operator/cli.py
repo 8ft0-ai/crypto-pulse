@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import sys
 
-from .commands import auth, candidate, ci, contracts, doctor, environment, live, pages, phase18_usefulness, protection, provenance, publication, review_pack, snapshot
+from .commands import auth, candidate, ci, contracts, doctor, environment, live, pages, phase18_usefulness_bounded as phase18_usefulness, protection, provenance, publication, review_pack, snapshot
 from .evidence import EXIT_CODE, Evidence
 from .github_read import GitHubReader
 from .process import ProcessRunner

@@ -14,12 +14,16 @@ from typing import Any
 
 from build_crypto_observation_hour_comparison_record import (
     COMPARISON_SCHEMA_VERSION,
+    _preparation_failure_record,
     build_observation_hour_comparison,
 )
 from resolve_crypto_observation_hour_adjacency import (
     ADJACENCY_POLICY_VERSION,
     OBSERVATION_HOUR_CONTRACT_VERSION,
     SEMANTIC_CONTRACT_VERSION,
+    ObservationHourReplayContext,
+    ObservationHourReplayContextError,
+    prepare_observation_hour_replay_context,
 )
 
 SERIES_SCHEMA_VERSION = "crypto-observation-hour-series/v1"
@@ -280,22 +284,50 @@ def build_observation_hour_series(
     series_key: str,
     start_utc: str,
     end_utc: str,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, Any]:
     """Build one canonical crypto-observation-hour-series/v1 record."""
     _series_identity(series_kind, series_key)
     start_text, end_text, slots = _window(start_utc, end_utc)
     root = Path(repository_root).resolve()
 
-    comparisons = [
-        build_observation_hour_comparison(root, commit_sha, slot) for slot in slots
-    ]
+    context = replay_context
+    preparation_error: ObservationHourReplayContextError | None = None
+    if context is not None and not context.matches(root, commit_sha):
+        preparation_error = ObservationHourReplayContextError(
+            "validation-contract-mismatch"
+        )
+        context = None
+    elif context is None:
+        try:
+            context = prepare_observation_hour_replay_context(root, commit_sha)
+        except ObservationHourReplayContextError as exc:
+            preparation_error = exc
+
+    if preparation_error is not None:
+        comparisons = [
+            _preparation_failure_record(slot, preparation_error) for slot in slots
+        ]
+    else:
+        assert context is not None
+        comparisons = [
+            build_observation_hour_comparison(
+                root,
+                commit_sha,
+                slot,
+                replay_context=context,
+            )
+            for slot in slots
+        ]
+
     if not comparisons or not isinstance(
         comparisons[0].get("repository_context"), dict
     ):
         raise ObservationHourSeriesError("repository comparison context is unavailable")
-    context = copy.deepcopy(comparisons[0]["repository_context"])
+    context_record = copy.deepcopy(comparisons[0]["repository_context"])
     for comparison in comparisons:
-        if comparison.get("repository_context") != context:
+        if comparison.get("repository_context") != context_record:
             raise ObservationHourSeriesError(
                 "comparison repository context changed within window"
             )
@@ -314,7 +346,7 @@ def build_observation_hour_series(
         "series_kind": series_kind,
         "series_key": series_key,
         "window": {"start_utc": start_text, "end_utc": end_text},
-        "repository_context": context,
+        "repository_context": context_record,
         "phase13": {
             "comparison_schema_version": COMPARISON_SCHEMA_VERSION,
             "adjacency_policy_version": ADJACENCY_POLICY_VERSION,
@@ -353,6 +385,8 @@ def _validate_json_native(value: Any, path: str = "$") -> None:
 def validate_observation_hour_series(
     repository_root: Path,
     record: Any,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, Any]:
     """Validate exact shape, vocabulary, continuity and immutable replay."""
     _validate_json_native(record)
@@ -435,6 +469,7 @@ def validate_observation_hour_series(
         record["series_key"],
         start_text,
         end_text,
+        replay_context=replay_context,
     )
     if canonical_json_bytes(record) != canonical_json_bytes(expected):
         raise ObservationHourSeriesError(
