@@ -16,7 +16,10 @@ from phase15_public_temporal_evidence import (  # noqa: E402
     build_public_temporal_evidence,
     select_public_temporal_evidence_window,
 )
-from resolve_crypto_observation_hour_adjacency import ObservationHourPopulationError  # noqa: E402
+from resolve_crypto_observation_hour_adjacency import (  # noqa: E402
+    ObservationHourPopulationError,
+    ObservationHourReplayContextError,
+)
 
 
 class Phase15PublicTemporalEvidenceTests(unittest.TestCase):
@@ -27,6 +30,11 @@ class Phase15PublicTemporalEvidenceTests(unittest.TestCase):
 
     def test_zero_participation_asserts_no_series_and_never_calls_builder(self) -> None:
         with mock.patch(
+            "phase15_public_temporal_evidence.prepare_observation_hour_replay_context",
+            side_effect=ObservationHourReplayContextError(
+                "validation-contract-mismatch"
+            ),
+        ), mock.patch(
             "phase15_public_temporal_evidence.load_observation_hour_population",
             return_value={},
         ), mock.patch(
@@ -68,6 +76,11 @@ class Phase15PublicTemporalEvidenceTests(unittest.TestCase):
 
     def test_unorderable_population_fails_before_series_construction(self) -> None:
         with mock.patch(
+            "phase15_public_temporal_evidence.prepare_observation_hour_replay_context",
+            side_effect=ObservationHourReplayContextError(
+                "validation-contract-mismatch"
+            ),
+        ), mock.patch(
             "phase15_public_temporal_evidence.load_observation_hour_population",
             side_effect=ObservationHourPopulationError("bad"),
         ), mock.patch(
@@ -92,6 +105,11 @@ class Phase15PublicTemporalEvidenceTests(unittest.TestCase):
             "entries": [{} for _ in range(PUBLIC_SLOT_COUNT)],
         }
         with mock.patch(
+            "phase15_public_temporal_evidence.prepare_observation_hour_replay_context",
+            side_effect=ObservationHourReplayContextError(
+                "validation-contract-mismatch"
+            ),
+        ), mock.patch(
             "phase15_public_temporal_evidence.load_observation_hour_population",
             return_value=population,
         ), mock.patch(

@@ -25,6 +25,11 @@ from phase15_public_temporal_evidence import (
     canonical_public_evidence_bytes,
     select_public_temporal_evidence_window,
 )
+from resolve_crypto_observation_hour_adjacency import (
+    ObservationHourReplayContext,
+    ObservationHourReplayContextError,
+    prepare_observation_hour_replay_context,
+)
 
 PHASE18_CONTRACT_VERSION = "phase18-public-multi-asset-price-evidence/v1"
 PUBLIC_SERIES_KIND = "metric"
@@ -139,14 +144,52 @@ def _enforce_member_shape(
     return member
 
 
+def _prepare_replay_context_or_legacy(
+    repository_root: Path,
+    commit_sha: str,
+    replay_context: ObservationHourReplayContext | None,
+) -> ObservationHourReplayContext | None:
+    if replay_context is not None:
+        if not replay_context.matches(repository_root, commit_sha):
+            raise Phase18MultiAssetTemporalEvidenceError(
+                "replay context repository identity mismatch"
+            )
+        return replay_context
+    try:
+        return prepare_observation_hour_replay_context(repository_root, commit_sha)
+    except RuntimeError as exc:
+        raise Phase18MultiAssetTemporalEvidenceError(
+            "immutable replay execution failed"
+        ) from exc
+    except ObservationHourReplayContextError as exc:
+        if exc.resolution_status == "validation-contract-mismatch":
+            # Preserve only the frozen semantic compatibility path. Execution
+            # failures remain RuntimeError and must never reach this retry.
+            return None
+        if exc.resolution_status == "candidate-set-unorderable":
+            raise Phase15PublicTemporalEvidenceError(
+                "candidate-set-unorderable"
+            ) from exc
+        raise Phase18MultiAssetTemporalEvidenceError(
+            "replay context preparation failed"
+        ) from exc
+
+
 def build_multi_asset_temporal_evidence(
     repository_root: Path,
     commit_sha: str,
+    *,
+    replay_context: ObservationHourReplayContext | None = None,
 ) -> dict[str, Any] | None:
     """Build the canonical Phase 18 BTC/ETH/SOL price-evidence bundle."""
     root = Path(repository_root)
+    context = _prepare_replay_context_or_legacy(root, commit_sha, replay_context)
     try:
-        window = select_public_temporal_evidence_window(root, commit_sha)
+        window = select_public_temporal_evidence_window(
+            root,
+            commit_sha,
+            replay_context=context,
+        )
     except Phase15PublicTemporalEvidenceError:
         raise
     if window is None:
@@ -162,25 +205,34 @@ def build_multi_asset_temporal_evidence(
                 series_key,
                 window["start_utc"],
                 window["end_utc"],
+                replay_context=context,
             )
-            validate_observation_hour_series(root, member)
+            validate_observation_hour_series(
+                root,
+                member,
+                replay_context=context,
+            )
             members.append(member)
     except ObservationHourSeriesError as exc:
         raise Phase18MultiAssetTemporalEvidenceError(
             "Phase 13 member construction or replay validation failed"
         ) from exc
 
-    context = members[0].get("repository_context")
-    if not isinstance(context, dict) or context.get("commit_sha") != commit_sha:
+    context_record = members[0].get("repository_context")
+    if not isinstance(context_record, dict) or context_record.get("commit_sha") != commit_sha:
         raise Phase18MultiAssetTemporalEvidenceError(
             "bundle repository context is unavailable or commit-mismatched"
         )
     exact_window = _require_24_slot_window(window)
     for expected_key, member in zip(PUBLIC_SERIES_KEYS, members):
-        _enforce_member_shape(member, expected_key, context, exact_window)
+        _enforce_member_shape(member, expected_key, context_record, exact_window)
 
     try:
-        phase15_btc = build_public_temporal_evidence(root, commit_sha)
+        phase15_btc = build_public_temporal_evidence(
+            root,
+            commit_sha,
+            replay_context=context,
+        )
     except Phase15PublicTemporalEvidenceError:
         raise
     if phase15_btc is None:
@@ -194,7 +246,7 @@ def build_multi_asset_temporal_evidence(
 
     bundle: dict[str, Any] = {
         "contract": PHASE18_CONTRACT_VERSION,
-        "repository_context": copy.deepcopy(context),
+        "repository_context": copy.deepcopy(context_record),
         "window": copy.deepcopy(exact_window),
         "series": members,
         "bundle_id": "",
@@ -214,10 +266,10 @@ def validate_multi_asset_temporal_evidence(
     if bundle.get("contract") != PHASE18_CONTRACT_VERSION:
         raise Phase18MultiAssetTemporalEvidenceError("bundle contract mismatch")
 
-    context = bundle.get("repository_context")
-    if not isinstance(context, dict) or not isinstance(context.get("commit_sha"), str):
+    context_record = bundle.get("repository_context")
+    if not isinstance(context_record, dict) or not isinstance(context_record.get("commit_sha"), str):
         raise Phase18MultiAssetTemporalEvidenceError("bundle repository context is invalid")
-    commit_sha = context["commit_sha"]
+    commit_sha = context_record["commit_sha"]
     window = _require_24_slot_window(bundle.get("window"))
 
     members = bundle.get("series")
@@ -226,10 +278,22 @@ def validate_multi_asset_temporal_evidence(
             "bundle must contain exactly BTC, ETH and SOL"
         )
 
+    # Validation is a fresh replay pass. Delay context preparation until the
+    # first member passes frozen-shape checks so malformed evidence retains the
+    # same validation precedence as the pre-refactor implementation.
+    replay_context: ObservationHourReplayContext | None = None
     for expected_key, member in zip(PUBLIC_SERIES_KEYS, members):
-        member = _enforce_member_shape(member, expected_key, context, window)
+        member = _enforce_member_shape(member, expected_key, context_record, window)
+        if replay_context is None:
+            replay_context = _prepare_replay_context_or_legacy(
+                Path(repository_root), commit_sha, None
+            )
         try:
-            validate_observation_hour_series(Path(repository_root), member)
+            validate_observation_hour_series(
+                Path(repository_root),
+                member,
+                replay_context=replay_context,
+            )
         except ObservationHourSeriesError as exc:
             raise Phase18MultiAssetTemporalEvidenceError(
                 "bundle member immutable replay validation failed"
@@ -246,7 +310,11 @@ def validate_multi_asset_temporal_evidence(
         raise Phase18MultiAssetTemporalEvidenceError("bundle_id mismatch")
 
     try:
-        phase15_btc = build_public_temporal_evidence(Path(repository_root), commit_sha)
+        phase15_btc = build_public_temporal_evidence(
+            Path(repository_root),
+            commit_sha,
+            replay_context=replay_context,
+        )
     except Phase15PublicTemporalEvidenceError as exc:
         raise Phase18MultiAssetTemporalEvidenceError(
             "Phase 15 BTC compatibility replay failed"
@@ -258,7 +326,11 @@ def validate_multi_asset_temporal_evidence(
             "Phase 15 BTC canonical compatibility mismatch"
         )
 
-    expected = build_multi_asset_temporal_evidence(Path(repository_root), commit_sha)
+    expected = build_multi_asset_temporal_evidence(
+        Path(repository_root),
+        commit_sha,
+        replay_context=replay_context,
+    )
     if expected is None or canonical_bundle_bytes(bundle) != canonical_bundle_bytes(expected):
         raise Phase18MultiAssetTemporalEvidenceError(
             "bundle does not match immutable Phase 18 replay"

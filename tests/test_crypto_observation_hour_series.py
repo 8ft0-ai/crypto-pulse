@@ -182,6 +182,8 @@ class ObservationHourSeriesTests(unittest.TestCase):
 
     def test_all_comparison_failures_map_to_closed_gaps(self) -> None:
         context = {"commit_sha": "b" * 40}
+        replay_context = mock.Mock()
+        replay_context.matches.return_value = True
         for status, reason in COMPARISON_GAP_MAP.items():
             comparison = {
                 "comparison_status": status,
@@ -201,6 +203,7 @@ class ObservationHourSeriesTests(unittest.TestCase):
                         "BTC.price_usd",
                         "2026-01-01T00:00:00Z",
                         "2026-01-01T00:00:00Z",
+                        replay_context=replay_context,
                     )
                 self.assertIsNone(record["entries"][0]["value"])
                 self.assertEqual(record["entries"][0]["gap"]["reason"], reason)
@@ -208,6 +211,8 @@ class ObservationHourSeriesTests(unittest.TestCase):
     def test_all_metric_failures_map_to_closed_gaps_without_raw_value_bypass(self) -> None:
         identity = METRIC_IDENTITIES["BTC.price_usd"]
         context = {"commit_sha": "b" * 40}
+        replay_context = mock.Mock()
+        replay_context.matches.return_value = True
         for state, reason in METRIC_GAP_MAP.items():
             comparison = {
                 "comparison_status": "comparison-available",
@@ -238,6 +243,7 @@ class ObservationHourSeriesTests(unittest.TestCase):
                         "BTC.price_usd",
                         "2026-01-01T00:00:00Z",
                         "2026-01-01T00:00:00Z",
+                        replay_context=replay_context,
                     )
                 self.assertIsNone(record["entries"][0]["value"])
                 self.assertEqual(record["entries"][0]["gap"]["reason"], reason)
