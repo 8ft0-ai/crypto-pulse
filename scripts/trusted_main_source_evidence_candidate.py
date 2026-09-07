@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import trusted_main_source_evidence_candidate_impl as _impl
+import trusted_main_source_evidence_candidate_v12 as _impl
 
 for _name, _value in vars(_impl).items():
     if _name not in {
@@ -71,7 +71,12 @@ def render_pr_body(manifest, evidence, candidate_commit_sha):
     return body
 
 
+# The v1.2 adapter delegates CLI dispatch to the mature implementation module.
+# Patch both surfaces so `candidate.py render-pr` retains the bounded public
+# renderer rather than silently falling through to the unbounded legacy body.
 _impl.render_pr_body = render_pr_body
+if hasattr(_impl, "_legacy"):
+    _impl._legacy.render_pr_body = render_pr_body
 _impl.PR_BODY_SAFE_MAX_CHARS = PR_BODY_SAFE_MAX_CHARS
 
 
