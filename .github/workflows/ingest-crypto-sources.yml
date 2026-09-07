@@ -319,7 +319,7 @@ jobs:
             ${{ runner.temp }}/deterministic-publication-intent/deterministic-publication-intent.json
             ${{ runner.temp }}/deterministic-publication-intent/payload/snapshot.json
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 35
 
       - name: Push rolling automation branch
         if: steps.publish_context.outputs.should_publish == 'true'
