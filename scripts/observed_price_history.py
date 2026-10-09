@@ -73,14 +73,28 @@ def _project(payload):
 
 
 def _wrapped_execution_failure(error):
-    """Never treat wrapped operating-system or runtime failures as source rejection."""
-    current = error.__cause__ or error.__context__
+    """Fail closed unless all wrapped causes are recognised source-parse rejections."""
+    pending = [(error, error.__cause__), (error, error.__context__)]
     seen = set()
-    while current is not None and id(current) not in seen:
+    while pending:
+        parent, current = pending.pop()
+        if current is None or id(current) in seen:
+            continue
         seen.add(id(current))
-        if isinstance(current, (OSError, RuntimeError)):
+        # Phase 12 explicitly wraps JSON decoding and datetime parsing in
+        # ValidationError. An unrelated KeyError/TypeError/OS/runtime failure
+        # (including one nested beneath another ValidationError) is terminal.
+        source_parse_error = (
+            isinstance(current, (ValidationError, json.JSONDecodeError))
+            or (
+                type(current) is ValueError
+                and isinstance(parent, ValidationError)
+                and str(parent).endswith("must be an ISO-8601 timestamp")
+            )
+        )
+        if not source_parse_error:
             return True
-        current = current.__cause__ or current.__context__
+        pending.extend(((current, current.__cause__), (current, current.__context__)))
     return False
 
 

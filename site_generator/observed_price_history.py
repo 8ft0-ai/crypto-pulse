@@ -53,7 +53,7 @@ def render(repository_root, candidate):
         '<p><strong>Historical prototype demonstration, not live market data or financial advice.</strong> '
         'Data may be stale; archived AI-generated reports may contain errors. No trading recommendations.</p>',
         '<p>Each marker represents a validated snapshot in its canonical UTC observation-hour slot; '
-        'the actual collection time is shown in the table. Empty intervals are not interpolated. '
+        'the actual snapshot generation timestamp is shown in the table, not a verified source-collection time. Empty intervals are not interpolated. '
         'Observed prices do not prove hourly price changes, returns or trends.</p>',
         '<p>Period: ' + _escape(record["window"]["start_utc"]) + ' to '
         + _escape(record["window"]["end_utc"]) + '</p>',

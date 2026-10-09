@@ -178,6 +178,73 @@ class ObservedPriceContractTests(unittest.TestCase):
                         materialise(ROOT, COMMIT)
                 self.assertIsInstance(result.exception.__cause__, type(failure))
 
+    def test_nested_validator_execution_failures_abort_without_invalid_hour(self):
+        ctx, slot, item = self._valid_item()
+
+        def wrapped(underlying, nested=False):
+            try:
+                raise underlying
+            except Exception as cause:
+                try:
+                    raise ValidationError("inner source check") from cause
+                except ValidationError as intermediate:
+                    if not nested:
+                        return intermediate
+                    try:
+                        raise ValidationError("outer source check") from intermediate
+                    except ValidationError as outer:
+                        return outer
+
+        from validate_crypto_snapshot import ValidationError
+        for failure in (KeyError("missing runtime key"), TypeError("validator bug"),
+                        AttributeError("validator bug"), OSError("disk"),
+                        RuntimeError("validator runtime"), ImportError("validator dependency")):
+            for nested in (False, True):
+                with self.subTest(failure=type(failure).__name__, nested=nested):
+                    err = wrapped(failure, nested)
+                    with patch("observed_price_history.validate_observation_hour",
+                               side_effect=err):
+                        with self.assertRaises(ValidationError):
+                            _classify([item], slot, ctx._config)
+                        with self.assertRaises(ObservedPriceError) as materialisation:
+                            materialise(ROOT, COMMIT)
+                    self.assertIs(materialisation.exception.__cause__, err)
+
+    def test_only_known_wrapped_source_parse_rejections_recover(self):
+        from validate_crypto_snapshot import ValidationError
+        from json import JSONDecodeError
+        ctx, slot, item = self._valid_item()
+
+        def wrapped(message, cause):
+            try:
+                raise cause
+            except Exception as exc:
+                try:
+                    raise ValidationError(message) from exc
+                except ValidationError as final:
+                    return final
+
+        cases = (
+            wrapped("invalid JSON", JSONDecodeError("invalid JSON", "bad", 0)),
+            wrapped("run.generated_at_utc must be an ISO-8601 timestamp",
+                    ValueError("invalid ISO format")),
+        )
+        for err in cases:
+            with self.subTest(error=str(err)):
+                with patch("observed_price_history.validate_observation_hour",
+                           side_effect=err):
+                    entry = _classify([item], slot, ctx._config)
+                self.assertEqual(entry["state"], "INVALID")
+                self.assertEqual(entry["blocked_reason"], "phase12-invalid")
+                self.assertTrue(all(value is None for value in entry["prices_usd"].values()))
+
+        # A generic ValueError is not evidence of ordinary source rejection.
+        error = wrapped("wrapped runtime failure", ValueError("unexpected internal failure"))
+        with patch("observed_price_history.validate_observation_hour",
+                   side_effect=error):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+
     def test_timezone_database_failure_is_terminal(self):
         from zoneinfo import ZoneInfoNotFoundError
         ctx, slot, item = self._valid_item()
