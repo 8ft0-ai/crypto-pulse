@@ -140,6 +140,8 @@ def build() -> None:
     reader_evidence.apply(base)
     add_archive_filters(filters)
     temporal_evidence.apply(base)
+    from . import observed_price_history
+    observed_price_history.apply(base)
     archive_reader.apply(base)
     add_accessibility_polish(base)
 
