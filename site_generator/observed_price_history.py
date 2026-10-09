@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import importlib
+import math
 import sys
 from pathlib import Path
 
@@ -17,16 +18,22 @@ def _draw_points(entries, asset):
     points = [(i, row["prices_usd"][asset]) for i, row in enumerate(entries) if row["state"].startswith("OBSERVED")]
     if not points:
         return '<p>No validated observed prices in this window.</p>'
+    if any(isinstance(price, bool) or not isinstance(price, (int, float))
+           or not math.isfinite(price) or price <= 0 for _, price in points):
+        raise ValueError("nonfinite or invalid SVG observation price")
     low = min(p for _, p in points)
     high = max(p for _, p in points)
-    span = high - low or 1
+    span = high - low
     markers = []
     for i, price in points:
         x = 36 + (i * 700 / 23)
-        y = 175 - ((price - low) * 135 / span)
+        ratio = (price - low) / span if span else 0.5
+        y = 175 - (135 * ratio)
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise ValueError("nonfinite SVG observation coordinate")
         markers.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5" fill="currentColor"><title>{_escape(entries[i]["slot_utc"])}: ${_escape(price)} USD</title></circle>')
     return (
-        '<svg viewBox="0 0 780 220" role="img" aria-label="Discrete observed '
+        '<svg viewBox="0 0 780 220" style="display:block;max-width:100%;height:auto" role="img" aria-label="Discrete observed '
         + _escape(asset)
         + ' prices only; intermediate hours are not observed. Refer to the evidence table.">'
         + '<path d="M36 30V175H736" fill="none" stroke="currentColor" opacity=".4"/>'
@@ -56,7 +63,10 @@ def render(repository_root, candidate):
         parts.append(_draw_points(entries, asset))
         parts.append('</section>')
     parts.append('<h2>Complete hourly evidence and provenance</h2>')
-    parts.append('<table><caption>All 24 UTC hours, with unavailable data explicitly distinguished</caption>'
+    parts.append('<div class="table-scroll-wrap" role="region" tabindex="0" '
+                 'aria-label="Scrollable complete hourly observed price evidence" '
+                 'style="max-width:100%;overflow-x:auto">')
+    parts.append('<table style="width:100%;min-width:980px;border-collapse:collapse"><caption>All 24 UTC hours, with unavailable data explicitly distinguished</caption>'
                  '<thead><tr><th scope="col">Observation hour (UTC)</th><th scope="col">Evidence state</th>'
                  '<th scope="col">BTC USD</th><th scope="col">ETH USD</th><th scope="col">SOL USD</th>'
                  '<th scope="col">Actual generated (UTC)</th><th scope="col">Committed snapshot</th></tr></thead><tbody>')
@@ -70,7 +80,7 @@ def render(repository_root, candidate):
         if candidate:
             generated = _escape(candidate["generated_at_utc"] or "Unavailable")
             provenance = (
-                '<code>' + _escape(candidate["path"]) + '</code>'
+                '<code style="overflow-wrap:anywhere">' + _escape(candidate["path"]) + '</code>'
                 '<details><summary>Source hashes</summary><code>Git blob '
                 + _escape(candidate["git_blob_sha"])
                 + '</code> <code>SHA-256 ' + _escape(candidate["snapshot_sha256"]) + '</code></details>'
@@ -86,7 +96,7 @@ def render(repository_root, candidate):
             '<td>' + price("ETH") + '</td><td>' + price("SOL") + '</td>'
             '<td>' + generated + '</td><td>' + provenance + '</td></tr>'
         )
-    parts.append('</tbody></table>')
+    parts.append('</tbody></table></div>')
     parts.append('<p>Immutable source commit: <code>' + _escape(record["repository_context"]["commit_sha"]) + '</code>; '
                  'tree: <code>' + _escape(record["repository_context"]["tree_sha"]) + '</code>; '
                  'record ID: <code>' + _escape(record["record_id"]) + '</code>.</p></section>')

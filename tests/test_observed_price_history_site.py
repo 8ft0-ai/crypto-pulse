@@ -50,5 +50,85 @@ class ObservedPriceSiteTests(unittest.TestCase):
         self.assertIn(self.record["repository_context"]["tree_sha"], rendered)
 
 
+    def test_horizontal_region_is_keyboard_focusable_and_responsive(self):
+        html = render(ROOT, self.record)
+        self.assertIn('class="table-scroll-wrap"', html)
+        self.assertIn('tabindex="0"', html)
+        self.assertIn('role="region"', html)
+        self.assertIn('aria-label="Scrollable complete hourly observed price evidence"', html)
+        self.assertIn('style="max-width:100%;overflow-x:auto"', html)
+        self.assertIn('min-width:980px', html)
+        self.assertIn('scope="col"', html)
+        self.assertIn('scope="row"', html)
+        self.assertEqual(html.count("<tr>"), 25)
+        self.assertIn('style="display:block;max-width:100%;height:auto"', html)
+
+    def test_extreme_finite_prices_produce_only_finite_svg_coordinates(self):
+        import math
+        import re
+        from site_generator.observed_price_history import _draw_points
+        points = [
+            {"slot_utc": "2026-01-01T00:00:00Z", "state": "OBSERVED",
+             "prices_usd": {"BTC": 1.0}},
+            {"slot_utc": "2026-01-01T01:00:00Z", "state": "OBSERVED",
+             "prices_usd": {"BTC": 1e308}},
+        ]
+        svg = _draw_points(points, "BTC")
+        locations = re.findall(r'<circle cx="([^"]+)" cy="([^"]+)"', svg)
+        self.assertEqual(len(locations), 2)
+        for x, y in locations:
+            self.assertTrue(math.isfinite(float(x)) and math.isfinite(float(y)))
+            self.assertGreaterEqual(float(y), 40)
+            self.assertLessEqual(float(y), 175)
+        self.assertNotIn("inf", svg.lower())
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("<polyline", svg)
+        points[1]["prices_usd"]["BTC"] = 1.0
+        self.assertEqual(_draw_points(points, "BTC").count('cy="107.50"'), 2)
+        points[1]["prices_usd"]["BTC"] = float("nan")
+        with self.assertRaises(ValueError):
+            _draw_points(points, "BTC")
+
+    def test_mixed_blocked_hour_labels_and_prices_are_explicit(self):
+        from unittest.mock import patch
+        variant = copy.deepcopy(self.record)
+        for row, state, reason in (
+            (variant["entries"][0], "MISSING", None),
+            (variant["entries"][1], "INVALID", "projection-invalid"),
+            (variant["entries"][2], "AMBIGUOUS", "duplicate-hour"),
+        ):
+            row["state"] = state
+            row["blocked_reason"] = reason
+            row["prices_usd"] = {"BTC": None, "ETH": None, "SOL": None}
+        observed_source = next(r["candidates"][0] for r in variant["entries"] if r["candidates"])
+        variant["entries"][2]["candidates"] = [copy.deepcopy(observed_source), copy.deepcopy(observed_source)]
+        with patch("observed_price_history.validate_replay", return_value=variant):
+            page = render(ROOT, variant)
+        self.assertIn("INVALID: projection-invalid", page)
+        self.assertIn("AMBIGUOUS: duplicate-hour", page)
+        self.assertIn("MISSING", page)
+        self.assertIn("Multiple source candidates", page)
+        self.assertEqual(page.count("<tr>"), 25)
+
+    def test_html_escaping_on_source_derived_strings(self):
+        from unittest.mock import patch
+        variant = copy.deepcopy(self.record)
+        row = next(x for x in variant["entries"] if x["candidates"])
+        attack = '<script>alert("attack")</script><img src=x onerror=alert(1)>'
+        row["candidates"][0]["path"] = attack
+        row["candidates"][0]["generated_at_utc"] = attack
+        row["warnings"] = [attack]
+        with patch("observed_price_history.validate_replay", return_value=variant):
+            page = render(ROOT, variant)
+        self.assertIn("&lt;script&gt;", page)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", page)
+        self.assertNotIn("<script>", page)
+        self.assertNotIn("<img src=x onerror=", page)
+        self.assertIn("Git blob", page)
+        self.assertIn("SHA-256", page)
+        with self.assertRaises(ObservedPriceError):
+            render(ROOT, variant)
+
+
 if __name__ == "__main__":
     unittest.main()

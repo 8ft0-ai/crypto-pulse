@@ -7,6 +7,7 @@ import math
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from resolve_crypto_observation_hour_adjacency import (
     prepare_observation_hour_replay_context,
@@ -23,6 +24,10 @@ STATES = {"OBSERVED", "OBSERVED_DEGRADED", "MISSING", "AMBIGUOUS", "INVALID"}
 
 class ObservedPriceError(ValueError):
     """No trustworthy complete evidence can be produced."""
+
+
+class CandidateProjectionInvalid(ValueError):
+    """One fully inspected candidate contains unusable required asset evidence."""
 
 
 def canonical(value):
@@ -43,21 +48,40 @@ def _identity(path, raw, payload):
 
 
 def _project(payload):
-    assets = payload["market"]["assets"]
+    # Phase 12 must have accepted the complete candidate. Only explicitly
+    # identified source-data defects may be downgraded to an INVALID hour.
+    market = payload.get("market") if isinstance(payload, dict) else None
+    assets = market.get("assets") if isinstance(market, dict) else None
+    if not isinstance(assets, list):
+        raise CandidateProjectionInvalid("asset list absent")
     found = {}
     ids = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
     for asset in assets:
+        if not isinstance(asset, dict):
+            raise CandidateProjectionInvalid("asset entry is not an object")
         symbol = asset.get("symbol")
         if symbol in ASSETS:
             if symbol in found or asset.get("id") != ids[symbol]:
-                raise ValueError("duplicated or mismatched asset")
+                raise CandidateProjectionInvalid("duplicated or mismatched asset")
             value = asset.get("price_usd")
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
-                raise ValueError("invalid asset USD price")
+                raise CandidateProjectionInvalid("invalid asset USD price")
             found[symbol] = value
     if set(found) != set(ASSETS):
-        raise ValueError("required asset absent")
+        raise CandidateProjectionInvalid("required asset absent")
     return {name: found[name] for name in ASSETS}
+
+
+def _wrapped_execution_failure(error):
+    """Never treat wrapped operating-system or runtime failures as source rejection."""
+    current = error.__cause__ or error.__context__
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (OSError, RuntimeError)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def _classify(items, slot, config):
@@ -76,6 +100,13 @@ def _classify(items, slot, config):
         entry.update(state="AMBIGUOUS", blocked_reason="duplicate-hour")
         return entry
     path, raw, payload = items[0]
+    # The shared identity helper catches ZoneInfoNotFoundError and returns False.
+    # Resolve this dependency explicitly first: an unavailable zone must abort,
+    # not be misreported as a bad candidate. Do not modify Phase 13 semantics.
+    run = payload.get("run") if isinstance(payload, dict) else None
+    timezone_name = run.get("timezone") if isinstance(run, dict) else None
+    if isinstance(timezone_name, str) and timezone_name.strip():
+        ZoneInfo(timezone_name)
     if not _identity_is_consistent(path, payload):
         entry.update(state="INVALID", blocked_reason="identity-invalid")
         return entry
@@ -86,7 +117,9 @@ def _classify(items, slot, config):
             local.write_bytes(raw)
             observed = validate_observation_hour(local, config)
             quality = validate_snapshot(local, config)
-    except ValidationError:
+    except ValidationError as exc:
+        if _wrapped_execution_failure(exc):
+            raise
         entry.update(state="INVALID", blocked_reason="phase12-invalid")
         return entry
     if observed["observation_hour_utc"] != slot:
@@ -96,7 +129,7 @@ def _classify(items, slot, config):
     entry["warnings"] = list(quality["non_blocking_warnings"])
     try:
         prices = _project(payload)
-    except (KeyError, TypeError, ValueError):
+    except CandidateProjectionInvalid:
         entry.update(state="INVALID", blocked_reason="projection-invalid")
         return entry
     entry.update(
