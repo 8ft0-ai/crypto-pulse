@@ -367,5 +367,45 @@ class ObservedPriceContractTests(unittest.TestCase):
                 self.assertTrue(all(v is None for v in row["prices_usd"].values()))
 
 
+    def test_pinned_rejection_authority_rejects_mutable_source_and_linecache(self):
+        import linecache
+        import tempfile
+        from unittest.mock import patch
+        from observed_price_history import _authenticated_validator_modules, _explicit_phase12_source_rejection
+        import validate_crypto_snapshot as snapshot_module
+        _authenticated_validator_modules()
+        try:
+            snapshot_module.require_mapping(None, "run")
+        except snapshot_module.ValidationError as err:
+            genuine = err
+        self.assertTrue(_explicit_phase12_source_rejection(genuine))
+        with patch.object(linecache, "getline", return_value="raise ValidationError('forged')"):
+            self.assertTrue(_explicit_phase12_source_rejection(genuine))
+            try:
+                raise snapshot_module.ValidationError("forged")
+            except snapshot_module.ValidationError as forged:
+                self.assertFalse(_explicit_phase12_source_rejection(forged))
+        original = Path(snapshot_module.__file__).read_bytes()
+        with patch.object(Path, "read_bytes", autospec=True,
+                          side_effect=lambda path: original + b"\n# altered" if Path(path).resolve() == Path(snapshot_module.__file__).resolve() else Path.open(path, "rb").read()):
+            with self.assertRaises(ObservedPriceError):
+                _authenticated_validator_modules()
+
+    def test_unknown_validator_execution_site_is_not_recoverable(self):
+        from observed_price_history import _explicit_phase12_source_rejection
+        import validate_crypto_snapshot as validator
+        from unittest.mock import patch
+        def fabricated_rejection(_value, _path):
+            raise validator.ValidationError("fake schema failure")
+        with patch.object(validator, "require_mapping", fabricated_rejection):
+            from observed_price_history import _authenticated_validator_modules
+            with self.assertRaises(ObservedPriceError):
+                _authenticated_validator_modules()
+            with self.assertRaises(validator.ValidationError) as captured:
+                validator.require_mapping(None, "run")
+            with self.assertRaises(ObservedPriceError):
+                _explicit_phase12_source_rejection(captured.exception)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import linecache
+import inspect
+import sys
 import math
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -73,25 +74,81 @@ def _project(payload):
     return {name: found[name] for name in ASSETS}
 
 
-def _explicit_phase12_source_rejection(error):
-    """Require an actual validator source-rejection raise site, not just its type.
+# Frozen Phase 12 explicit rejection sites (module, function, source line).
+# Every site was independently enumerated from the exact frozen validator blobs.
+# Do not derive this allowlist dynamically from runtime source or linecache.
+_PINNED_REJECTION_SITES = {
+    "validate_crypto_snapshot": {
+        "require_mapping": {36}, "require_list": {40}, "require_string": {44},
+        "parse_iso_timestamp": {52}, "validate_source_status": {108},
+        "validate_market_shape": {116}, "validate_exchange_shape": {127, 129, 132},
+        "validate_defi_shape": {136}, "validate_quality": {229, 230, 232},
+        "validate_snapshot": {237, 239, 242, 246},
+    },
+    "validate_crypto_observation_hour": {
+        "validate_observation_hour": {42, 46, 50, 52, 58},
+    },
+}
+_PINNED_VALIDATOR_BLOBS = {
+    "validate_crypto_snapshot": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a",
+    "validate_crypto_observation_hour": "21e18835c1047243ebda4b5ec7760fd9df793356",
+}
 
-    These two pinned Phase 12 modules own explicit ValidationError rejections.
-    Exceptions injected by wrappers or other code cannot impersonate them by
-    choosing ValidationError or reusing its message.
-    """
+
+def _authenticated_validator_modules(validation_refs=None):
+    """Authenticate on-disk validators and their runtime function code origins."""
+    result = {}
+    for name, expected_blob in _PINNED_VALIDATOR_BLOBS.items():
+        module = sys.modules.get(name)
+        source = Path(__file__).resolve().with_name(name + ".py")
+        if module is None or Path(getattr(module, "__file__", "")).resolve() != source:
+            raise ObservedPriceError("pinned validator module identity mismatch")
+        try:
+            actual = _git_blob_sha(source.read_bytes())
+        except OSError as exc:
+            raise ObservedPriceError("pinned validator source unavailable") from exc
+        if actual != expected_blob:
+            raise ObservedPriceError("pinned validator source differs from authorised blob")
+        # Compare the running validator functions with freshly compiled pinned
+        # source, rather than trusting filenames, linecache or monkeypatched names.
+        compiled = compile(source.read_bytes(), str(source), "exec")
+        expected_functions = {
+            obj.co_name: obj for obj in compiled.co_consts
+            if inspect.iscode(obj)
+        }
+        for function_name in _PINNED_REJECTION_SITES[name]:
+            function = getattr(module, function_name, None)
+            expected_code = expected_functions.get(function_name)
+            if (not inspect.isfunction(function) or expected_code is None
+                    or function.__code__ != expected_code):
+                raise ObservedPriceError("loaded validator function differs from pinned source")
+        if validation_refs is not None:
+            ref_name = "snapshot_validator" if name == "validate_crypto_snapshot" else "observation_validator"
+            if validation_refs.get(ref_name, {}).get("git_blob_sha") != expected_blob:
+                raise ObservedPriceError("replay validator authority differs from pinned source")
+        result[name] = (module, source)
+    return result
+
+
+def _explicit_phase12_source_rejection(error):
+    """Allow only an authentic validator function's explicitly pinned raise site."""
+    modules = _authenticated_validator_modules()
     tb = error.__traceback__
     if tb is None:
         return False
     while tb.tb_next is not None:
         tb = tb.tb_next
     frame = tb.tb_frame
-    return (
-        frame.f_globals.get("__name__") in
-        ("validate_crypto_snapshot", "validate_crypto_observation_hour")
-        and "raise ValidationError(" in
-        linecache.getline(frame.f_code.co_filename, tb.tb_lineno)
-    )
+    name = frame.f_globals.get("__name__")
+    if name not in _PINNED_REJECTION_SITES:
+        return False
+    module, source = modules[name]
+    if Path(frame.f_code.co_filename).resolve() != source:
+        return False
+    function = getattr(module, frame.f_code.co_name, None)
+    if not inspect.isfunction(function) or function.__code__ is not frame.f_code:
+        return False
+    return tb.tb_lineno in _PINNED_REJECTION_SITES[name].get(function.__name__, ())
 
 
 def _wrapped_execution_failure(error):
@@ -182,6 +239,7 @@ def _classify(items, slot, config):
 def materialise(repository_root: Path, commit_sha: str):
     try:
         ctx = prepare_observation_hour_replay_context(Path(repository_root), commit_sha)
+        _authenticated_validator_modules(ctx.repository_context())
         population = ctx._population
         if not population:
             raise ObservedPriceError("no observation population")
