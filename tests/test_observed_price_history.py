@@ -156,11 +156,21 @@ class ObservedPriceContractTests(unittest.TestCase):
     def test_phase12_rejection_vs_execution_failure(self):
         from validate_crypto_snapshot import ValidationError
         ctx, slot, item = self._valid_item()
+        # A forged, unchained ValidationError has no validator-owned source
+        # rejection site and must not silently turn the hour INVALID.
         with patch("observed_price_history.validate_observation_hour",
                    side_effect=ValidationError("bad source")):
-            entry = _classify([item], slot, ctx._config)
+            with self.assertRaises(ObservedPriceError) as unexpected:
+                materialise(ROOT, COMMIT)
+        self.assertIsInstance(unexpected.exception.__cause__, ValidationError)
+
+        # Genuine, bare Phase 12 source rejection remains recoverable.
+        import json
+        payload = copy.deepcopy(item[2])
+        payload["run"].pop("observation_hour_utc")
+        raw = json.dumps(payload).encode("utf-8")
+        entry = _classify([(item[0], raw, payload)], slot, ctx._config)
         self.assertEqual(entry["state"], "INVALID")
-        self.assertEqual(entry["blocked_reason"], "phase12-invalid")
         self.assertTrue(all(v is None for v in entry["prices_usd"].values()))
         try:
             raise ValidationError("wrapped I/O") from OSError("unavailable disk")

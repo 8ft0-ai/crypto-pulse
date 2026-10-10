@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import linecache
 import math
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -72,6 +73,27 @@ def _project(payload):
     return {name: found[name] for name in ASSETS}
 
 
+def _explicit_phase12_source_rejection(error):
+    """Require an actual validator source-rejection raise site, not just its type.
+
+    These two pinned Phase 12 modules own explicit ValidationError rejections.
+    Exceptions injected by wrappers or other code cannot impersonate them by
+    choosing ValidationError or reusing its message.
+    """
+    tb = error.__traceback__
+    if tb is None:
+        return False
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    frame = tb.tb_frame
+    return (
+        frame.f_globals.get("__name__") in
+        ("validate_crypto_snapshot", "validate_crypto_observation_hour")
+        and "raise ValidationError(" in
+        linecache.getline(frame.f_code.co_filename, tb.tb_lineno)
+    )
+
+
 def _wrapped_execution_failure(error):
     """Fail closed unless all wrapped causes are recognised source-parse rejections."""
     pending = [(error, error.__cause__), (error, error.__context__)]
@@ -95,6 +117,11 @@ def _wrapped_execution_failure(error):
         if not source_parse_error:
             return True
         pending.extend(((current, current.__cause__), (current, current.__context__)))
+    # A bare ValidationError is recoverable only when raised by an explicit
+    # Phase 12 source-validation statement. Known chained parser rejections
+    # are separately recognised above; arbitrary unchained errors abort.
+    if error.__cause__ is None and error.__context__ is None:
+        return not _explicit_phase12_source_rejection(error)
     return False
 
 
