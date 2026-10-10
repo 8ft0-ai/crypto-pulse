@@ -86,7 +86,23 @@ def render(repository_root, candidate):
                 + '</code> <code>SHA-256 ' + _escape(candidate["snapshot_sha256"]) + '</code></details>'
             )
         elif row["state"] == "AMBIGUOUS":
-            provenance = "Multiple source candidates — no winner selected"
+            details = []
+            for index, source_candidate in enumerate(row["candidates"], 1):
+                details.append(
+                    '<li><strong>Candidate ' + str(index) + '</strong>'
+                    '<dl><dt>Committed path</dt><dd><code>' + _escape(source_candidate["path"]) + '</code></dd>'
+                    '<dt>Git blob SHA</dt><dd><code>' + _escape(source_candidate["git_blob_sha"]) + '</code></dd>'
+                    '<dt>Raw SHA-256</dt><dd><code>' + _escape(source_candidate["snapshot_sha256"]) + '</code></dd>'
+                    '<dt>Asserted observation hour</dt><dd>' + _escape(source_candidate["observation_hour_utc"] or "Unavailable") + '</dd>'
+                    '<dt>Generated at UTC</dt><dd>' + _escape(source_candidate["generated_at_utc"] or "Unavailable") + '</dd>'
+                    '<dt>Quality status</dt><dd>' + _escape(source_candidate["quality_status"] or "Not evaluated — ambiguous hour") + '</dd>'
+                    '</dl></li>'
+                )
+            provenance = (
+                'Multiple source candidates — no winner selected'
+                '<details><summary>' + str(len(details)) + ' conflicting source candidates</summary>'
+                '<ol>' + ''.join(details) + '</ol></details>'
+            )
         message = row["state"] + (": " + row["blocked_reason"] if row["blocked_reason"] else "")
         if row["warnings"]:
             message += " (warnings: " + ", ".join(map(str, row["warnings"])) + ")"

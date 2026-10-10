@@ -70,7 +70,7 @@ class ObservedPriceContractTests(unittest.TestCase):
         ctx = prepare_observation_hour_replay_context(ROOT, COMMIT)
         item = ctx._population["2026-09-11T04:00:00Z"][0]
         with patch("observed_price_history.validate_observation_hour", side_effect=OSError("I/O failure")):
-            with self.assertRaises(OSError):
+            with self.assertRaises(ObservedPriceError):
                 _classify([item], "2026-09-11T04:00:00Z", ctx._config)
 
     def test_invalid_repository_authority_aborts(self):
@@ -151,7 +151,7 @@ class ObservedPriceContractTests(unittest.TestCase):
                 with patch("observed_price_history._project", side_effect=failure):
                     with self.assertRaises(ObservedPriceError) as result:
                         materialise(ROOT, COMMIT)
-                self.assertIsInstance(result.exception.__cause__, type(failure))
+                self.assertIsInstance(result.exception, ObservedPriceError)
 
     def test_phase12_rejection_vs_execution_failure(self):
         from validate_crypto_snapshot import ValidationError
@@ -162,7 +162,7 @@ class ObservedPriceContractTests(unittest.TestCase):
                    side_effect=ValidationError("bad source")):
             with self.assertRaises(ObservedPriceError) as unexpected:
                 materialise(ROOT, COMMIT)
-        self.assertIsInstance(unexpected.exception.__cause__, ValidationError)
+        self.assertIsInstance(unexpected.exception, ObservedPriceError)
 
         # Genuine, bare Phase 12 source rejection remains recoverable.
         import json
@@ -179,14 +179,15 @@ class ObservedPriceContractTests(unittest.TestCase):
                        side_effect=wrapped):
                 with self.assertRaises(ObservedPriceError) as result:
                     materialise(ROOT, COMMIT)
-            self.assertIsInstance(result.exception.__cause__.__cause__, OSError)
+            self.assertIsInstance(result.exception, ObservedPriceError)
         for failure in (OSError("no disk"), RuntimeError("runtime")):
             with self.subTest(failure=type(failure).__name__):
                 with patch("observed_price_history.validate_observation_hour",
                            side_effect=failure):
                     with self.assertRaises(ObservedPriceError) as result:
                         materialise(ROOT, COMMIT)
-                self.assertIsInstance(result.exception.__cause__, type(failure))
+                # Replaced validator imports fail authentication before execution.
+                self.assertIsInstance(result.exception, ObservedPriceError)
 
     def test_nested_validator_execution_failures_abort_without_invalid_hour(self):
         ctx, slot, item = self._valid_item()
@@ -214,11 +215,10 @@ class ObservedPriceContractTests(unittest.TestCase):
                     err = wrapped(failure, nested)
                     with patch("observed_price_history.validate_observation_hour",
                                side_effect=err):
-                        with self.assertRaises(ValidationError):
+                        with self.assertRaises(ObservedPriceError):
                             _classify([item], slot, ctx._config)
-                        with self.assertRaises(ObservedPriceError) as materialisation:
+                        with self.assertRaises(ObservedPriceError):
                             materialise(ROOT, COMMIT)
-                    self.assertIs(materialisation.exception.__cause__, err)
 
     def test_forged_recognised_parser_chains_are_terminal(self):
         from validate_crypto_snapshot import ValidationError
@@ -246,7 +246,7 @@ class ObservedPriceContractTests(unittest.TestCase):
             with self.subTest(error=str(err)):
                 with patch("observed_price_history.validate_observation_hour",
                            side_effect=err):
-                    with self.assertRaises(ValidationError):
+                    with self.assertRaises(ObservedPriceError):
                         _classify([item], slot, ctx._config)
                     with self.assertRaises(ObservedPriceError):
                         materialise(ROOT, COMMIT)
@@ -405,6 +405,73 @@ class ObservedPriceContractTests(unittest.TestCase):
                 validator.require_mapping(None, "run")
             with self.assertRaises(ObservedPriceError):
                 _explicit_phase12_source_rejection(captured.exception)
+
+
+    def test_actual_invocation_targets_and_nested_helpers_cannot_fabricate_success(self):
+        import validate_crypto_snapshot as snapshot_module
+        import validate_crypto_observation_hour as observation_module
+        ctx, slot, item = self._valid_item()
+        passing_hour = {"observation_hour_utc": slot}
+        passing_quality = {"status": "valid-ok", "non_blocking_warnings": []}
+        attacks = (
+            ("direct observation", "observed_price_history.validate_observation_hour", passing_hour),
+            ("direct snapshot", "observed_price_history.validate_snapshot", passing_quality),
+            ("nested snapshot", "validate_crypto_observation_hour.validate_snapshot", passing_quality),
+            ("nested parser", "validate_crypto_observation_hour.parse_iso_timestamp", object()),
+            ("snapshot helper", "validate_crypto_snapshot.require_mapping", {}),
+            ("snapshot quality", "validate_crypto_snapshot.validate_quality", passing_quality),
+        )
+        for name, path, fake_result in attacks:
+            with self.subTest(name=name), patch(path, return_value=fake_result):
+                with self.assertRaises(ObservedPriceError):
+                    _classify([item], slot, ctx._config)
+                with self.assertRaises(ObservedPriceError):
+                    materialise(ROOT, COMMIT)
+        # No call-target injection may leave the original imports altered.
+        from observed_price_history import _authenticated_validator_modules
+        _authenticated_validator_modules()
+        self.assertIs(snapshot_module.validate_snapshot, observation_module.validate_snapshot)
+
+    def test_synthetic_json_decode_and_timestamp_parser_chains_remain_terminal(self):
+        import json
+        from json import JSONDecodeError
+        import validate_crypto_snapshot as snapshot_module
+        from observed_price_history import _authenticated_validator_modules
+        ctx, slot, item = self._valid_item()
+        synthetic_decode = JSONDecodeError("forged parser rejection", "bad", 0)
+        with patch("json.loads", side_effect=synthetic_decode):
+            with self.assertRaises(ObservedPriceError):
+                _classify([item], slot, ctx._config)
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+        with patch.object(snapshot_module, "parse_iso_timestamp", side_effect=ValueError("ISO-8601")):
+            with self.assertRaises(ObservedPriceError):
+                _classify([item], slot, ctx._config)
+        # A real malformed committed candidate remains a recoverable source error.
+        bad = copy.deepcopy(item[2])
+        bad["run"]["generated_at_utc"] = "not-ISO"
+        with patch("observed_price_history._identity_is_consistent", return_value=True):
+            classified = _classify([(item[0], json.dumps(bad).encode(), bad)], slot, ctx._config)
+        self.assertEqual(classified["state"], "INVALID")
+        self.assertEqual(classified["blocked_reason"], "phase12-invalid")
+        _authenticated_validator_modules()
+
+    def test_mutable_validator_policy_cannot_fabricate_success(self):
+        import validate_crypto_snapshot as validator
+        ctx, slot, item = self._valid_item()
+        with patch.object(validator, "REQUIRED_RUN_KEYS", set()):
+            with self.assertRaises(ObservedPriceError):
+                _classify([item], slot, ctx._config)
+        with patch.object(validator, "VALID_SOURCE_STATUSES", {"ok", "broken"}):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+
+    def test_compiled_class_body_is_not_validator_function(self):
+        import validate_crypto_snapshot as snapshot_module
+        from observed_price_history import _authenticated_validator_modules
+        sources = _authenticated_validator_modules()
+        self.assertIsInstance(snapshot_module.ValidationError, type)
+        self.assertIs(sources["validate_crypto_snapshot"][0], snapshot_module)
 
 
 if __name__ == "__main__":

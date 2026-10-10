@@ -133,5 +133,58 @@ class ObservedPriceSiteTests(unittest.TestCase):
             render(ROOT, variant)
 
 
+    def test_ambiguous_hours_display_complete_provenance_for_every_source(self):
+        from unittest.mock import patch
+        variant = copy.deepcopy(self.record)
+        hour = variant["entries"][0]
+        prototype = next(row["candidates"][0] for row in variant["entries"] if row["candidates"])
+        sources = []
+        for idx in range(3):
+            candidate = copy.deepcopy(prototype)
+            candidate["path"] = f"data/crypto/hourly/conflict-{idx}_source_snapshot.json"
+            candidate["git_blob_sha"] = str(idx + 1) * 40
+            candidate["snapshot_sha256"] = str(idx + 1) * 64
+            candidate["generated_at_utc"] = f"2026-09-11T04:{idx:02d}:00Z"
+            candidate["observation_hour_utc"] = hour["slot_utc"]
+            candidate["quality_status"] = None
+            sources.append(candidate)
+        hour.update(state="AMBIGUOUS", blocked_reason="duplicate-hour", candidates=sources)
+        with patch("observed_price_history.validate_replay", return_value=variant):
+            html = render(ROOT, variant)
+        self.assertIn("3 conflicting source candidates", html)
+        self.assertIn("no winner selected", html)
+        self.assertIn("Not evaluated", html)
+        for idx, candidate in enumerate(sources):
+            self.assertIn(f"Candidate {idx+1}", html)
+            self.assertIn(candidate["path"], html)
+            self.assertIn(candidate["git_blob_sha"], html)
+            self.assertIn(candidate["snapshot_sha256"], html)
+            self.assertIn(candidate["generated_at_utc"], html)
+        self.assertEqual(html.count("<tr>"), 25)
+        self.assertIn("AMBIGUOUS: duplicate-hour", html)
+        self.assertIn("<summary>3 conflicting source candidates</summary>", html)
+        self.assertIn('tabindex="0"', html)
+        self.assertEqual(html.count("<circle "), 18)
+        # The actual renderer must not bypass replay validation on altered candidates.
+        with self.assertRaises(ObservedPriceError):
+            render(ROOT, variant)
+
+    def test_ambiguous_candidate_html_injection_is_escaped(self):
+        from unittest.mock import patch
+        variant = copy.deepcopy(self.record)
+        hour = variant["entries"][0]
+        candidate = copy.deepcopy(next(row["candidates"][0] for row in variant["entries"] if row["candidates"]))
+        candidate["path"] = '<img src=x onerror=alert(1)>'
+        candidate["generated_at_utc"] = '<script>alert(1)</script>'
+        hour.update(state="AMBIGUOUS", blocked_reason="duplicate-hour", candidates=[candidate, copy.deepcopy(candidate)])
+        with patch("observed_price_history.validate_replay", return_value=variant):
+            html = render(ROOT, variant)
+        self.assertIn("&lt;script&gt;", html)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertNotIn('<script>alert(1)</script>', html)
+        self.assertNotIn('<img src=x onerror=alert(1)>', html)
+        self.assertIn("2 conflicting source candidates", html)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import inspect
+import ast
 import sys
 import math
 import tempfile
@@ -18,6 +19,17 @@ from resolve_crypto_observation_hour_adjacency import (
 )
 from validate_crypto_observation_hour import validate_observation_hour
 from validate_crypto_snapshot import ValidationError, validate_snapshot
+import validate_crypto_snapshot as _snapshot_module
+import validate_crypto_observation_hour as _observation_module
+
+# These are process-local import baselines; the frozen Git blobs remain the
+# source authority. Guard mutable call targets and parser bindings as well.
+_IMPORTED_VALIDATORS = {
+    "validate_crypto_snapshot": _snapshot_module,
+    "validate_crypto_observation_hour": _observation_module,
+}
+_IMPORTED_JSON_LOADS = json.loads
+_IMPORTED_JSON_DECODE_ERROR = json.JSONDecodeError
 
 CONTRACT = "observed-price-history/v2-terminal"
 ASSETS = ("BTC", "ETH", "SOL")
@@ -101,7 +113,8 @@ def _authenticated_validator_modules(validation_refs=None):
     for name, expected_blob in _PINNED_VALIDATOR_BLOBS.items():
         module = sys.modules.get(name)
         source = Path(__file__).resolve().with_name(name + ".py")
-        if module is None or Path(getattr(module, "__file__", "")).resolve() != source:
+        if (module is not _IMPORTED_VALIDATORS[name]
+                or Path(getattr(module, "__file__", "")).resolve() != source):
             raise ObservedPriceError("pinned validator module identity mismatch")
         try:
             actual = _git_blob_sha(source.read_bytes())
@@ -112,21 +125,79 @@ def _authenticated_validator_modules(validation_refs=None):
         # Compare the running validator functions with freshly compiled pinned
         # source, rather than trusting filenames, linecache or monkeypatched names.
         compiled = compile(source.read_bytes(), str(source), "exec")
+        # Only module-level function definitions qualify; class bodies also
+        # compile into code objects (notably ValidationError) but are not
+        # function call targets and must not be mistaken for them.
+        parsed = ast.parse(source.read_bytes())
+        function_names = {
+            node.name for node in parsed.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        # Code and import checks alone cannot protect mutable validator policy
+        # constants. Derive their literal values from the same pinned source.
+        for node in parsed.body:
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            target = node.targets[0]
+            if not isinstance(target, ast.Name):
+                continue
+            try:
+                literal = ast.literal_eval(node.value)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                continue
+            actual_literal = getattr(module, target.id, None)
+            if type(actual_literal) is not type(literal) or actual_literal != literal:
+                raise ObservedPriceError("loaded validator policy constant differs from pinned source")
         expected_functions = {
             obj.co_name: obj for obj in compiled.co_consts
-            if inspect.iscode(obj)
+            if inspect.iscode(obj) and obj.co_name in function_names
         }
-        for function_name in _PINNED_REJECTION_SITES[name]:
+        if set(expected_functions) != function_names:
+            raise ObservedPriceError("pinned validator function inventory mismatch")
+        # Authenticate the complete source-defined function surface: authentic
+        # entry-point code could otherwise call a replaced nested helper.
+        for function_name, expected_code in expected_functions.items():
             function = getattr(module, function_name, None)
-            expected_code = expected_functions.get(function_name)
-            if (not inspect.isfunction(function) or expected_code is None
+            if (not inspect.isfunction(function)
+                    or function.__globals__ is not module.__dict__
+                    or function.__closure__ is not None
                     or function.__code__ != expected_code):
                 raise ObservedPriceError("loaded validator function differs from pinned source")
+        if not _PINNED_REJECTION_SITES[name].keys() <= expected_functions.keys():
+            raise ObservedPriceError("pinned rejection function missing")
         if validation_refs is not None:
             ref_name = "snapshot_validator" if name == "validate_crypto_snapshot" else "observation_validator"
             if validation_refs.get(ref_name, {}).get("git_blob_sha") != expected_blob:
                 raise ObservedPriceError("replay validator authority differs from pinned source")
         result[name] = (module, source)
+
+    # Loaded source blobs and function code do not authenticate the globals
+    # those functions resolve at call time. Check the actual top-level targets,
+    # cross-module imports and the mutable JSON parser binding before use.
+    snapshot = result["validate_crypto_snapshot"][0]
+    observation = result["validate_crypto_observation_hour"][0]
+    required_bindings = (
+        (validate_snapshot, snapshot.validate_snapshot),
+        (validate_observation_hour, observation.validate_observation_hour),
+        (ValidationError, snapshot.ValidationError),
+        (observation.ValidationError, snapshot.ValidationError),
+        (observation.validate_snapshot, snapshot.validate_snapshot),
+        (observation.parse_iso_timestamp, snapshot.parse_iso_timestamp),
+        (snapshot.json, json),
+        (observation.json, json),
+        (snapshot.math, math),
+        (snapshot.datetime, datetime),
+        (snapshot.timezone, timezone),
+        (observation.timezone, timezone),
+        (snapshot.Path, Path),
+        (observation.Path, Path),
+        (json.loads, _IMPORTED_JSON_LOADS),
+        (json.JSONDecodeError, _IMPORTED_JSON_DECODE_ERROR),
+    )
+    if any(actual is not expected for actual, expected in required_bindings):
+        raise ObservedPriceError("validator call target or import binding differs from pinned authority")
+    if observation.OBSERVATION_HOUR_RE.pattern != r"^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$":
+        raise ObservedPriceError("canonical observation-hour parser changed")
     return result
 
 
@@ -192,6 +263,8 @@ def _classify(items, slot, config):
     }
     if not items:
         return entry
+    # Also protect direct _classify callers, not only materialise().
+    _authenticated_validator_modules()
     entry["candidates"] = [_identity(p, raw, payload) for p, raw, payload in sorted(items)]
     if len(items) > 1:
         entry.update(state="AMBIGUOUS", blocked_reason="duplicate-hour")
