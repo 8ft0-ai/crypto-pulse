@@ -114,15 +114,14 @@ def _wrapped_execution_failure(error):
                 and str(parent).endswith("must be an ISO-8601 timestamp")
             )
         )
+        if isinstance(current, ValidationError) and not _explicit_phase12_source_rejection(current):
+            return True
         if not source_parse_error:
             return True
         pending.extend(((current, current.__cause__), (current, current.__context__)))
-    # A bare ValidationError is recoverable only when raised by an explicit
-    # Phase 12 source-validation statement. Known chained parser rejections
-    # are separately recognised above; arbitrary unchained errors abort.
-    if error.__cause__ is None and error.__context__ is None:
-        return not _explicit_phase12_source_rejection(error)
-    return False
+    # Every ValidationError, chained or bare, must originate at a pinned
+    # Phase 12 source-rejection statement; type and message alone are insufficient.
+    return not _explicit_phase12_source_rejection(error)
 
 
 def _classify(items, slot, config):

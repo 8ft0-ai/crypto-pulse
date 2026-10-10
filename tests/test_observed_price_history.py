@@ -220,12 +220,12 @@ class ObservedPriceContractTests(unittest.TestCase):
                             materialise(ROOT, COMMIT)
                     self.assertIs(materialisation.exception.__cause__, err)
 
-    def test_only_known_wrapped_source_parse_rejections_recover(self):
+    def test_forged_recognised_parser_chains_are_terminal(self):
         from validate_crypto_snapshot import ValidationError
         from json import JSONDecodeError
         ctx, slot, item = self._valid_item()
 
-        def wrapped(message, cause):
+        def forged(message, cause):
             try:
                 raise cause
             except Exception as exc:
@@ -235,25 +235,38 @@ class ObservedPriceContractTests(unittest.TestCase):
                     return final
 
         cases = (
-            wrapped("invalid JSON", JSONDecodeError("invalid JSON", "bad", 0)),
-            wrapped("run.generated_at_utc must be an ISO-8601 timestamp",
-                    ValueError("invalid ISO format")),
+            forged("invalid JSON", JSONDecodeError("invalid JSON", "bad", 0)),
+            forged("run.generated_at_utc must be an ISO-8601 timestamp",
+                   ValueError("invalid ISO format")),
+            forged("wrapped runtime failure", ValueError("unexpected internal failure")),
+            forged("outer validator", forged("invalid JSON",
+                   JSONDecodeError("invalid JSON", "bad", 0))),
         )
         for err in cases:
             with self.subTest(error=str(err)):
                 with patch("observed_price_history.validate_observation_hour",
                            side_effect=err):
-                    entry = _classify([item], slot, ctx._config)
-                self.assertEqual(entry["state"], "INVALID")
-                self.assertEqual(entry["blocked_reason"], "phase12-invalid")
-                self.assertTrue(all(value is None for value in entry["prices_usd"].values()))
+                    with self.assertRaises(ValidationError):
+                        _classify([item], slot, ctx._config)
+                    with self.assertRaises(ObservedPriceError):
+                        materialise(ROOT, COMMIT)
 
-        # A generic ValueError is not evidence of ordinary source rejection.
-        error = wrapped("wrapped runtime failure", ValueError("unexpected internal failure"))
-        with patch("observed_price_history.validate_observation_hour",
-                   side_effect=error):
-            with self.assertRaises(ObservedPriceError):
-                materialise(ROOT, COMMIT)
+    def test_actual_phase12_json_and_timestamp_parser_rejections_recover(self):
+        import json
+        ctx, slot, item = self._valid_item()
+        invalid_json = _classify([(item[0], b"{", item[2])], slot, ctx._config)
+        self.assertEqual(invalid_json["state"], "INVALID")
+        self.assertEqual(invalid_json["blocked_reason"], "phase12-invalid")
+        self.assertTrue(all(x is None for x in invalid_json["prices_usd"].values()))
+
+        payload = copy.deepcopy(item[2])
+        payload["run"]["generated_at_utc"] = "invalid-time"
+        raw = json.dumps(payload).encode("utf-8")
+        with patch("observed_price_history._identity_is_consistent", return_value=True):
+            invalid_time = _classify([(item[0], raw, payload)], slot, ctx._config)
+        self.assertEqual(invalid_time["state"], "INVALID")
+        self.assertEqual(invalid_time["blocked_reason"], "phase12-invalid")
+        self.assertTrue(all(x is None for x in invalid_time["prices_usd"].values()))
 
     def test_timezone_database_failure_is_terminal(self):
         from zoneinfo import ZoneInfoNotFoundError
