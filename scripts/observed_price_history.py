@@ -48,6 +48,13 @@ _IMPORTED_DECODER_CONSTANTS = tuple(sorted(
 _IMPORTED_ADJACENCY = _adjacency_module
 _IMPORTED_IDENTITY = _identity_is_consistent
 _IMPORTED_ADJACENCY_ZONEINFO = _adjacency_module.ZoneInfo
+_IMPORTED_GIT_RUN = _adjacency_module.subprocess.run
+_IMPORTED_GIT_RUN_CODE = _IMPORTED_GIT_RUN.__code__
+_IMPORTED_REPLAY_CONTEXT_TYPE = _adjacency_module.ObservationHourReplayContext
+_IMPORTED_REPLAY_CONTEXT_INIT = _IMPORTED_REPLAY_CONTEXT_TYPE.__init__
+_IMPORTED_REPLAY_CONTEXT_INIT_CODE = _IMPORTED_REPLAY_CONTEXT_INIT.__code__
+_IMPORTED_REPLAY_CONTEXT_REFS = _IMPORTED_REPLAY_CONTEXT_TYPE.repository_context
+_IMPORTED_REPLAY_CONTEXT_REFS_CODE = _IMPORTED_REPLAY_CONTEXT_REFS.__code__
 _PINNED_ADJACENCY_BLOB = "d7ca33806c1d2cdbf113c40d0b158efdabfe4ca9"
 
 CONTRACT = "observed-price-history/v2-terminal"
@@ -171,9 +178,27 @@ def _authenticate_adjacency_identity(snapshot):
     if _git_blob_sha(raw) != _PINNED_ADJACENCY_BLOB:
         raise ObservedPriceError("Phase 13 identity source changed")
     compiled = compile(raw, str(source), "exec")
-    needed = {"_identity_is_consistent", "_parse_local_timestamp",
-              "_is_snapshot_path", "_parse_payload",
-              "_load_observation_hour_population_exact"}
+    # Every source-defined Phase 13 helper is part of the inherited replay
+    # graph. Attesting only the entry point missed mutable enumeration and
+    # committed-byte readers that can forge apparently valid replay records.
+    parsed = ast.parse(raw)
+    needed = {
+        node.name for node in parsed.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for node in parsed.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name):
+            continue
+        try:
+            literal = ast.literal_eval(node.value)
+        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+            continue
+        actual = getattr(module, target.id, None)
+        if type(actual) is not type(literal) or actual != literal:
+            raise ObservedPriceError("Phase 13 population policy constant changed")
     expected = {code.co_name: code for code in compiled.co_consts
                 if inspect.iscode(code) and code.co_name in needed}
     if set(expected) != needed:
@@ -186,6 +211,8 @@ def _authenticate_adjacency_identity(snapshot):
                 or function.__code__ != code):
             raise ObservedPriceError("Phase 13 identity execution changed")
     bindings = (
+        (prepare_observation_hour_replay_context, module.prepare_observation_hour_replay_context),
+        (_git_blob_sha, module._git_blob_sha),
         (_identity_is_consistent, _IMPORTED_IDENTITY),
         (_identity_is_consistent, module._identity_is_consistent),
         (module.parse_iso_timestamp, snapshot.parse_iso_timestamp),
@@ -200,7 +227,18 @@ def _authenticate_adjacency_identity(snapshot):
     )
     if any(actual is not expected for actual, expected in bindings):
         raise ObservedPriceError("Phase 13 identity parser binding changed")
-    if module.SNAPSHOT_PREFIX != PurePosixPath("data/crypto/hourly"):
+    context_type = module.ObservationHourReplayContext
+    if (context_type is not _IMPORTED_REPLAY_CONTEXT_TYPE
+            or context_type.__init__ is not _IMPORTED_REPLAY_CONTEXT_INIT
+            or context_type.__init__.__code__ != _IMPORTED_REPLAY_CONTEXT_INIT_CODE
+            or context_type.repository_context is not _IMPORTED_REPLAY_CONTEXT_REFS
+            or context_type.repository_context.__code__ != _IMPORTED_REPLAY_CONTEXT_REFS_CODE):
+        raise ObservedPriceError("Phase 13 replay context implementation changed")
+    if (module.subprocess.run is not _IMPORTED_GIT_RUN
+            or module.subprocess.run.__code__ != _IMPORTED_GIT_RUN_CODE):
+        raise ObservedPriceError("Phase 13 Git invocation changed")
+    if (module.SNAPSHOT_PREFIX != PurePosixPath("data/crypto/hourly")
+            or module.SNAPSHOT_SUFFIX != "_source_snapshot.json"):
         raise ObservedPriceError("Phase 13 identity path policy changed")
 
 
@@ -460,35 +498,40 @@ def _classify(items, slot, config):
     return entry
 
 
+def _record_from_context(ctx):
+    """Assemble a record from a prepared, authenticated replay context."""
+    population = ctx._population
+    if not population:
+        raise ObservedPriceError("no observation population")
+    # Enumeration and validator authority must be established before selecting an hour.
+    latest = max(population)
+    end = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+    start = end - timedelta(hours=23)
+    slots = [(start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00:00Z") for i in range(24)]
+    entries = [_classify(population.get(slot, []), slot, ctx._config) for slot in slots]
+    refs = ctx.repository_context()
+    result = {
+        "contract": CONTRACT,
+        "repository_context": {
+            "commit_sha": ctx.commit_sha,
+            "tree_sha": ctx.tree_sha,
+            "validation_refs": {name: refs[name] for name in ("config", "snapshot_validator", "observation_validator")},
+        },
+        "window": {"start_utc": slots[0], "end_utc": slots[-1], "slots": 24},
+        "assets": list(ASSETS),
+        "entries": entries,
+    }
+    result["record_id"] = hashlib.sha256(canonical(result)).hexdigest()
+    return result
+
+
 def materialise(repository_root: Path, commit_sha: str):
     try:
         # Authenticate before Phase 13 population loading/JSON decoding begins.
         _authenticated_validator_modules()
         ctx = prepare_observation_hour_replay_context(Path(repository_root), commit_sha)
         _authenticated_validator_modules(ctx.repository_context())
-        population = ctx._population
-        if not population:
-            raise ObservedPriceError("no observation population")
-        # Enumeration and validator authority must be established before selecting an hour.
-        latest = max(population)
-        end = datetime.fromisoformat(latest.replace("Z", "+00:00"))
-        start = end - timedelta(hours=23)
-        slots = [(start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00:00Z") for i in range(24)]
-        entries = [_classify(population.get(slot, []), slot, ctx._config) for slot in slots]
-        refs = ctx.repository_context()
-        result = {
-            "contract": CONTRACT,
-            "repository_context": {
-                "commit_sha": ctx.commit_sha,
-                "tree_sha": ctx.tree_sha,
-                "validation_refs": {name: refs[name] for name in ("config", "snapshot_validator", "observation_validator")},
-            },
-            "window": {"start_utc": slots[0], "end_utc": slots[-1], "slots": 24},
-            "assets": list(ASSETS),
-            "entries": entries,
-        }
-        result["record_id"] = hashlib.sha256(canonical(result)).hexdigest()
-        return result
+        return _record_from_context(ctx)
     except ObservedPriceError:
         raise
     except Exception as exc:

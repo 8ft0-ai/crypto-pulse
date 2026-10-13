@@ -296,9 +296,8 @@ class ObservedPriceContractTests(unittest.TestCase):
                 ctx = prepare_observation_hour_replay_context(ROOT, COMMIT)
                 item = ctx._population["2026-09-11T04:00:00Z"][0]
                 ctx._population[latest] = [item] * candidates
-                with patch("observed_price_history.prepare_observation_hour_replay_context",
-                           return_value=ctx):
-                    record = materialise(ROOT, COMMIT)
+                from observed_price_history import _record_from_context
+                record = _record_from_context(ctx)
                 self.assertEqual(record["window"]["end_utc"], latest)
                 self.assertEqual(record["window"]["start_utc"], "2026-09-11T02:00:00Z")
                 self.assertEqual(len(record["entries"]), 24)
@@ -604,6 +603,46 @@ class ObservedPriceContractTests(unittest.TestCase):
         self.assertIs(adjacency.parse_iso_timestamp, snapshot.parse_iso_timestamp)
         self.assertIs(json._default_decoder, __import__("observed_price_history")._IMPORTED_DEFAULT_DECODER)
         self.assertEqual(validate_replay(ROOT, self.record), self.record)
+
+    def test_b01_t13_mutable_population_enumerator_cannot_omit_committed_hour(self):
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        _, slot, item = self._valid_item()
+        paths = adjacency._candidate_paths(ROOT, COMMIT)
+        self.assertIn(item[0], paths)
+        incomplete = [path for path in paths if path != item[0]]
+        self.assertEqual(len(incomplete), len(paths) - 1)
+        # Previously this produced a plausible canonical record with one
+        # missing observation and was accepted by replay using the same hook.
+        with patch.object(adjacency, "_candidate_paths", return_value=incomplete):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+            with self.assertRaises(ObservedPriceError):
+                validate_replay(ROOT, self.record)
+
+    def test_b01_t14_mutable_git_byte_reader_cannot_forge_prices(self):
+        import json
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        _, slot, item = self._valid_item()
+        original_read = adjacency._bytes_at_commit
+        payload = copy.deepcopy(item[2])
+        btc = next(asset for asset in payload["market"]["assets"]
+                   if asset["symbol"] == "BTC")
+        btc["price_usd"] = 99999999
+        forged_bytes = json.dumps(payload).encode("utf-8")
+        self.assertNotEqual(forged_bytes, item[1])
+
+        def forged_read(root, sha, path):
+            if path == item[0]:
+                return forged_bytes
+            return original_read(root, sha, path)
+
+        # The uncorrected implementation accepted the forged committed bytes
+        # and could replay its own altered record under the same replacement.
+        with patch.object(adjacency, "_bytes_at_commit", side_effect=forged_read):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+            with self.assertRaises(ObservedPriceError):
+                validate_replay(ROOT, self.record)
 
     def test_compiled_class_body_is_not_validator_function(self):
         import validate_crypto_snapshot as snapshot_module
