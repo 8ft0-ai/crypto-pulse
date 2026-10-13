@@ -9,7 +9,7 @@ import sys
 import math
 import tempfile
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zoneinfo import ZoneInfo
 
 from resolve_crypto_observation_hour_adjacency import (
@@ -21,6 +21,8 @@ from validate_crypto_observation_hour import validate_observation_hour
 from validate_crypto_snapshot import ValidationError, validate_snapshot
 import validate_crypto_snapshot as _snapshot_module
 import validate_crypto_observation_hour as _observation_module
+import resolve_crypto_observation_hour_adjacency as _adjacency_module
+import json.decoder as _json_decoder_module
 
 # These are process-local import baselines; the frozen Git blobs remain the
 # source authority. Guard mutable call targets and parser bindings as well.
@@ -30,6 +32,23 @@ _IMPORTED_VALIDATORS = {
 }
 _IMPORTED_JSON_LOADS = json.loads
 _IMPORTED_JSON_DECODE_ERROR = json.JSONDecodeError
+_IMPORTED_JSON_LOADS_CODE = json.loads.__code__
+_IMPORTED_DEFAULT_DECODER = json._default_decoder
+_IMPORTED_DECODER_TYPE = type(_IMPORTED_DEFAULT_DECODER)
+# Immutable snapshots, not aliases to mutable decoder attributes.
+_IMPORTED_DECODER_ATTRS = tuple(vars(_IMPORTED_DEFAULT_DECODER).items())
+_IMPORTED_DECODER_METHODS = {
+    name: (getattr(_IMPORTED_DECODER_TYPE, name),
+           getattr(_IMPORTED_DECODER_TYPE, name).__code__)
+    for name in ("__init__", "decode", "raw_decode")
+}
+_IMPORTED_DECODER_CONSTANTS = tuple(sorted(
+    (key, repr(value)) for key, value in _json_decoder_module._CONSTANTS.items()
+))
+_IMPORTED_ADJACENCY = _adjacency_module
+_IMPORTED_IDENTITY = _identity_is_consistent
+_IMPORTED_ADJACENCY_ZONEINFO = _adjacency_module.ZoneInfo
+_PINNED_ADJACENCY_BLOB = "d7ca33806c1d2cdbf113c40d0b158efdabfe4ca9"
 
 CONTRACT = "observed-price-history/v2-terminal"
 ASSETS = ("BTC", "ETH", "SOL")
@@ -107,8 +126,136 @@ _PINNED_VALIDATOR_BLOBS = {
 }
 
 
+def _authenticate_json_decoder():
+    """Reject changes to the JSON decoder actually invoked by json.loads.
+
+    A preserved json.loads function is insufficient: it delegates to the
+    mutable json._default_decoder and its scanner/methods by default.
+    """
+    decoder = json._default_decoder
+    if (json.loads is not _IMPORTED_JSON_LOADS
+            or json.loads.__code__ != _IMPORTED_JSON_LOADS_CODE
+            or decoder is not _IMPORTED_DEFAULT_DECODER
+            or type(decoder) is not _IMPORTED_DECODER_TYPE):
+        raise ObservedPriceError("JSON decoder authority changed")
+    actual = vars(decoder)
+    if actual.keys() != {key for key, _ in _IMPORTED_DECODER_ATTRS}:
+        raise ObservedPriceError("JSON decoder attributes changed")
+    for key, original in _IMPORTED_DECODER_ATTRS:
+        current = actual[key]
+        if key == "memo":
+            if current is not original or current != {}:
+                raise ObservedPriceError("JSON decoder memo changed")
+        elif current is not original:
+            raise ObservedPriceError("JSON decoder parse binding changed")
+    for name, (method, code) in _IMPORTED_DECODER_METHODS.items():
+        current = getattr(_IMPORTED_DECODER_TYPE, name, None)
+        if current is not method or current.__code__ != code:
+            raise ObservedPriceError("JSON decoder implementation changed")
+    if tuple(sorted((key, repr(value)) for key, value
+                    in _json_decoder_module._CONSTANTS.items())) != _IMPORTED_DECODER_CONSTANTS:
+        raise ObservedPriceError("JSON decoder constants changed")
+
+
+def _authenticate_adjacency_identity(snapshot):
+    """Validate frozen Phase 13 identity parsing without editing Phase 13."""
+    module = sys.modules.get("resolve_crypto_observation_hour_adjacency")
+    source = Path(__file__).resolve().with_name("resolve_crypto_observation_hour_adjacency.py")
+    if (module is not _IMPORTED_ADJACENCY
+            or Path(getattr(module, "__file__", "")).resolve() != source):
+        raise ObservedPriceError("Phase 13 identity module changed")
+    try:
+        raw = source.read_bytes()
+    except OSError as exc:
+        raise ObservedPriceError("Phase 13 identity source unavailable") from exc
+    if _git_blob_sha(raw) != _PINNED_ADJACENCY_BLOB:
+        raise ObservedPriceError("Phase 13 identity source changed")
+    compiled = compile(raw, str(source), "exec")
+    needed = {"_identity_is_consistent", "_parse_local_timestamp",
+              "_is_snapshot_path", "_parse_payload",
+              "_load_observation_hour_population_exact"}
+    expected = {code.co_name: code for code in compiled.co_consts
+                if inspect.iscode(code) and code.co_name in needed}
+    if set(expected) != needed:
+        raise ObservedPriceError("Phase 13 identity inventory changed")
+    for name, code in expected.items():
+        function = getattr(module, name, None)
+        if (not inspect.isfunction(function)
+                or function.__globals__ is not module.__dict__
+                or function.__closure__ is not None
+                or function.__code__ != code):
+            raise ObservedPriceError("Phase 13 identity execution changed")
+    bindings = (
+        (_identity_is_consistent, _IMPORTED_IDENTITY),
+        (_identity_is_consistent, module._identity_is_consistent),
+        (module.parse_iso_timestamp, snapshot.parse_iso_timestamp),
+        (module.load_config, snapshot.load_config),
+        (module.ValidationError, snapshot.ValidationError),
+        (module.ZoneInfo, _IMPORTED_ADJACENCY_ZONEINFO),
+        (module.json, json),
+        (module.datetime, datetime),
+        (module.timezone, timezone),
+        (module.PurePosixPath, PurePosixPath),
+        (module.Path, Path),
+    )
+    if any(actual is not expected for actual, expected in bindings):
+        raise ObservedPriceError("Phase 13 identity parser binding changed")
+    if module.SNAPSHOT_PREFIX != PurePosixPath("data/crypto/hourly"):
+        raise ObservedPriceError("Phase 13 identity path policy changed")
+
+
+def _source_identity_is_consistent(path, payload):
+    """Independent source-rejection witness for the frozen boolean helper.
+
+    Distinguish genuine malformed source/path from an unexplained False
+    returned after the inherited helper swallows a parser execution error.
+    """
+    if not isinstance(path, str) or not _adjacency_module._is_snapshot_path(path):
+        return False
+    if not isinstance(payload, dict) or not isinstance(payload.get("run"), dict):
+        return False
+    run = payload["run"]
+    utc_text = run.get("generated_at_utc")
+    if not isinstance(utc_text, str) or not utc_text.strip():
+        return False
+    try:
+        utc = _snapshot_module.parse_iso_timestamp(utc_text, "run.generated_at_utc")
+    except ValidationError as exc:
+        if _wrapped_execution_failure(exc):
+            raise
+        return False
+    try:
+        local = _adjacency_module._parse_local_timestamp(run.get("generated_at_local"))
+    except ValueError:
+        return False
+    timezone_name = run.get("timezone")
+    if not isinstance(timezone_name, str) or not timezone_name.strip():
+        return False
+    # An unavailable timezone database is an execution failure, not bad data.
+    zone = ZoneInfo(timezone_name)
+    expected_local = utc.astimezone(zone)
+    if local.astimezone(timezone.utc) != utc:
+        return False
+    if local.replace(tzinfo=None) != expected_local.replace(tzinfo=None):
+        return False
+    if local.utcoffset() != expected_local.utcoffset():
+        return False
+    abbreviation = run.get("timezone_abbreviation")
+    if abbreviation is not None and abbreviation != expected_local.tzname():
+        return False
+    name = expected_local.tzname() or "LOCAL"
+    safe_name = "".join(ch for ch in name if ch.isalnum()) or "LOCAL"
+    expected = (PurePosixPath("data/crypto/hourly")
+                / f"{expected_local.year:04d}"
+                / f"{expected_local.month:02d}"
+                / f"{expected_local.day:02d}"
+                / f"{expected_local.hour:02d}{expected_local.minute:02d}_{safe_name}_source_snapshot.json")
+    return PurePosixPath(path) == expected
+
+
 def _authenticated_validator_modules(validation_refs=None):
     """Authenticate on-disk validators and their runtime function code origins."""
+    _authenticate_json_decoder()
     result = {}
     for name, expected_blob in _PINNED_VALIDATOR_BLOBS.items():
         module = sys.modules.get(name)
@@ -198,6 +345,7 @@ def _authenticated_validator_modules(validation_refs=None):
         raise ObservedPriceError("validator call target or import binding differs from pinned authority")
     if observation.OBSERVATION_HOUR_RE.pattern != r"^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$":
         raise ObservedPriceError("canonical observation-hour parser changed")
+    _authenticate_adjacency_identity(snapshot)
     return result
 
 
@@ -277,7 +425,10 @@ def _classify(items, slot, config):
     timezone_name = run.get("timezone") if isinstance(run, dict) else None
     if isinstance(timezone_name, str) and timezone_name.strip():
         ZoneInfo(timezone_name)
-    if not _identity_is_consistent(path, payload):
+    witness = _source_identity_is_consistent(path, payload)
+    if _identity_is_consistent(path, payload) != witness:
+        raise ObservedPriceError("unproven inherited identity rejection")
+    if not witness:
         entry.update(state="INVALID", blocked_reason="identity-invalid")
         return entry
     # A validator rejection is recoverable, but I/O/runtime errors are NOT.
@@ -311,6 +462,8 @@ def _classify(items, slot, config):
 
 def materialise(repository_root: Path, commit_sha: str):
     try:
+        # Authenticate before Phase 13 population loading/JSON decoding begins.
+        _authenticated_validator_modules()
         ctx = prepare_observation_hour_replay_context(Path(repository_root), commit_sha)
         _authenticated_validator_modules(ctx.repository_context())
         population = ctx._population

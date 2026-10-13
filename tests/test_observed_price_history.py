@@ -262,10 +262,9 @@ class ObservedPriceContractTests(unittest.TestCase):
         payload = copy.deepcopy(item[2])
         payload["run"]["generated_at_utc"] = "invalid-time"
         raw = json.dumps(payload).encode("utf-8")
-        with patch("observed_price_history._identity_is_consistent", return_value=True):
-            invalid_time = _classify([(item[0], raw, payload)], slot, ctx._config)
+        invalid_time = _classify([(item[0], raw, payload)], slot, ctx._config)
         self.assertEqual(invalid_time["state"], "INVALID")
-        self.assertEqual(invalid_time["blocked_reason"], "phase12-invalid")
+        self.assertEqual(invalid_time["blocked_reason"], "identity-invalid")
         self.assertTrue(all(x is None for x in invalid_time["prices_usd"].values()))
 
     def test_timezone_database_failure_is_terminal(self):
@@ -450,10 +449,9 @@ class ObservedPriceContractTests(unittest.TestCase):
         # A real malformed committed candidate remains a recoverable source error.
         bad = copy.deepcopy(item[2])
         bad["run"]["generated_at_utc"] = "not-ISO"
-        with patch("observed_price_history._identity_is_consistent", return_value=True):
-            classified = _classify([(item[0], json.dumps(bad).encode(), bad)], slot, ctx._config)
+        classified = _classify([(item[0], json.dumps(bad).encode(), bad)], slot, ctx._config)
         self.assertEqual(classified["state"], "INVALID")
-        self.assertEqual(classified["blocked_reason"], "phase12-invalid")
+        self.assertEqual(classified["blocked_reason"], "identity-invalid")
         _authenticated_validator_modules()
 
     def test_mutable_validator_policy_cannot_fabricate_success(self):
@@ -465,6 +463,147 @@ class ObservedPriceContractTests(unittest.TestCase):
         with patch.object(validator, "VALID_SOURCE_STATUSES", {"ok", "broken"}):
             with self.assertRaises(ObservedPriceError):
                 materialise(ROOT, COMMIT)
+
+    # Consolidated B01 T01–T12 matrix. These test production entry points,
+    # not only private authentication helpers.
+    def test_b01_t01_default_decoder_forgery_is_terminal_before_replay(self):
+        import json
+        original = json._default_decoder
+        genuine = self.record["entries"][3]["prices_usd"]["BTC"]
+        self.assertEqual(genuine, 77086)
+
+        class ForgingDecoder:
+            def decode(self, source):
+                parsed = original.decode(source)
+                if isinstance(parsed, dict) and isinstance(parsed.get("market"), dict):
+                    for asset in parsed["market"].get("assets", []):
+                        if asset.get("symbol") == "BTC":
+                            asset["price_usd"] = 99999999
+                return parsed
+
+        with patch.object(json, "_default_decoder", ForgingDecoder()):
+            self.assertIs(json.loads, __import__("observed_price_history")._IMPORTED_JSON_LOADS)
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+            with self.assertRaises(ObservedPriceError):
+                validate_replay(ROOT, self.record)
+
+    def test_b01_t02_in_place_scanner_and_memo_mutation_are_terminal(self):
+        import json
+        decoder = json._default_decoder
+        with patch.object(decoder, "scan_once", lambda text, pos: ({}, len(text))):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+        decoder.memo["injected"] = object()
+        try:
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+        finally:
+            decoder.memo.clear()
+
+    def test_b01_t03_decoder_method_code_and_rebinding_are_terminal(self):
+        import json
+        method = json.JSONDecoder.decode
+        code = method.__code__
+
+        def forged_decode(self, text):
+            return {"run": {"observation_hour_utc": "2026-09-11T04:00:00Z"}}
+
+        try:
+            method.__code__ = forged_decode.__code__
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+        finally:
+            method.__code__ = code
+        with patch.object(json.JSONDecoder, "raw_decode", lambda self, text, idx=0: ({}, len(text))):
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+
+    def test_b01_t04_inherited_timestamp_parser_typeerror_must_abort(self):
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        ctx, slot, item = self._valid_item()
+        with patch.object(adjacency, "parse_iso_timestamp",
+                          side_effect=TypeError("unexpected parser failure")):
+            with self.assertRaises(ObservedPriceError):
+                _classify([item], slot, ctx._config)
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+            with self.assertRaises(ObservedPriceError):
+                validate_replay(ROOT, self.record)
+
+    def test_b01_t05_inherited_nested_parser_timezone_and_path_changes_abort(self):
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        ctx, slot, item = self._valid_item()
+        for target, replacement in (
+            ("_parse_local_timestamp", lambda value: (_ for _ in ()).throw(TypeError("fault"))),
+            ("_is_snapshot_path", lambda path: True),
+            ("ZoneInfo", lambda value: (_ for _ in ()).throw(ValueError("fault"))),
+        ):
+            with self.subTest(target=target), patch.object(adjacency, target, replacement):
+                with self.assertRaises(ObservedPriceError):
+                    _classify([item], slot, ctx._config)
+                with self.assertRaises(ObservedPriceError):
+                    materialise(ROOT, COMMIT)
+
+    def test_b01_t06_unexplained_inherited_false_is_terminal(self):
+        ctx, slot, item = self._valid_item()
+        with patch("observed_price_history._identity_is_consistent", return_value=False):
+            with self.assertRaises(ObservedPriceError):
+                _classify([item], slot, ctx._config)
+            with self.assertRaises(ObservedPriceError):
+                materialise(ROOT, COMMIT)
+
+    def test_b01_t07_genuine_identity_errors_remain_source_invalid(self):
+        ctx, slot, item = self._valid_item()
+        wrong = ("data/crypto/hourly/2026/09/11/wrong_source_snapshot.json", item[1], item[2])
+        row = _classify([wrong], slot, ctx._config)
+        self.assertEqual((row["state"], row["blocked_reason"]), ("INVALID", "identity-invalid"))
+        bad = copy.deepcopy(item[2])
+        bad["run"]["generated_at_utc"] = "not-a-timestamp"
+        row = _classify([(item[0], item[1], bad)], slot, ctx._config)
+        self.assertEqual((row["state"], row["blocked_reason"]), ("INVALID", "identity-invalid"))
+        self.assertTrue(all(v is None for v in row["prices_usd"].values()))
+
+    def test_b01_t08_genuine_phase12_malformed_json_remains_source_invalid(self):
+        ctx, slot, item = self._valid_item()
+        row = _classify([(item[0], b"{", item[2])], slot, ctx._config)
+        self.assertEqual((row["state"], row["blocked_reason"]), ("INVALID", "phase12-invalid"))
+
+    def test_b01_t09_ambiguous_retains_every_source_without_prices(self):
+        ctx, slot, item = self._valid_item()
+        other = ("data/crypto/hourly/2026/09/11/other_source_snapshot.json",
+                 b"other committed bytes", item[2])
+        row = _classify([item, other], slot, ctx._config)
+        self.assertEqual(row["state"], "AMBIGUOUS")
+        self.assertEqual(len(row["candidates"]), 2)
+        self.assertEqual({c["path"] for c in row["candidates"]}, {item[0], other[0]})
+        self.assertTrue(all(v is None for v in row["prices_usd"].values()))
+
+    def test_b01_t10_frozen_base_oracle_remains_deterministic(self):
+        again = materialise(ROOT, COMMIT)
+        self.assertEqual(canonical(again), canonical(self.record))
+        self.assertEqual(validate_replay(ROOT, again), again)
+        self.assertEqual(sum(e["state"] == "OBSERVED" for e in again["entries"]), 6)
+        self.assertEqual(sum(e["state"] == "MISSING" for e in again["entries"]), 18)
+
+    def test_b01_t11_replay_rejects_substitution(self):
+        altered = copy.deepcopy(self.record)
+        altered["entries"][3]["prices_usd"]["BTC"] = 99999999
+        altered["record_id"] = hashlib.sha256(canonical({
+            k: v for k, v in altered.items() if k != "record_id"
+        })).hexdigest()
+        with self.assertRaises(ObservedPriceError):
+            validate_replay(ROOT, altered)
+
+    def test_b01_t12_all_parser_bindings_restore_and_replay(self):
+        from observed_price_history import _authenticated_validator_modules
+        import json
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        import validate_crypto_snapshot as snapshot
+        _authenticated_validator_modules()
+        self.assertIs(adjacency.parse_iso_timestamp, snapshot.parse_iso_timestamp)
+        self.assertIs(json._default_decoder, __import__("observed_price_history")._IMPORTED_DEFAULT_DECODER)
+        self.assertEqual(validate_replay(ROOT, self.record), self.record)
 
     def test_compiled_class_body_is_not_validator_function(self):
         import validate_crypto_snapshot as snapshot_module
