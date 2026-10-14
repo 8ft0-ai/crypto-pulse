@@ -644,6 +644,53 @@ class ObservedPriceContractTests(unittest.TestCase):
             with self.assertRaises(ObservedPriceError):
                 validate_replay(ROOT, self.record)
 
+    def test_b01_t15_subprocess_popen_substitution_cannot_forge_git_bytes(self):
+        import json
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        _, _, item = self._valid_item()
+        payload = copy.deepcopy(item[2])
+        btc = next(a for a in payload["market"]["assets"] if a["symbol"] == "BTC")
+        btc["price_usd"] = 99999999
+        forged_bytes = json.dumps(payload).encode("utf-8")
+        original_popen = adjacency.subprocess.Popen
+
+        class ForgedGitPopen(original_popen):
+            def communicate(self, input=None, timeout=None):
+                stdout, stderr = super().communicate(input=input, timeout=timeout)
+                if self.args[-1] == f"{COMMIT}:{item[0]}":
+                    return forged_bytes, stderr
+                return stdout, stderr
+
+        # subprocess.run and its code object remain unchanged; only the
+        # delegated process class changes the committed-blob response.
+        with patch.object(adjacency.subprocess, "Popen", ForgedGitPopen):
+            with self.assertRaisesRegex(ObservedPriceError, "Git process execution changed"):
+                materialise(ROOT, COMMIT)
+            with self.assertRaisesRegex(ObservedPriceError, "Git process execution changed"):
+                validate_replay(ROOT, self.record)
+
+    def test_b01_t16_in_place_popen_communication_patch_is_terminal(self):
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        # A preserved Popen class identity does not prove its methods are intact.
+        with patch.object(adjacency.subprocess.Popen, "communicate",
+                          return_value=(b"forged Git stdout", b"")):
+            with self.assertRaisesRegex(ObservedPriceError, "Git process execution changed"):
+                materialise(ROOT, COMMIT)
+
+    def test_b01_t17_mutated_hour_grammar_cannot_admit_noncanonical_population(self):
+        import re
+        import resolve_crypto_observation_hour_adjacency as adjacency
+        invalid = "2026-09-12T00:30:00Z"
+        with self.assertRaises(ValueError):
+            adjacency._parse_slot(invalid)
+        relaxed = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00Z$")
+        with patch.object(adjacency, "OBSERVATION_HOUR_RE", relaxed):
+            self.assertEqual(adjacency._parse_slot(invalid).minute, 30)
+            with self.assertRaisesRegex(ObservedPriceError, "observation-hour grammar changed"):
+                materialise(ROOT, COMMIT)
+            with self.assertRaisesRegex(ObservedPriceError, "observation-hour grammar changed"):
+                validate_replay(ROOT, self.record)
+
     def test_compiled_class_body_is_not_validator_function(self):
         import validate_crypto_snapshot as snapshot_module
         from observed_price_history import _authenticated_validator_modules
