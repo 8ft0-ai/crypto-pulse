@@ -50,6 +50,15 @@ _IMPORTED_IDENTITY = _identity_is_consistent
 _IMPORTED_ADJACENCY_ZONEINFO = _adjacency_module.ZoneInfo
 _IMPORTED_GIT_RUN = _adjacency_module.subprocess.run
 _IMPORTED_GIT_RUN_CODE = _IMPORTED_GIT_RUN.__code__
+# A stable run() still delegates to mutable Popen class and methods.
+_IMPORTED_GIT_POPEN = _adjacency_module.subprocess.Popen
+_IMPORTED_GIT_POPEN_ATTRS = tuple(vars(_IMPORTED_GIT_POPEN).items())
+_IMPORTED_GIT_POPEN_CODES = {
+    name: value.__code__
+    for name, value in _IMPORTED_GIT_POPEN_ATTRS if inspect.isfunction(value)
+}
+_IMPORTED_ADJACENCY_HOUR_RE = _adjacency_module.OBSERVATION_HOUR_RE
+_IMPORTED_ADJACENCY_HOUR_FLAGS = _IMPORTED_ADJACENCY_HOUR_RE.flags
 _IMPORTED_REPLAY_CONTEXT_TYPE = _adjacency_module.ObservationHourReplayContext
 _IMPORTED_REPLAY_CONTEXT_INIT = _IMPORTED_REPLAY_CONTEXT_TYPE.__init__
 _IMPORTED_REPLAY_CONTEXT_INIT_CODE = _IMPORTED_REPLAY_CONTEXT_INIT.__code__
@@ -237,6 +246,24 @@ def _authenticate_adjacency_identity(snapshot):
     if (module.subprocess.run is not _IMPORTED_GIT_RUN
             or module.subprocess.run.__code__ != _IMPORTED_GIT_RUN_CODE):
         raise ObservedPriceError("Phase 13 Git invocation changed")
+    # Git's identity and bytes ultimately come from Popen, not run() itself.
+    popen = module.subprocess.Popen
+    actual_attrs = vars(_IMPORTED_GIT_POPEN)
+    if (popen is not _IMPORTED_GIT_POPEN
+            or actual_attrs.keys() != {name for name, _ in _IMPORTED_GIT_POPEN_ATTRS}):
+        raise ObservedPriceError("Phase 13 Git process execution changed")
+    for name, original in _IMPORTED_GIT_POPEN_ATTRS:
+        actual = actual_attrs[name]
+        if (actual is not original
+                or (name in _IMPORTED_GIT_POPEN_CODES
+                    and actual.__code__ != _IMPORTED_GIT_POPEN_CODES[name])):
+            raise ObservedPriceError("Phase 13 Git process execution changed")
+    # This compiled grammar determines the global hour population/anchor.
+    hour_re = module.OBSERVATION_HOUR_RE
+    if (hour_re is not _IMPORTED_ADJACENCY_HOUR_RE
+            or hour_re.pattern != r"^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$"
+            or hour_re.flags != _IMPORTED_ADJACENCY_HOUR_FLAGS):
+        raise ObservedPriceError("Phase 13 observation-hour grammar changed")
     if (module.SNAPSHOT_PREFIX != PurePosixPath("data/crypto/hourly")
             or module.SNAPSHOT_SUFFIX != "_source_snapshot.json"):
         raise ObservedPriceError("Phase 13 identity path policy changed")
