@@ -736,12 +736,57 @@ def evaluate_gate(
         state == ACTIVATION_DISABLED,
         "deterministic publication activation is disabled",
     )
-    deny(
-        state == ACTIVATION_PILOT
-        and str(attestation["source_workflow_run_id"])
-        != str(facts.get("pilot_run_id", "")),
-        "pilot activation is not bound to this source ingestion run",
-    )
+    if state == ACTIVATION_PILOT:
+        pilot_run_id = str(facts.get("pilot_run_id") or "")
+        pilot_run_number = str(facts.get("pilot_run_number") or "")
+        deny(
+            bool(pilot_run_id) == bool(pilot_run_number),
+            "pilot must use exactly one run-ID or run-number selector",
+        )
+        if pilot_run_id:
+            deny(
+                str(attestation["source_workflow_run_id"]) != pilot_run_id,
+                "pilot activation is not bound to this source ingestion run",
+            )
+        if pilot_run_number:
+            source_run = as_dict(facts.get("pilot_source_run"))
+            deny(
+                re.fullmatch(r"[1-9][0-9]*", pilot_run_number) is None,
+                "pilot run-number selector is invalid",
+            )
+            deny(
+                str(source_run.get("run_number", "")) != pilot_run_number,
+                "pilot run number does not match the selected source run",
+            )
+            deny(
+                str(source_run.get("id", ""))
+                != str(attestation["source_workflow_run_id"]),
+                "pilot source run ID mismatch",
+            )
+            deny(
+                str(source_run.get("workflow_id", ""))
+                != str(attestation["source_workflow_id"])
+                or source_run.get("path") != EXPECTED_SOURCE_WORKFLOW_PATH,
+                "pilot source workflow identity mismatch",
+            )
+            deny(
+                str(source_run.get("run_attempt", ""))
+                != str(attestation["source_workflow_run_attempt"])
+                or source_run.get("run_attempt") != 1,
+                "pilot source run must be its first attempt",
+            )
+            deny(
+                source_run.get("head_sha")
+                != attestation["source_workflow_head_sha"]
+                or source_run.get("head_branch") != "main",
+                "pilot source run head or branch mismatch",
+            )
+            deny(
+                source_run.get("event") != "schedule"
+                or source_run.get("status") != "completed"
+                or source_run.get("conclusion") != "success",
+                "pilot source run is not a successful scheduled ingestion",
+            )
 
     return GateDecision(not reasons, tuple(dict.fromkeys(reasons)))
 
@@ -810,6 +855,8 @@ def normalise_gate_facts(
     pilot_run_id: str,
     attestation_count: int,
     attestation_expired: bool,
+    pilot_run_number: str = "",
+    pilot_source_run_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     user = as_dict(pr_payload.get("user"))
     head = as_dict(pr_payload.get("head"))
@@ -925,6 +972,8 @@ def normalise_gate_facts(
         ),
         "activation": normalise_activation(activation),
         "pilot_run_id": str(pilot_run_id or ""),
+        "pilot_run_number": str(pilot_run_number or ""),
+        "pilot_source_run": dict(pilot_source_run_payload or {}),
     }
 
 
@@ -1096,6 +1145,11 @@ def command_build_gate_facts(args: argparse.Namespace) -> int:
         pilot_run_id=args.pilot_run_id,
         attestation_count=args.attestation_count,
         attestation_expired=args.attestation_expired,
+        pilot_run_number=args.pilot_run_number,
+        pilot_source_run_payload=(
+            load_json(Path(args.pilot_source_run_json))
+            if args.pilot_source_run_json else {}
+        ),
     )
     write_json(Path(args.output), facts)
     return 0
@@ -1200,6 +1254,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--main-root", default=".")
     p.add_argument("--activation", default=ACTIVATION_DISABLED)
     p.add_argument("--pilot-run-id", default="")
+    p.add_argument("--pilot-run-number", default="")
+    p.add_argument("--pilot-source-run-json")
     p.add_argument("--attestation-count", type=int, required=True)
     p.add_argument("--attestation-expired", action="store_true")
     p.set_defaults(func=command_build_gate_facts)

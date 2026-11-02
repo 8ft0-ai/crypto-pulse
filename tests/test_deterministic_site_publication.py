@@ -110,6 +110,75 @@ class DeterministicSitePublicationTests(unittest.TestCase):
         facts["pilot_run_id"] = "54321"
         self.assertTrue(self.decision(facts=facts).eligible)
 
+    def pilot_number_facts(self):
+        facts = self.mutate_fact("activation", value="pilot")
+        facts["pilot_run_id"] = ""
+        facts["pilot_run_number"] = "1109"
+        facts["pilot_source_run"] = {
+            "id": self.attestation["source_workflow_run_id"],
+            "workflow_id": self.attestation["source_workflow_id"],
+            "path": publication.EXPECTED_SOURCE_WORKFLOW_PATH,
+            "run_number": 1109,
+            "run_attempt": 1,
+            "head_sha": self.attestation["source_workflow_head_sha"],
+            "head_branch": "main",
+            "event": "schedule",
+            "status": "completed",
+            "conclusion": "success",
+        }
+        return facts
+
+    def test_prearmed_pilot_run_number_accepts_only_exact_scheduled_run(self):
+        facts = self.pilot_number_facts()
+        self.assertTrue(self.decision(facts=facts).eligible)
+        variants = (
+            ("run_number", 1110, "pilot run number"),
+            ("id", 100000000, "pilot source run ID"),
+            ("workflow_id", 1, "pilot source workflow identity"),
+            ("path", ".github/workflows/other.yml", "pilot source workflow identity"),
+            ("run_attempt", 2, "first attempt"),
+            ("head_sha", "e" * 40, "pilot source run head"),
+            ("head_branch", "feature", "pilot source run head"),
+            ("event", "workflow_dispatch", "successful scheduled ingestion"),
+            ("status", "in_progress", "successful scheduled ingestion"),
+            ("conclusion", "failure", "successful scheduled ingestion"),
+        )
+        for field, value, reason in variants:
+            with self.subTest(field=field):
+                mutated = copy.deepcopy(facts)
+                mutated["pilot_source_run"][field] = value
+                self.assert_refused(self.decision(facts=mutated), reason)
+
+    def test_prearmed_pilot_fails_closed_for_missing_conflicting_or_degraded_selection(self):
+        facts = self.pilot_number_facts()
+        facts["pilot_run_id"] = str(self.attestation["source_workflow_run_id"])
+        self.assert_refused(self.decision(facts=facts), "exactly one")
+        facts["pilot_run_id"] = ""
+        facts["pilot_run_number"] = ""
+        self.assert_refused(self.decision(facts=facts), "exactly one")
+        facts["pilot_run_number"] = "1109"
+        facts["pilot_source_run"] = {}
+        self.assert_refused(self.decision(facts=facts), "pilot run number")
+        facts = self.pilot_number_facts()
+        facts["pilot_run_number"] = "01109"
+        self.assert_refused(self.decision(facts=facts), "selector is invalid")
+        facts = self.pilot_number_facts()
+        facts["snapshot"]["quality_status"] = "valid-degraded"
+        self.assert_refused(self.decision(facts=facts), "not valid-ok")
+
+    def test_run_number_selector_is_rechecked_by_generation_and_gate(self):
+        root = Path(__file__).resolve().parents[1]
+        generation = (root / ".github/workflows/generate-deterministic-site-publication.yml").read_text(encoding="utf-8")
+        gate = (root / ".github/workflows/deterministic-site-publication-gate.yml").read_text(encoding="utf-8")
+        self.assertIn("github.event.workflow_run.run_number", generation)
+        self.assertIn("vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == ''", generation)
+        self.assertIn("vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER == ''", generation)
+        self.assertIn('test "$TRIGGER_RUN_ATTEMPT" = "1"', generation)
+        self.assertIn('test "$TRIGGER_EVENT" = "schedule"', generation)
+        self.assertIn('gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id"', gate)
+        self.assertIn('--pilot-run-number "$PILOT_RUN_NUMBER"', gate)
+        self.assertIn('--pilot-source-run-json "$WORK/pilot-source-run.json"', gate)
+
     def test_degraded_blocking_warning_and_error_evidence_refuse(self):
         variants = [
             (("snapshot", "quality_status"), "valid-degraded", "not valid-ok"),

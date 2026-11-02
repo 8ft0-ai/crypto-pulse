@@ -43,7 +43,18 @@ jobs:
           vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'recurring' ||
           (
             vars.DETERMINISTIC_PUBLICATION_ACTIVATION == 'pilot' &&
-            vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == format('{0}', github.event.workflow_run.id)
+            (
+              (
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID != '' &&
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER == '' &&
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == format('{0}', github.event.workflow_run.id)
+              ) ||
+              (
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == '' &&
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER != '' &&
+                vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER == format('{0}', github.event.workflow_run.run_number)
+              )
+            )
           )
         )
       ) || github.event_name == 'workflow_dispatch'
@@ -68,10 +79,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
           PILOT_RUN_ID: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID || '' }}
+          PILOT_RUN_NUMBER: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER || '' }}
           EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha || '' }}
           PROOF_SOURCE_RUN_ID: ${{ inputs.proof_source_run_id || '' }}
           AUTHORITY_COMMENT_ID: ${{ inputs.authority_comment_id || '' }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+          TRIGGER_RUN_NUMBER: ${{ github.event.workflow_run.run_number || '' }}
           TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || '' }}
           TRIGGER_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id || '' }}
           TRIGGER_HEAD_SHA: ${{ github.event.workflow_run.head_sha || '' }}
@@ -91,7 +104,17 @@ jobs:
             case "$ACTIVATION" in
               recurring) ;;
               pilot)
-                test "$PILOT_RUN_ID" = "$TRIGGER_RUN_ID"
+                # Pre-arm one future run number or retain the exact run-ID
+                # selector. Both set is invalid; a retry is not reselected.
+                if [[ -n "$PILOT_RUN_NUMBER" ]]; then
+                  test -z "$PILOT_RUN_ID"
+                  [[ "$PILOT_RUN_NUMBER" =~ ^[1-9][0-9]*$ ]]
+                  test "$PILOT_RUN_NUMBER" = "$TRIGGER_RUN_NUMBER"
+                  test "$TRIGGER_RUN_ATTEMPT" = "1"
+                  test "$TRIGGER_EVENT" = "schedule"
+                else
+                  test "$PILOT_RUN_ID" = "$TRIGGER_RUN_ID"
+                fi
                 ;;
               *)
                 echo "Trusted generation is not operational while activation is disabled or invalid." >&2

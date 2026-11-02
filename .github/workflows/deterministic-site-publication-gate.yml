@@ -33,6 +33,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ACTIVATION: ${{ vars.DETERMINISTIC_PUBLICATION_ACTIVATION || 'disabled' }}
       PILOT_RUN_ID: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID || '' }}
+      PILOT_RUN_NUMBER: ${{ vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER || '' }}
 
     steps:
       - name: Check out trusted default-branch policy only
@@ -184,6 +185,15 @@ jobs:
           gh api -H "Accept: application/vnd.github.raw+json" \
             "/repos/$GITHUB_REPOSITORY/contents/$REPORT_PATH?ref=$CANDIDATE_HEAD_SHA" > "$WORK/candidate/report.md"
 
+          # Bind the pre-armed run number to GitHub's immutable scheduled-run
+          # metadata, rather than trusting PR text or generation output.
+          if [[ "$ACTIVATION" == "pilot" && -n "$PILOT_RUN_NUMBER" ]]; then
+            source_run_id="$(jq -er '.source_workflow_run_id | select(type == "number" and . > 0)' "$WORK/attestation.json")"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id" > "$WORK/pilot-source-run.json"
+          else
+            printf '{}\n' > "$WORK/pilot-source-run.json"
+          fi
+
       - name: Build credential-free gate facts
         env:
           WORK: ${{ steps.metadata.outputs.work }}
@@ -204,6 +214,8 @@ jobs:
             --main-root . \
             --activation "$ACTIVATION" \
             --pilot-run-id "$PILOT_RUN_ID" \
+            --pilot-run-number "$PILOT_RUN_NUMBER" \
+            --pilot-source-run-json "$WORK/pilot-source-run.json" \
             --attestation-count 1 \
             --output "$WORK/facts.json"
 
