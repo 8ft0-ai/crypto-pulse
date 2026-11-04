@@ -1,0 +1,7 @@
+name = "cryptopulse-hourly-ingestion"
+main = "worker.mjs"
+compatibility_date = "2026-11-04"
+
+# Repository-only configuration: never deploy without separate owner approval.
+[triggers]
+crons = ["7 * * * *"]
