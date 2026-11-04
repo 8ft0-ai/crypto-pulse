@@ -22,7 +22,7 @@ Follow [Build and inspect CryptoPulse locally](tutorials/build-and-inspect-crypt
 
 ### Understand the complete system
 
-Read [Product positioning](explanation/product-positioning.md) for what CryptoPulse is today and why the evidence-first approach matters. Then read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow source evidence through validation, deterministic or governed reporting, repository review, site generation, deployment and live verification.
+Read [Product positioning](explanation/product-positioning.md) for what CryptoPulse is today and why the evidence-first approach matters. Then read [How CryptoPulse works](explanation/how-cryptopulse-works.md) to follow source evidence through validation, deterministic or governed reporting, repository review, site generation, deployment and live verification. For the proposed hourly source scheduling architecture, see [Reliable hourly source ingestion](explanation/reliable-hourly-source-ingestion.md).
 
 ### Build, publish and verify the site
 
@@ -125,6 +125,7 @@ CryptoPulse uses four documentation modes. Each page has one primary purpose eve
 - [Evidence and analysis boundary](explanation/evidence-and-analysis-boundary.md)
 - [Fail-closed analysis validation](explanation/fail-closed-analysis-validation.md)
 - [Trusted main and secret isolation](explanation/trusted-main-and-secret-isolation.md)
+- [Reliable hourly source ingestion (proposed design)](explanation/reliable-hourly-source-ingestion.md)
 
 ### Working notes
 
