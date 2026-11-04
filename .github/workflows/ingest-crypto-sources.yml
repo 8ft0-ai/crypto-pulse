@@ -12,10 +12,6 @@ on:
         description: "Deterministic cp-YYYYMMDDHH identifier for this intended UTC hour"
         required: true
         type: string
-  schedule:
-    # GitHub cron schedules are UTC. The ingestion script writes Australia/Sydney
-    # local timestamps into the snapshot path and run metadata.
-    - cron: "17 * * * *"
 
 permissions:
   actions: read
