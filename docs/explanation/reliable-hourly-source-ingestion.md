@@ -1,5 +1,9 @@
 # Reliable hourly source ingestion — proposed design (#564)
 
+> **Mode:** Explanation
+> **Audience:** CryptoPulse operators, contributors and reviewers
+> **Outcome:** Understand the proposed reliable hourly ingestion architecture, its safeguards, acceptance criteria and separate implementation authority.
+
 **Status:** proposed; documentation only. **Owner:** [Crypto Pulse #564](https://github.com/8ft0-ai/crypto-pulse/issues/564). **Publication authority:** [#561](https://github.com/8ft0-ai/crypto-pulse/issues/561).
 
 ## Outcome and decision
