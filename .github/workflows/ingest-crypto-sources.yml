@@ -1,7 +1,17 @@
 name: Ingest Crypto Sources
+run-name: "Crypto source ingestion ${{ inputs.dispatch_correlation_id || github.run_id }}"
 
 on:
   workflow_dispatch:
+    inputs:
+      intended_hour_utc:
+        description: "Canonical UTC hour YYYY-MM-DDTHH:00:00Z"
+        required: true
+        type: string
+      dispatch_correlation_id:
+        description: "Deterministic cp-YYYYMMDDHH identifier for this intended UTC hour"
+        required: true
+        type: string
   schedule:
     # GitHub cron schedules are UTC. The ingestion script writes Australia/Sydney
     # local timestamps into the snapshot path and run metadata.
@@ -37,6 +47,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml
 
+      - name: Validate bounded scheduler request
+        env:
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          python scripts/crypto_ingestion_slot.py request \
+            --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" \
+            --correlation "$DISPATCH_CORRELATION"
+
       - name: Fetch source data
         id: ingest
         run: |
@@ -67,6 +90,25 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/validate_crypto_observation_hour.py "$SNAPSHOT_PATH"
+
+      - name: Check source-hour acceptance vacancy
+        id: slot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+        run: |
+          set -euo pipefail
+          artifact_name="$(python scripts/crypto_ingestion_slot.py prepare \
+            --snapshot "$SNAPSHOT_PATH" --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" --correlation "$DISPATCH_CORRELATION")"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact_name&per_page=100" \
+            > "$RUNNER_TEMP/crypto-hour-existing.json"
+          python scripts/crypto_ingestion_slot.py vacant \
+            --listing "$RUNNER_TEMP/crypto-hour-existing.json" --name "$artifact_name"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
 
       - name: Build PR evidence
         id: evidence
@@ -245,9 +287,8 @@ jobs:
           git status --porcelain --untracked-files=all -- data/crypto/hourly
 
           if [[ -z "$(git status --porcelain -- data/crypto/hourly)" ]]; then
-            echo "No generated source snapshot changes to commit."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "No source snapshot changes; refuse success without immutable intent." >&2
+            exit 1
           fi
 
           unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^data\/crypto\/hourly\// { print }')"
@@ -331,6 +372,8 @@ jobs:
           git push --force-with-lease --set-upstream origin "$PUBLISH_BRANCH"
 
       - name: Create or update rolling snapshot PR
+        id: rolling_pr
+        continue-on-error: true  # Rolling inspection PR is not source-publication authority.
         if: steps.publish_context.outputs.should_publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -378,3 +421,43 @@ jobs:
               exit 1
             fi
           fi
+
+      - name: Recheck uniqueness immediately before accepted-hour upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACCEPTED_HOUR_ARTIFACT: ${{ steps.slot.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ACCEPTED_HOUR_ARTIFACT&per_page=100" \
+            > "$RUNNER_TEMP/crypto-hour-final-existing.json"
+          python scripts/crypto_ingestion_slot.py vacant \
+            --listing "$RUNNER_TEMP/crypto-hour-final-existing.json" \
+            --name "$ACCEPTED_HOUR_ARTIFACT"
+
+      - name: Prepare accepted-hour receipt
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+          SOURCE_INTENT_ARTIFACT: ${{ steps.publication_intent.outputs.artifact_name }}
+          ROLLING_PR_OUTCOME: ${{ steps.rolling_pr.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/crypto-hour-accepted"
+          python scripts/crypto_ingestion_slot.py accept \
+            --snapshot "$SNAPSHOT_PATH" --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" --correlation "$DISPATCH_CORRELATION" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --snapshot-commit "$(git rev-parse HEAD)" \
+            --source-intent "$SOURCE_INTENT_ARTIFACT" \
+            --rolling-pr-outcome "$ROLLING_PR_OUTCOME" \
+            --output "$RUNNER_TEMP/crypto-hour-accepted/receipt.json"
+
+      - name: Upload accepted-hour receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.slot.outputs.artifact_name }}
+          path: ${{ runner.temp }}/crypto-hour-accepted/receipt.json
+          if-no-files-found: error
+          retention-days: 35

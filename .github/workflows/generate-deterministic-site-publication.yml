@@ -101,6 +101,8 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
             test "$TRIGGER_CONCLUSION" = "success"
             test "$TRIGGER_HEAD_BRANCH" = "main"
+            # #564 external dispatches are ingestion-only; publication remains scheduled-source-only.
+            test "$TRIGGER_EVENT" = "schedule"
             case "$ACTIVATION" in
               recurring) ;;
               pilot)

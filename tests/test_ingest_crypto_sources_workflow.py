@@ -117,5 +117,47 @@ class IngestCryptoSourcesWorkflowTests(unittest.TestCase):
         )
 
 
+    def test_external_hour_dispatch_is_bounded_and_never_implicitly_publishes(self) -> None:
+        required = (
+            "run-name: \"Crypto source ingestion ${{ inputs.dispatch_correlation_id || github.run_id }}\"",
+            "intended_hour_utc:",
+            "dispatch_correlation_id:",
+            'test "$GITHUB_REF" = "refs/heads/main"',
+            "python scripts/crypto_ingestion_slot.py request",
+            "python scripts/crypto_ingestion_slot.py prepare",
+            "python scripts/crypto_ingestion_slot.py vacant",
+            "python scripts/crypto_ingestion_slot.py accept",
+            "crypto-hour-final-existing.json",
+            "continue-on-error: true  # Rolling inspection PR is not source-publication authority.",
+            "name: ${{ steps.slot.outputs.artifact_name }}",
+        )
+        for marker in required:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.body)
+        self.assertIn('group: crypto-source-ingestion', self.body)
+        self.assertIn('cancel-in-progress: false', self.body)
+        self.assertIn('retention-days: 35', self.body)
+        self.assert_ordered(
+            "- name: Validate bounded scheduler request",
+            "- name: Validate source snapshot",
+            "- name: Validate observation hour",
+            "- name: Check source-hour acceptance vacancy",
+            "- name: Commit generated snapshot",
+            "- name: Upload immutable publication source intent",
+            "- name: Push rolling automation branch",
+            "- name: Create or update rolling snapshot PR",
+            "- name: Recheck uniqueness immediately before accepted-hour upload",
+            "- name: Prepare accepted-hour receipt",
+            "- name: Upload accepted-hour receipt",
+        )
+
+    def test_publication_workflow_refuses_external_ingestion_even_if_recurring(self) -> None:
+        generator = (ROOT / ".github/workflows/generate-deterministic-site-publication.yml").read_text(encoding="utf-8")
+        self.assertIn('test "$TRIGGER_EVENT" = "schedule"', generator)
+        source_gate = generator.split('if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then', 1)[1]
+        self.assertLess(source_gate.index('test "$TRIGGER_EVENT" = "schedule"'),
+                        source_gate.index('case "$ACTIVATION" in'))
+
+
 if __name__ == "__main__":
     unittest.main()
