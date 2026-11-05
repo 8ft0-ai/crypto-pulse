@@ -9,8 +9,7 @@ export function slotForEvent(scheduledTime, nowMs) {
     throw new Error("invalid scheduledTime/clock");
   }
   const scheduled = new Date(scheduledTime);
-  if (Number.isNaN(scheduled.getTime()) || scheduled.getUTCMinutes() !== 7
-      || scheduled.getUTCSeconds() !== 0 || scheduled.getUTCMilliseconds() !== 0) {
+  if (Number.isNaN(scheduled.getTime()) || scheduled.getUTCMinutes() !== 7) {
     throw new Error("cron event is not an exact UTC :07 slot");
   }
   const hourStart = Date.UTC(
