@@ -13,12 +13,14 @@ function capture() {
   return { lines, log: { log: line => lines.push(JSON.parse(line)) } };
 }
 
-test("canonical Cloudflare scheduledTime controls slot, never arrival time", () => {
+test("Cloudflare UTC :07 minute controls slot despite seconds of delivery jitter", () => {
   assert.deepEqual(slotForEvent(AT_07, AT_10), {
     hour: "2026-11-04T01:00:00Z",
     correlation: "cp-2026110401",
   });
-  assert.throws(() => slotForEvent(AT_07 + 60_000, AT_10), /exact UTC :07/);
+  assert.deepEqual(slotForEvent(AT_07 + 21_332, AT_10), slotForEvent(AT_07, AT_10));
+  assert.deepEqual(slotForEvent(AT_07 + 59_999, AT_10), slotForEvent(AT_07, AT_10));
+  assert.throws(() => slotForEvent(AT_07 + 60_000, AT_10), /UTC :07/);
   assert.throws(() => slotForEvent(AT_07, HOUR_START + 30 * 60_000), /deadline/);
   assert.throws(() => slotForEvent(AT_07, AT_07 - 1), /early/);
   assert.throws(() => slotForEvent(Number.NaN, AT_10), /invalid/);
