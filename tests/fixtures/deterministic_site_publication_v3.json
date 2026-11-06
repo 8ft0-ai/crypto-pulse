@@ -76,6 +76,8 @@
       "sha256": "340c4ce51a62f8788e439777b7beeb94b43a22df7e7ca7fd3af74493de3ef09d",
       "warnings": []
     },
+    "source_event": "schedule",
+    "source_provenance_verified": true,
     "unresolved_threads": 0,
     "validation": {
       "check_app_slug": "github-actions",

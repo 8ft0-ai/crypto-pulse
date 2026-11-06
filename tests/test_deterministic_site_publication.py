@@ -139,15 +139,30 @@ class DeterministicSitePublicationTests(unittest.TestCase):
             ("run_attempt", 2, "first attempt"),
             ("head_sha", "e" * 40, "pilot source run head"),
             ("head_branch", "feature", "pilot source run head"),
-            ("event", "workflow_dispatch", "successful scheduled ingestion"),
-            ("status", "in_progress", "successful scheduled ingestion"),
-            ("conclusion", "failure", "successful scheduled ingestion"),
+            ("event", "push", "successful trusted ingestion"),
+            ("status", "in_progress", "successful trusted ingestion"),
+            ("conclusion", "failure", "successful trusted ingestion"),
         )
         for field, value, reason in variants:
             with self.subTest(field=field):
                 mutated = copy.deepcopy(facts)
                 mutated["pilot_source_run"][field] = value
                 self.assert_refused(self.decision(facts=mutated), reason)
+
+    def test_prearmed_dispatch_requires_independent_provenance_and_exact_event(self):
+        facts = self.pilot_number_facts()
+        facts["pilot_source_run"]["event"] = "workflow_dispatch"
+        self.assert_refused(self.decision(facts=facts), "successful trusted ingestion")
+        facts["source_event"] = "workflow_dispatch"
+        self.assertTrue(self.decision(facts=facts).eligible)
+        facts["source_provenance_verified"] = False
+        self.assert_refused(self.decision(facts=facts), "source provenance")
+
+    def test_gate_refuses_missing_source_provenance_even_for_recurring(self):
+        facts = self.mutate_fact("source_provenance_verified", value=False)
+        self.assert_refused(self.decision(facts=facts), "source provenance")
+        facts = self.mutate_fact("source_event", value="push")
+        self.assert_refused(self.decision(facts=facts), "source event")
 
     def test_prearmed_pilot_fails_closed_for_missing_conflicting_or_degraded_selection(self):
         facts = self.pilot_number_facts()
@@ -174,7 +189,7 @@ class DeterministicSitePublicationTests(unittest.TestCase):
         self.assertIn("vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_ID == ''", generation)
         self.assertIn("vars.DETERMINISTIC_PUBLICATION_PILOT_RUN_NUMBER == ''", generation)
         self.assertIn('test "$TRIGGER_RUN_ATTEMPT" = "1"', generation)
-        self.assertIn('test "$TRIGGER_EVENT" = "schedule"', generation)
+        self.assertIn('[[ "$TRIGGER_EVENT" == "schedule" || "$TRIGGER_EVENT" == "workflow_dispatch" ]]', generation)
         self.assertIn('gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id"', gate)
         self.assertIn('--pilot-run-number "$PILOT_RUN_NUMBER"', gate)
         self.assertIn('--pilot-source-run-json "$WORK/pilot-source-run.json"', gate)
