@@ -151,12 +151,25 @@ class IngestCryptoSourcesWorkflowTests(unittest.TestCase):
             "- name: Upload accepted-hour receipt",
         )
 
-    def test_publication_workflow_refuses_external_ingestion_even_if_recurring(self) -> None:
+    def test_publication_requires_verified_receipt_for_external_ingestion(self) -> None:
         generator = (ROOT / ".github/workflows/generate-deterministic-site-publication.yml").read_text(encoding="utf-8")
-        self.assertIn('test "$TRIGGER_EVENT" = "schedule"', generator)
+        merge_gate = (ROOT / ".github/workflows/deterministic-site-publication-gate.yml").read_text(encoding="utf-8")
+        self.assertIn("github.event.workflow_run.event == 'workflow_dispatch'", generator)
         source_gate = generator.split('if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then', 1)[1]
-        self.assertLess(source_gate.index('test "$TRIGGER_EVENT" = "schedule"'),
+        self.assertIn('case "$TRIGGER_EVENT" in', source_gate)
+        self.assertIn('schedule|workflow_dispatch) ;;', source_gate)
+        self.assertIn('*) echo "Unsupported ingestion event" >&2; exit 1 ;;', source_gate)
+        self.assertLess(source_gate.index('case "$TRIGGER_EVENT" in'),
                         source_gate.index('case "$ACTIVATION" in'))
+        self.assertIn("if: steps.source.outputs.proof_mode == 'false'", generator)
+        self.assertIn('gh run download "$SOURCE_RUN_ID"', generator)
+        self.assertIn("python scripts/deterministic_ingestion_provenance.py verify", generator)
+        self.assertLess(generator.index("Independently verify source run and accepted-hour dispatch receipt"),
+                        generator.index("Generate deterministic Markdown report"))
+        self.assertIn('gh run download "$source_run_id"', merge_gate)
+        self.assertIn('--source-receipt-json "$WORK/source-receipt.json"', merge_gate)
+        self.assertLess(merge_gate.index("Independently verify immutable source-run provenance"),
+                        merge_gate.index("Build credential-free gate facts"))
 
 
 if __name__ == "__main__":

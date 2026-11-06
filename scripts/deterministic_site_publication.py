@@ -731,6 +731,10 @@ def evaluate_gate(
         "publication PR has blocking reviews",
     )
 
+    deny(facts.get("source_provenance_verified") is not True,
+         "source provenance was not independently verified")
+    deny(facts.get("source_event") not in ("schedule", "workflow_dispatch"),
+         "source event is not trusted")
     state = normalise_activation(facts.get("activation"))
     deny(
         state == ACTIVATION_DISABLED,
@@ -782,10 +786,10 @@ def evaluate_gate(
                 "pilot source run head or branch mismatch",
             )
             deny(
-                source_run.get("event") != "schedule"
+                source_run.get("event") != facts.get("source_event")
                 or source_run.get("status") != "completed"
                 or source_run.get("conclusion") != "success",
-                "pilot source run is not a successful scheduled ingestion",
+                "pilot source run is not a successful trusted ingestion",
             )
 
     return GateDecision(not reasons, tuple(dict.fromkeys(reasons)))
@@ -857,6 +861,8 @@ def normalise_gate_facts(
     attestation_expired: bool,
     pilot_run_number: str = "",
     pilot_source_run_payload: Mapping[str, Any] | None = None,
+    source_event: str = "",
+    source_provenance_verified: bool = False,
 ) -> dict[str, Any]:
     user = as_dict(pr_payload.get("user"))
     head = as_dict(pr_payload.get("head"))
@@ -974,6 +980,8 @@ def normalise_gate_facts(
         "pilot_run_id": str(pilot_run_id or ""),
         "pilot_run_number": str(pilot_run_number or ""),
         "pilot_source_run": dict(pilot_source_run_payload or {}),
+        "source_event": source_event,
+        "source_provenance_verified": source_provenance_verified,
     }
 
 
@@ -1127,6 +1135,16 @@ def command_build_gate_facts(args: argparse.Namespace) -> int:
         raise PublicationPolicyError(
             "reviews/files API payload must be arrays"
         )
+    from deterministic_ingestion_provenance import ProvenanceError, verify_source
+    source_run = load_json(Path(args.source_run_json))
+    receipt = load_json(Path(args.source_receipt_json))
+    try:
+        source_event = verify_source(
+            source_run, attestation, receipt=receipt,
+            repository=args.source_repository,
+        )
+    except ProvenanceError as exc:
+        raise PublicationPolicyError(f"untrusted source provenance: {exc}") from exc
     facts = normalise_gate_facts(
         attestation=attestation,
         pr_payload=load_json(Path(args.pr_json)),
@@ -1150,6 +1168,8 @@ def command_build_gate_facts(args: argparse.Namespace) -> int:
             load_json(Path(args.pilot_source_run_json))
             if args.pilot_source_run_json else {}
         ),
+        source_event=source_event,
+        source_provenance_verified=True,
     )
     write_json(Path(args.output), facts)
     return 0
@@ -1256,6 +1276,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pilot-run-id", default="")
     p.add_argument("--pilot-run-number", default="")
     p.add_argument("--pilot-source-run-json")
+    p.add_argument("--source-run-json", required=True)
+    p.add_argument("--source-receipt-json", required=True)
+    p.add_argument("--source-repository", required=True)
     p.add_argument("--attestation-count", type=int, required=True)
     p.add_argument("--attestation-expired", action="store_true")
     p.set_defaults(func=command_build_gate_facts)

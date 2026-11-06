@@ -145,6 +145,29 @@ jobs:
             --attestation "$WORK/attestation.json" \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Independently verify immutable source-run provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORK: ${{ steps.metadata.outputs.work }}
+        run: |
+          set -euo pipefail
+          source_run_id="$(jq -er '.source_workflow_run_id | select(type == "number" and . > 0)' "$WORK/attestation.json")"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id" > "$WORK/source-run.json"
+          event="$(jq -er '.event' "$WORK/source-run.json")"
+          printf "{}\n" > "$WORK/source-receipt.json"
+          receipt_args=()
+          if [[ "$event" == "workflow_dispatch" ]]; then
+            hour="$(jq -er '.observation_hour_utc' "$WORK/attestation.json")"
+            name="$(python scripts/deterministic_ingestion_provenance.py receipt-name --hour "$hour")"
+            mkdir -p "$WORK/accepted-hour"
+            gh run download "$source_run_id" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$WORK/accepted-hour"
+            cp "$WORK/accepted-hour/receipt.json" "$WORK/source-receipt.json"
+            receipt_args=(--receipt "$WORK/accepted-hour/receipt.json")
+          fi
+          python scripts/deterministic_ingestion_provenance.py verify \
+            --source-run "$WORK/source-run.json" --evidence "$WORK/attestation.json" \
+            --repository "$GITHUB_REPOSITORY" "${receipt_args[@]}"
+
       - name: Read exact candidate bytes and decision metadata
         env:
           WORK: ${{ steps.metadata.outputs.work }}
@@ -216,6 +239,9 @@ jobs:
             --pilot-run-id "$PILOT_RUN_ID" \
             --pilot-run-number "$PILOT_RUN_NUMBER" \
             --pilot-source-run-json "$WORK/pilot-source-run.json" \
+            --source-run-json "$WORK/source-run.json" \
+            --source-receipt-json "$WORK/source-receipt.json" \
+            --source-repository "$GITHUB_REPOSITORY" \
             --attestation-count 1 \
             --output "$WORK/facts.json"
 
