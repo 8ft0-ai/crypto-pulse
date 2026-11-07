@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from validate_crypto_snapshot import ValidationError, load_config, validate_snapshot
+from research_brief_v1 import research_brief
 
 REPORT_SCHEMA_VERSION = "deterministic-crypto-report/v1"
 DEFAULT_CONFIG_PATH = Path("config/crypto_sources.yml")
@@ -380,6 +381,8 @@ def render_report(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[s
         "## Product boundary and non-investment-advice notice",
         "",
         "This report is deterministic demonstration content generated from one validated source snapshot. It is not financial advice, investment research, a recommendation, a trading signal, or a call to buy, sell, or hold any asset.",
+        "",
+        research_brief(snapshot, snapshot_path, quality),
         "",
         snapshot_at_a_glance(snapshot, snapshot_path, quality),
         "",
