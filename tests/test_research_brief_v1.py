@@ -2,12 +2,13 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from research_brief_v1 import research_brief, number
+from research_brief_v1 import research_brief, number, evidence
 from generate_crypto_report import render_report
 
 PATH = ROOT / "data/crypto/hourly/2026/11/08/0807_AEDT_source_snapshot.json"
@@ -55,3 +56,22 @@ class ResearchBriefTests(unittest.TestCase):
     def test_nonfinite_rejected(self):
         self.assertIsNone(number("nan"))
         self.assertIsNone(number("inf"))
+
+    def test_modified_local_bytes_not_accepted_as_committed_evidence(self):
+        with patch.object(Path, "read_bytes", return_value=b"uncommitted changes"):
+            self.assertIsNone(evidence(PATH))
+
+    def test_current_stale_asset_excluded_from_historical_comparison(self):
+        snapshot = deepcopy(self.snapshot)
+        for asset in snapshot["market"]["assets"]:
+            asset["last_updated"] = "2026-10-01T00:00:00Z"
+        text = research_brief(snapshot, PATH, self.quality)
+        self.assertNotIn("Archived interval comparison", text)
+
+    def test_cross_source_over_threshold_is_rejected(self):
+        snapshot = deepcopy(self.snapshot)
+        rows = snapshot["exchange_crosscheck"]["sources"]["coinbase_exchange"]
+        rows[0]["price"] = float(rows[0]["price"]) * 1.5
+        text = research_brief(snapshot, PATH, self.quality)
+        self.assertIn("Rejected/inconclusive:", text)
+        self.assertIn("over tolerance", text)
