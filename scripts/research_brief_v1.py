@@ -42,7 +42,13 @@ def evidence(path):
         ).stdout.strip()
         if len(sha) != 40 or any(c not in "0123456789abcdef" for c in sha):
             return None
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        committed = subprocess.run(
+            ["git", "show", f"{sha}:{relative}"],
+            cwd=ROOT, check=True, capture_output=True, timeout=5,
+        ).stdout
+        if path.read_bytes() != committed:
+            return None
+        digest = hashlib.sha256(committed).hexdigest()
         url = f"https://github.com/8ft0-ai/crypto-pulse/blob/{sha}/{quote(relative, safe='/')}"
         return f"[archived JSON]({url}) (SHA-256 `{digest}`)"
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -61,7 +67,15 @@ def prior_snapshot(path, now):
         try:
             payload = json.loads(candidate.read_text())
             t = instant(payload.get("run", {}).get("generated_at_utc"))
-            if t and 0 < (now - t).total_seconds() <= MAX_HISTORICAL_GAP_SECONDS and payload.get("quality", {}).get("status") == "valid-ok":
+            if (t and 0 < (now - t).total_seconds() <= MAX_HISTORICAL_GAP_SECONDS
+                    and payload.get("quality", {}).get("status") == "valid-ok"
+                    and evidence(candidate)):
+                # Reject prior observations whose asset timestamps are not aligned.
+                assets = payload.get("market", {}).get("assets", [])
+                if not any(isinstance(a, dict) and (at := instant(a.get("last_updated")))
+                           and abs((t-at).total_seconds()) <= MAX_SOURCE_SKEW_SECONDS
+                           for a in assets):
+                    continue
                 candidates.append((t, candidate, payload))
         except (OSError, ValueError, TypeError):
             continue
@@ -110,14 +124,15 @@ def research_brief(snapshot, path, quality):
                 rejected.append(symbol)
                 continue
             delta = abs(a-b)/a*100
-            differences.append(f"{symbol} {delta:.3f}%")
             if delta > MAX_CROSS_SOURCE_DIFFERENCE_PCT:
-                rejected.append(symbol)
-        if differences:
+                rejected.append(f"{symbol} {delta:.3f}% (over tolerance)")
+            else:
+                differences.append(f"{symbol} {delta:.3f}%")
+        if differences or rejected:
             findings.append(
-                f"**Cross-source price check:** {', '.join(differences)} absolute difference versus the market-source price "
+                f"**Cross-source price check:** accepted: {', '.join(differences) if differences else 'none'}; absolute difference versus the market-source price "
                 f"(tolerance ≤{MAX_CROSS_SOURCE_DIFFERENCE_PCT:.1f}%; observation skew ≤{MAX_SOURCE_SKEW_SECONDS} s). "
-                + ("Inconclusive or over threshold: " + ", ".join(sorted(set(rejected))) + ". " if rejected else "All compared rows are within tolerance. ")
+                + ("Rejected/inconclusive: " + ", ".join(sorted(set(rejected))) + ". " if rejected else "All compared rows are within tolerance. ")
                 + "These are asynchronous venue/source observations, not identical-time execution prices."
             )
     if ref and run_time:
@@ -131,7 +146,10 @@ def research_brief(snapshot, path, quality):
                 for symbol in sorted(set(assets) & set(prev_assets)):
                     old, new = number(prev_assets[symbol].get("price_usd")), number(assets[symbol].get("price_usd"))
                     old_time, new_time = instant(prev_assets[symbol].get("last_updated")), instant(assets[symbol].get("last_updated"))
-                    if old and new and old > 0 and old_time and new_time and 0 < (new_time-old_time).total_seconds() <= MAX_HISTORICAL_GAP_SECONDS and abs((prev_time-old_time).total_seconds()) <= MAX_SOURCE_SKEW_SECONDS:
+                    if (old and new and old > 0 and new > 0 and old_time and new_time
+                            and 0 < (new_time-old_time).total_seconds() <= MAX_HISTORICAL_GAP_SECONDS
+                            and abs((prev_time-old_time).total_seconds()) <= MAX_SOURCE_SKEW_SECONDS
+                            and abs((run_time-new_time).total_seconds()) <= MAX_SOURCE_SKEW_SECONDS):
                         comparisons.append(f"{symbol} {(new/old-1)*100:+.2f}%")
                 if comparisons:
                     findings.append(
