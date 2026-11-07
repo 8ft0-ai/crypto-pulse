@@ -1,0 +1,297 @@
+{
+  "defi": {
+    "stablecoins": [
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 176784974011.1511,
+        "id": "1",
+        "name": "Tether",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9988,
+        "symbol": "USDT"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 70556204965.14066,
+        "id": "2",
+        "name": "USD Coin",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9998137485500002,
+        "symbol": "USDC"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 5592823709.952243,
+        "id": "209",
+        "name": "Sky Dollar",
+        "peg_type": "peggedUSD",
+        "price_usd": 1.00022618324448,
+        "symbol": "USDS"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 4918418461.6103,
+        "id": "146",
+        "name": "Ethena USDe",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.998984757,
+        "symbol": "USDe"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 4673471264.558033,
+        "id": "5",
+        "name": "Dai",
+        "peg_type": "peggedUSD",
+        "price_usd": 1.000115217846767,
+        "symbol": "DAI"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 3508740697.5125723,
+        "id": "262",
+        "name": "World Liberty Financial USD",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9977862150000001,
+        "symbol": "USD1"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 2755193195.9356966,
+        "id": "120",
+        "name": "PayPal USD",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9996339672499999,
+        "symbol": "PYUSD"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 2724012913.105977,
+        "id": "286",
+        "name": "Global Dollar",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9999835420000002,
+        "symbol": "USDG"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 2687296546.5947437,
+        "id": "250",
+        "name": "Ripple USD",
+        "peg_type": "peggedUSD",
+        "price_usd": 0.9999835420000002,
+        "symbol": "RLUSD"
+      },
+      {
+        "change_1d_pct": null,
+        "change_7d_pct": null,
+        "circulating_usd": 1758417407.3076491,
+        "id": "173",
+        "name": "BlackRock USD",
+        "peg_type": "peggedUSD",
+        "price_usd": 1,
+        "symbol": "BUIDL"
+      }
+    ],
+    "total_tvl_date": "1794009600",
+    "total_tvl_usd": 163817753769
+  },
+  "errors": [],
+  "exchange_crosscheck": {
+    "selected": "coinbase_exchange",
+    "sources": {
+      "binance": [],
+      "bybit": [],
+      "coinbase_exchange": [
+        {
+          "ask": "75803.26",
+          "bid": "75803.25",
+          "pair": "BTC-USD",
+          "price": "75803.25",
+          "quote": "USD",
+          "source_time": "2026-11-07T04:07:15.300533450Z",
+          "symbol": "BTC",
+          "trade_id": 1116672735,
+          "volume_24h_base": "7957.20012329"
+        },
+        {
+          "ask": "2240.3",
+          "bid": "2240.29",
+          "pair": "ETH-USD",
+          "price": "2240.3",
+          "quote": "USD",
+          "source_time": "2026-11-07T04:07:14.523022259Z",
+          "symbol": "ETH",
+          "trade_id": 852946859,
+          "volume_24h_base": "123362.20326313"
+        },
+        {
+          "ask": "89.93",
+          "bid": "89.92",
+          "pair": "SOL-USD",
+          "price": "89.93",
+          "quote": "USD",
+          "source_time": "2026-11-07T04:07:14.647964007Z",
+          "symbol": "SOL",
+          "trade_id": 359880073,
+          "volume_24h_base": "626011.90915784"
+        }
+      ],
+      "cryptocompare": [],
+      "kraken": [],
+      "okx": []
+    },
+    "strategy": "first_successful"
+  },
+  "market": {
+    "assets": [
+      {
+        "change_1h_pct": -0.1959,
+        "change_24h_pct": 0.16343,
+        "change_7d_pct": -2.0004,
+        "id": "bitcoin",
+        "last_updated": "2026-11-07T04:05:52.000Z",
+        "market_cap_rank": 1,
+        "market_cap_usd": 1524894553054,
+        "name": "Bitcoin",
+        "price_usd": 75836,
+        "symbol": "BTC",
+        "volume_24h_usd": 27152985050
+      },
+      {
+        "change_1h_pct": -0.1106,
+        "change_24h_pct": 0.5445,
+        "change_7d_pct": -0.0826,
+        "id": "ethereum",
+        "last_updated": "2026-11-07T04:05:52.000Z",
+        "market_cap_rank": 2,
+        "market_cap_usd": 273943961941,
+        "name": "Ethereum",
+        "price_usd": 2241.81,
+        "symbol": "ETH",
+        "volume_24h_usd": 9625011364
+      },
+      {
+        "change_1h_pct": -0.4121,
+        "change_24h_pct": 0.50346,
+        "change_7d_pct": -7.0474,
+        "id": "solana",
+        "last_updated": "2026-11-07T04:05:52.000Z",
+        "market_cap_rank": 7,
+        "market_cap_usd": 53150852857,
+        "name": "Solana",
+        "price_usd": 89.94,
+        "symbol": "SOL",
+        "volume_24h_usd": 2154341739
+      }
+    ]
+  },
+  "quality": {
+    "blocking_issues": [],
+    "disabled_sources": [
+      "binance",
+      "bybit",
+      "cryptocompare"
+    ],
+    "non_blocking_warnings": [],
+    "optional_exchange_sources": [
+      "coinbase_exchange",
+      "kraken",
+      "okx"
+    ],
+    "required_sources": [
+      "coingecko",
+      "defillama"
+    ],
+    "status": "valid-ok"
+  },
+  "run": {
+    "cadence": "hourly",
+    "generated_at_local": "2026-11-07T15:07:15+11:00",
+    "generated_at_utc": "2026-11-07T04:07:15Z",
+    "observation_hour_utc": "2026-11-07T04:00:00Z",
+    "producer": "scripts/ingest_crypto_sources.py",
+    "timezone": "Australia/Sydney",
+    "timezone_abbreviation": "AEDT"
+  },
+  "schema_version": "0.2",
+  "sources": {
+    "binance": {
+      "reason": "GitHub-hosted runners returned HTTP 451",
+      "status": "skipped"
+    },
+    "bybit": {
+      "reason": "GitHub-hosted runners returned HTTP 403",
+      "status": "skipped"
+    },
+    "coinbase_exchange": {
+      "covered_symbols": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "endpoints": [
+        "/products/{product_id}/ticker"
+      ],
+      "fetched_at_utc": "2026-11-07T04:07:16Z",
+      "message": "Coinbase Exchange returned all configured exchange cross-check pairs",
+      "missing_symbols": [],
+      "pairs": {
+        "BTC": "BTC-USD",
+        "ETH": "ETH-USD",
+        "SOL": "SOL-USD"
+      },
+      "status": "ok",
+      "symbol_errors": [],
+      "symbols": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ]
+    },
+    "coingecko": {
+      "asset_ids": [
+        "bitcoin",
+        "ethereum",
+        "solana"
+      ],
+      "endpoints": [
+        "/coins/markets"
+      ],
+      "fetched_at_utc": "2026-11-07T04:07:15Z",
+      "status": "ok",
+      "vs_currency": "usd"
+    },
+    "cryptocompare": {
+      "reason": "No-secrets MVP returned HTTP 401 without an API key",
+      "status": "skipped"
+    },
+    "defillama": {
+      "endpoints": [
+        "/charts",
+        "/stablecoins"
+      ],
+      "fetched_at_utc": "2026-11-07T04:07:15Z",
+      "status": "ok",
+      "warnings": []
+    },
+    "kraken": {
+      "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+      "status": "skipped"
+    },
+    "okx": {
+      "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+      "status": "skipped"
+    }
+  },
+  "warnings": []
+}
