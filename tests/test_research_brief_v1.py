@@ -39,7 +39,9 @@ class ResearchBriefTests(unittest.TestCase):
         for row in snapshot["exchange_crosscheck"]["sources"]["coinbase_exchange"]:
             row["source_time"] = "2026-10-01T00:00:00Z"
         text = research_brief(snapshot, PATH, self.quality)
-        self.assertNotIn("Cross-source price check", text)
+        self.assertIn("Cross-source price check", text)
+        self.assertIn("accepted: none", text)
+        self.assertIn("Rejected/inconclusive: BTC, ETH, SOL", text)
 
     def test_stale_market_refused(self):
         snapshot = deepcopy(self.snapshot)
