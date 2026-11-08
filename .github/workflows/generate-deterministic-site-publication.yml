@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       candidate_branch: ${{ steps.identity.outputs.candidate_branch }}
+      evidence_commit_sha: ${{ steps.evidence.outputs.evidence_commit_sha }}
       observation_hour_utc: ${{ steps.intent.outputs.observation_hour_utc }}
       report_path: ${{ steps.report.outputs.report_path }}
       snapshot_path: ${{ steps.intent.outputs.snapshot_path }}
@@ -284,6 +285,33 @@ jobs:
             --source-run "$work/source-run.json" --evidence "$intent" \
             --repository "$GITHUB_REPOSITORY" "${receipt_args[@]}"
 
+      - name: Derive immutable generation-run candidate identity
+        id: identity
+        env:
+          OBSERVATION_HOUR_COMPACT: ${{ steps.intent.outputs.observation_hour_compact }}
+        run: |
+          set -euo pipefail
+          candidate_branch="automation/deterministic-publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${OBSERVATION_HOUR_COMPACT}"
+          python scripts/deterministic_site_publication.py branch-identity --branch "$candidate_branch"
+          echo "candidate_branch=$candidate_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Create local immutable snapshot evidence commit
+        id: evidence
+        env:
+          SNAPSHOT_PATH: ${{ steps.intent.outputs.snapshot_path }}
+          OBSERVATION_HOUR_UTC: ${{ steps.intent.outputs.observation_hour_utc }}
+          CANDIDATE_BRANCH: ${{ steps.identity.outputs.candidate_branch }}
+        run: |
+          set -euo pipefail
+          git checkout -b "$CANDIDATE_BRANCH"
+          git config user.name "cryptopulse-deterministic-publication[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$SNAPSHOT_PATH"
+          test "$(git diff --cached --name-only)" = "$SNAPSHOT_PATH"
+          GIT_AUTHOR_DATE="$OBSERVATION_HOUR_UTC" GIT_COMMITTER_DATE="$OBSERVATION_HOUR_UTC" \
+            git commit -m "Archive deterministic crypto snapshot ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "evidence_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Generate deterministic Markdown report
         id: report
         env:
@@ -307,16 +335,6 @@ jobs:
           python -m unittest discover -s tests
           python -m site_generator
 
-      - name: Derive immutable generation-run candidate identity
-        id: identity
-        env:
-          OBSERVATION_HOUR_COMPACT: ${{ steps.intent.outputs.observation_hour_compact }}
-        run: |
-          set -euo pipefail
-          candidate_branch="automation/deterministic-publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${OBSERVATION_HOUR_COMPACT}"
-          python scripts/deterministic_site_publication.py branch-identity --branch "$candidate_branch"
-          echo "candidate_branch=$candidate_branch" >> "$GITHUB_OUTPUT"
-
       - name: Prove exact two-file candidate scope
         env:
           SNAPSHOT_PATH: ${{ steps.intent.outputs.snapshot_path }}
@@ -324,9 +342,10 @@ jobs:
         run: |
           set -euo pipefail
           changed="$RUNNER_TEMP/deterministic-publication-changed-files.txt"
-          git status --porcelain --untracked-files=all \
-            | awk '$2 !~ /^_site\// { print $2 }' \
-            | sort > "$changed"
+          {
+            git diff --name-only "$GITHUB_SHA" HEAD
+            git status --porcelain --untracked-files=all | awk '$2 !~ /^_site\// { print $2 }'
+          } | sort -u > "$changed"
           cat "$changed"
           python scripts/deterministic_site_publication.py validate-scope \
             --changed-files "$changed" \
@@ -369,6 +388,7 @@ jobs:
       pull-requests: read
     env:
       CANDIDATE_BRANCH: ${{ needs.prepare.outputs.candidate_branch }}
+      EVIDENCE_COMMIT_SHA: ${{ needs.prepare.outputs.evidence_commit_sha }}
       OBSERVATION_HOUR_UTC: ${{ needs.prepare.outputs.observation_hour_utc }}
       REPORT_PATH: ${{ needs.prepare.outputs.report_path }}
       SNAPSHOT_PATH: ${{ needs.prepare.outputs.snapshot_path }}
@@ -451,15 +471,27 @@ jobs:
           generation_workflow_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.workflow_id')"
           echo "generation_workflow_id=$generation_workflow_id" >> "$GITHUB_OUTPUT"
 
-      - name: Create exact immutable publication commit
+      - name: Reproduce immutable snapshot evidence commit and publish report commit
         run: |
           set -euo pipefail
           git checkout -b "$CANDIDATE_BRANCH"
           git config user.name "cryptopulse-deterministic-publication[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$SNAPSHOT_PATH" "$REPORT_PATH"
+          git add "$SNAPSHOT_PATH"
+          test "$(git diff --cached --name-only)" = "$SNAPSHOT_PATH"
+          GIT_AUTHOR_DATE="$OBSERVATION_HOUR_UTC" GIT_COMMITTER_DATE="$OBSERVATION_HOUR_UTC" \
+            git commit -m "Archive deterministic crypto snapshot ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$(git rev-parse HEAD)" = "$EVIDENCE_COMMIT_SHA"
+          test "$(git rev-parse HEAD^)" = "$GITHUB_SHA"
+          git show "HEAD:$SNAPSHOT_PATH" | cmp - "$SNAPSHOT_PATH"
+          grep -F "blob/$EVIDENCE_COMMIT_SHA/$SNAPSHOT_PATH" "$REPORT_PATH" >/dev/null
+          git add "$REPORT_PATH"
+          test "$(git diff --cached --name-only)" = "$REPORT_PATH"
           staged="$RUNNER_TEMP/deterministic-publication-staged-files.txt"
-          git diff --cached --name-only | sort > "$staged"
+          {
+            git diff --name-only "$GITHUB_SHA" HEAD
+            git diff --cached --name-only
+          } | sort -u > "$staged"
           python scripts/deterministic_site_publication.py validate-scope \
             --changed-files "$staged" \
             --snapshot-path "$SNAPSHOT_PATH" \
