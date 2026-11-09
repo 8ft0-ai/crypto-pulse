@@ -234,6 +234,12 @@ body {
 
 .report-body { min-width: 0; }
 
+/* Distinguish inline report evidence links without relying on colour. */
+.report-body a {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
 .toc-card {
   position: sticky;
   top: 24px;
