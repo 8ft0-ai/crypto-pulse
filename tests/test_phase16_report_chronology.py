@@ -338,12 +338,12 @@ class Phase16ReportChronologyTests(unittest.TestCase):
                 build=build,
                 collect_reports=lambda: [representative],
                 asset_prefix_for=lambda _path: "",
-                html_page=lambda report, _prefix, _previous, _next: f"rendered:{report.source_rel}",
+                html_page=lambda report, _prefix, _previous, _next, *, archive_article=False: f"rendered:{report.source_rel}:{archive_article}",
             )
             pipeline.build_base_site(base)
 
             self.assertEqual(representative_path.read_text(encoding="utf-8"), "representative")
-            self.assertEqual(alias_path.read_text(encoding="utf-8"), "rendered:alias")
+            self.assertEqual(alias_path.read_text(encoding="utf-8"), "rendered:alias:True")
             self.assertEqual(len(base.collect_reports()), 1)
 
     def test_unsupported_retained_report_is_not_silently_skipped(self) -> None:

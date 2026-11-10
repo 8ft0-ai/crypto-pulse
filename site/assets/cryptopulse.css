@@ -704,3 +704,134 @@ a:hover { text-decoration: underline; }
   .temporal-evidence-discovery { display: none; }
   .temporal-evidence-content .temporal-evidence-table { min-width: 0; }
 }
+
+/* Slice 1: canonical archived article, separate from the Phase 16 latest route. */
+.editorial-demo-warning,
+.editorial-article,
+.editorial-legacy,
+.editorial-audit {
+  box-sizing: border-box;
+  max-width: 780px;
+  margin: 24px auto;
+}
+
+.editorial-demo-warning {
+  padding: 16px 22px;
+  border: 1px solid #aebfd4;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #172554;
+}
+
+.editorial-demo-warning p {
+  margin: 6px 0 0;
+  line-height: 1.55;
+}
+
+.editorial-article,
+.editorial-legacy {
+  padding: 16px 28px 22px;
+}
+
+.editorial-kicker {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #334155;
+}
+
+.editorial-article h2,
+.editorial-legacy h2 {
+  margin: 12px 0 18px;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #102a43;
+}
+
+.editorial-summary {
+  font-size: 1.125rem;
+  line-height: 1.65;
+  color: #243b53;
+}
+
+.editorial-finding,
+.editorial-assurance {
+  margin-top: 28px;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 20px;
+  line-height: 1.65;
+}
+
+.editorial-finding h3,
+.editorial-assurance h3 {
+  margin: 0 0 12px;
+  color: #102a43;
+}
+
+.editorial-finding p,
+.editorial-assurance p {
+  margin: 12px 0;
+}
+
+.editorial-uncertainty,
+.editorial-caveat {
+  padding-left: 14px;
+  border-left: 3px solid #64748b;
+}
+
+.editorial-sources {
+  padding-left: 24px;
+}
+
+.editorial-article a,
+.editorial-audit a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.editorial-audit {
+  padding: 16px 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+}
+
+.editorial-audit > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 6px 0;
+}
+
+.editorial-audit > summary:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 4px;
+}
+
+@media (max-width: 720px) {
+  .editorial-demo-warning,
+  .editorial-article,
+  .editorial-legacy,
+  .editorial-audit {
+    margin: 16px 0;
+    max-width: 100%;
+  }
+  .editorial-article,
+  .editorial-legacy {
+    padding: 12px 8px;
+  }
+  .editorial-audit {
+    padding: 12px;
+  }
+}
+
+@media print {
+  .editorial-audit {
+    display: block;
+  }
+  .editorial-demo-warning,
+  .editorial-article,
+  .editorial-legacy,
+  .editorial-audit {
+    max-width: none;
+  }
+}

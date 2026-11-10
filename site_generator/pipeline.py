@@ -56,6 +56,7 @@ def render_chronology_alias_routes(base: Any) -> None:
                     base.asset_prefix_for(alias.output_path),
                     previous_report,
                     next_report,
+                    archive_article=True,
                 ),
                 encoding="utf-8",
             )
