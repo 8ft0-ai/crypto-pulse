@@ -7,7 +7,9 @@ an artefact for GitHub Pages deployment.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import re
 import shutil
 import sys
@@ -18,7 +20,7 @@ from email.utils import format_datetime
 from html import escape
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import markdown
 import yaml
@@ -359,8 +361,212 @@ def report_pager(previous_report: Report | None, next_report: Report | None, ass
     """
 
 
-def html_page(report: Report, asset_prefix: str, previous_report: Report | None = None, next_report: Report | None = None) -> str:
+class EditorialArticleError(ValueError):
+    """New typed metadata must fail closed rather than invent or silently discard claims."""
+
+
+def verify_editorial_source(source: Any) -> None:
+    """Check exact pinned source bytes, never evaluate market values at Pages build."""
+    if not isinstance(source, dict) or set(source) != {"path", "commit", "sha256", "url"}:
+        raise EditorialArticleError("invalid typed source identity")
+    path, commit, digest, url = (source[key] for key in ("path", "commit", "sha256", "url"))
+    if not isinstance(path, str) or not re.fullmatch(r"data/crypto/hourly/\d{4}/\d{2}/\d{2}/[A-Za-z0-9_-]+\.json", path):
+        raise EditorialArticleError("source path is not an archived snapshot")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise EditorialArticleError("invalid source commit")
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise EditorialArticleError("invalid source hash")
+    expected_url = f"https://github.com/8ft0-ai/crypto-pulse/blob/{commit}/{quote(path, safe='/')}"
+    if url != expected_url:
+        raise EditorialArticleError("source URL does not match pinned identity")
+    try:
+        committed = subprocess.run(
+            ["git", "show", f"{commit}:{path}"],
+            cwd=ROOT, check=True, capture_output=True, timeout=5,
+        ).stdout
+        working = (ROOT / path).read_bytes()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise EditorialArticleError("pinned source could not be verified") from exc
+    if committed != working or hashlib.sha256(committed).hexdigest() != digest:
+        raise EditorialArticleError("pinned source bytes and stored identity disagree")
+
+
+def validated_editorial_article(report: Report) -> dict[str, Any] | None:
+    if "editorial_article" not in report.metadata:
+        return None  # Immutable legacy Markdown has no retrospective typed assessment.
+    article = report.metadata["editorial_article"]
+    if not isinstance(article, dict) or article.get("schema") != "cryptopulse-editorial-article/v1":
+        raise EditorialArticleError("unsupported editorial article schema")
+    state = article.get("article_state")
+    if state not in ("finding", "factual_update", "inconclusive"):
+        raise EditorialArticleError("invalid editorial article state")
+    if (report.metadata.get("schema_version") != "deterministic-crypto-report/v1"
+            or report.metadata.get("llm_generated") is not False
+            or report.metadata.get("no_investment_advice") is not True
+            or report.metadata.get("generated_at_utc") != article.get("as_of_utc")
+            or report.metadata.get("quality_status") != article.get("quality_status")):
+        raise EditorialArticleError("editorial identity or generation taxonomy contradicts report")
+    if not isinstance(article.get("headline"), str) or not article["headline"].strip():
+        raise EditorialArticleError("missing article headline")
+    if not isinstance(article.get("summary"), str) or not 50 <= len(article["summary"].split()) <= 100:
+        raise EditorialArticleError("summary must be 50 to 100 source-bounded words")
+    if not isinstance(article.get("candidates"), list) or not isinstance(article.get("caveats"), list):
+        raise EditorialArticleError("invalid candidate/caveat metadata")
+    for item in article["candidates"]:
+        if (not isinstance(item, dict)
+                or item.get("status") not in ("admitted", "rejected", "unavailable")
+                or not isinstance(item.get("kind"), str)
+                or not isinstance(item.get("reason"), str)):
+            raise EditorialArticleError("malformed admission candidate")
+    if not all(isinstance(c, str) for c in article["caveats"]):
+        raise EditorialArticleError("malformed claim-local caveats")
+    claims = article.get("claims")
+    if not isinstance(claims, list) or len(claims) > 3:
+        raise EditorialArticleError("unbounded typed claims")
+    for claim in claims:
+        if not isinstance(claim, dict) or claim.get("kind") not in ("seven_day_relative", "archived_interval", "cross_source"):
+            raise EditorialArticleError("unknown claim kind")
+        if claim.get("category") != ("assurance" if claim["kind"] == "cross_source" else "market"):
+            raise EditorialArticleError("contradictory claim category")
+        for field in ("headline", "finding", "significance", "uncertainty", "next_test"):
+            if not isinstance(claim.get(field), str) or not claim[field].strip():
+                raise EditorialArticleError("incomplete typed claim")
+        if not isinstance(claim.get("caveats"), list) or not all(isinstance(c, str) for c in claim["caveats"]):
+            raise EditorialArticleError("invalid claim caveats")
+        if not isinstance(claim.get("sources"), list) or not 1 <= len(claim["sources"]) <= 2:
+            raise EditorialArticleError("missing claim evidence")
+    market_count = sum(c["category"] == "market" for c in claims)
+    if ((state == "finding") != bool(market_count)) or (state == "inconclusive" and claims):
+        raise EditorialArticleError("article state contradicts admitted market claims")
+    source = article.get("source")
+    if source is None:
+        if state != "inconclusive":
+            raise EditorialArticleError("conclusive typed article lacks source authority")
+    else:
+        verify_editorial_source(source)
+        if report.metadata.get("source_snapshot") != source["path"]:
+            raise EditorialArticleError("report front matter and source identity disagree")
+        for claim in claims:
+            if claim["sources"][0] != source:
+                raise EditorialArticleError("claim is not bound to report source")
+            for reference in claim["sources"]:
+                verify_editorial_source(reference)
+    if state == "inconclusive" and not isinstance(article.get("reason"), str):
+        raise EditorialArticleError("inconclusive state requires reason")
+    if state == "factual_update" and any(c["category"] == "market" for c in claims):
+        raise EditorialArticleError("factual update cannot contain market findings")
+    return article
+
+
+def editorial_article(report: Report) -> str:
+    article = validated_editorial_article(report)
+    if article is None:
+        # An old report's own excerpt is not a new verified market conclusion.
+        return (
+            '<section class="editorial-legacy" aria-label="Original archived publication">'
+            '<p class="editorial-kicker">Original archived publication · no retrospective re-assessment</p>'
+            '<h2>Preserved historical report</h2>'
+            f'<p>{escape(report.headline)}</p>'
+            '<p class="muted">The original report and its contemporaneous conclusions are reproduced below. '
+            'No new finding has been inferred from this historical Markdown.</p></section>'
+        )
+
+    state = article["article_state"]
+    labels = {"finding": "Source-bounded finding", "factual_update": "Factual update — no qualifying market finding",
+              "inconclusive": "Inconclusive — essential evidence not established"}
+    rows = [
+        '<section class="editorial-article" aria-labelledby="editorial-headline">',
+        f'<p class="editorial-kicker">Deterministic demo · {escape(labels[state])} · {escape(report.timestamp)}</p>',
+        f'<h2 id="editorial-headline">{escape(article["headline"])}</h2>',
+        f'<p class="editorial-summary">{escape(article["summary"])}</p>',
+    ]
+    for claim in article["claims"]:
+        if claim["category"] != "market":
+            continue
+        rows.extend([
+            '<article class="editorial-finding">',
+            f'<h3>{escape(claim["headline"])}</h3>',
+            f'<p><strong>What the evidence shows.</strong> {escape(claim["finding"])}</p>',
+            f'<p><strong>Why it matters.</strong> {escape(claim["significance"])}</p>',
+            f'<p class="editorial-uncertainty"><strong>Uncertainty.</strong> {escape(claim["uncertainty"])}</p>',
+        ])
+        rows.extend(f'<p class="editorial-caveat"><strong>Local evidence caveat.</strong> {escape(item)}</p>'
+                    for item in claim["caveats"])
+        rows.append(f'<p><strong>Next test.</strong> {escape(claim["next_test"])}</p>')
+        rows.append('<ul class="editorial-sources" aria-label="Pinned evidence for finding">')
+        rows.extend(f'<li><a href="{escape(source["url"], quote=True)}">Pinned archived JSON ({escape(source["sha256"][:12])}…)</a></li>'
+                    for source in claim["sources"])
+        rows.extend(['</ul>', '</article>'])
+    assurance = [claim for claim in article["claims"] if claim["category"] == "assurance"]
+    if assurance:
+        rows.append('<section class="editorial-assurance"><h3>Supporting source checks</h3>')
+        rows.extend(f'<p>{escape(claim["finding"])} {escape(claim["uncertainty"])}</p>' for claim in assurance)
+        rows.append('</section>')
+    if state != "finding" and article.get("caveats"):
+        rows.extend(f'<p class="editorial-caveat">{escape(item)}</p>' for item in article["caveats"])
+    if state == "inconclusive":
+        rows.append(f'<p class="editorial-uncertainty">{escape(article["reason"])}</p>')
+    if article["source"]:
+        source = article["source"]
+        rows.append(f'<p class="editorial-primary-source"><a href="{escape(source["url"], quote=True)}">Inspect exact archived source JSON</a> '
+                    f'(SHA-256 {escape(source["sha256"])})</p>')
+    rows.append('</section>')
+    return "\n".join(rows)
+
+
+def archive_page_sections(report: Report, pager: str) -> str:
+    """Article first on canonical archive routes; existing audit is intact and inspectable."""
+    legacy = "editorial_article" not in report.metadata
+    audit_open = " open" if legacy else ""
+    return f"""
+      <section class="editorial-demo-warning" aria-label="Demo and non-advice status">
+        <strong>CryptoPulse AI-generated demo archive</strong>
+        <p>This is a demonstration, not investment research, financial advice, a recommendation or a trading signal. Reports can be inaccurate, incomplete or stale. Do not use for trading decisions.</p>
+      </section>
+      {editorial_article(report)}
+      <details class="editorial-audit"{audit_open}>
+        <summary>Original archived report, evidence and technical record</summary>
+        <section class="report-warning compact-warning">
+          <div class="eyebrow">Report warning</div>
+          <p>{escape(REPORT_NOTICE)}</p>
+        </section>
+        {metadata_panel(report)}
+        {source_panel(report.source_items)}
+        <section class="headline">
+          <div class="eyebrow">Original report excerpt</div>
+          <p>{escape(report.headline)}</p>
+        </section>
+        <section class="content report-content">
+          {report.toc_html}
+          <div class="report-body">{report.body_html}</div>
+        </section>
+      </details>
+      {pager}
+    """
+
+
+def html_page(report: Report, asset_prefix: str, previous_report: Report | None = None, next_report: Report | None = None, *, archive_article: bool = False) -> str:
     pager = report_pager(previous_report, next_report, asset_prefix)
+    archive_sections = archive_page_sections(report, pager) if archive_article else ""
+    original_sections = f"""      <section class="report-warning compact-warning">
+        <div class="eyebrow">Report warning</div>
+        <p>{escape(REPORT_NOTICE)}</p>
+      </section>
+      {metadata_panel(report)}
+      {source_panel(report.source_items)}
+      <section class="headline">
+        <div class="eyebrow">Headline</div>
+        <p>{escape(report.headline)}</p>
+      </section>
+      {pager}
+      <section class="content report-content">
+        {report.toc_html}
+        <div class="report-body">
+          {report.body_html}
+        </div>
+      </section>
+      {pager}
+"""
     return f"""<!doctype html>
 <html lang="en-AU">
 <head>
@@ -380,24 +586,7 @@ def html_page(report: Report, asset_prefix: str, previous_report: Report | None 
         <p>{escape(report.timestamp)}</p>
         {badges()}
       </header>
-      <section class="report-warning compact-warning">
-        <div class="eyebrow">Report warning</div>
-        <p>{escape(REPORT_NOTICE)}</p>
-      </section>
-      {metadata_panel(report)}
-      {source_panel(report.source_items)}
-      <section class="headline">
-        <div class="eyebrow">Headline</div>
-        <p>{escape(report.headline)}</p>
-      </section>
-      {pager}
-      <section class="content report-content">
-        {report.toc_html}
-        <div class="report-body">
-          {report.body_html}
-        </div>
-      </section>
-      {pager}
+      {archive_sections if archive_article else original_sections}
       {footer()}
     </article>
   </main>
@@ -602,7 +791,7 @@ def write_report_pages(reports: list[Report]) -> None:
         previous_report = reports[index + 1] if index + 1 < len(reports) else None
         next_report = reports[index - 1] if index > 0 else None
         report.output_path.parent.mkdir(parents=True, exist_ok=True)
-        report.output_path.write_text(html_page(report, asset_prefix_for(report.output_path), previous_report, next_report), encoding="utf-8")
+        report.output_path.write_text(html_page(report, asset_prefix_for(report.output_path), previous_report, next_report, archive_article=True), encoding="utf-8")
 
 
 def write_site_indexes(reports: list[Report]) -> None:

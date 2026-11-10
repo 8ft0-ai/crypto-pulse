@@ -78,7 +78,8 @@ class PublicationEvidenceTests(unittest.TestCase):
         self.assertEqual(source, path.read_bytes())
         digest = hashlib.sha256(source).hexdigest()
         content = self.brief(self.snapshot, path)
-        self.assertIn(f"/blob/{sha}/{RELATIVE.as_posix()}", content)
+        self.assertIn(f"fixture://{sha}/{RELATIVE.as_posix()}", content)
+        self.assertNotIn("https://github.com/8ft0-ai/crypto-pulse/blob/", content)
         self.assertIn(f"SHA-256 `{digest}`", content)
         self.assertIn("Seven-day relative movement", content)
         self.assertIn("-4.63 percentage points", content)
@@ -91,7 +92,7 @@ class PublicationEvidenceTests(unittest.TestCase):
         path, _ = committed_snapshot(self.root, self.snapshot, commit=False)
         self.assertIn("No qualifying finding", self.brief(self.snapshot, path))
         _, sha = committed_snapshot(self.root, self.snapshot)
-        self.assertIn(f"/blob/{sha}/", self.brief(self.snapshot, path))
+        self.assertIn(f"fixture://{sha}/", self.brief(self.snapshot, path))
         path.write_bytes(path.read_bytes() + b"\n")
         content = self.brief(self.snapshot, path)
         self.assertIn("immutable public link unavailable", content)
@@ -119,7 +120,7 @@ class PublicationEvidenceTests(unittest.TestCase):
                             asset["last_updated"] = "2026-11-08T00:00:00Z"
                 path, sha = committed_snapshot(self.root, candidate)
                 content = self.brief(candidate, path)
-                self.assertIn(f"/blob/{sha}/", content)
+                self.assertIn(f"fixture://{sha}/", content)
                 self.assertNotIn("Seven-day relative movement", content)
                 self.assertIn("No qualifying finding", content)
 

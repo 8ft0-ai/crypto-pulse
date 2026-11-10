@@ -34,14 +34,14 @@ class ResearchBriefTests(unittest.TestCase):
         self.assertLess(body.index("## Evidence-backed findings"), body.index("## Market summary"))
         self.assertIn("blob/", body)
 
-    def test_stale_exchange_refused(self):
+    def test_changed_in_memory_exchange_cannot_borrow_archived_source_identity(self):
         snapshot = deepcopy(self.snapshot)
         for row in snapshot["exchange_crosscheck"]["sources"]["coinbase_exchange"]:
             row["source_time"] = "2026-10-01T00:00:00Z"
         text = research_brief(snapshot, PATH, self.quality)
-        self.assertIn("Cross-source price check", text)
-        self.assertIn("accepted: none", text)
-        self.assertIn("Rejected/inconclusive: BTC, ETH, SOL", text)
+        self.assertIn("immutable public link unavailable", text)
+        self.assertNotIn("**Cross-source price check:**", text)
+        self.assertIn("No qualifying finding", text)
 
     def test_stale_market_refused(self):
         snapshot = deepcopy(self.snapshot)
@@ -70,10 +70,10 @@ class ResearchBriefTests(unittest.TestCase):
         text = research_brief(snapshot, PATH, self.quality)
         self.assertNotIn("Archived interval comparison", text)
 
-    def test_cross_source_over_threshold_is_rejected(self):
+    def test_changed_in_memory_over_threshold_cannot_borrow_source_identity(self):
         snapshot = deepcopy(self.snapshot)
         rows = snapshot["exchange_crosscheck"]["sources"]["coinbase_exchange"]
         rows[0]["price"] = float(rows[0]["price"]) * 1.5
         text = research_brief(snapshot, PATH, self.quality)
-        self.assertIn("Rejected/inconclusive:", text)
-        self.assertIn("over tolerance", text)
+        self.assertIn("immutable public link unavailable", text)
+        self.assertNotIn("**Cross-source price check:**", text)

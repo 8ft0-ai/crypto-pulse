@@ -10,12 +10,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+
+import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from validate_crypto_snapshot import ValidationError, load_config, validate_snapshot
-from research_brief_v1 import research_brief
+from research_brief_v1 import assess, research_brief_from_assessment
 
 REPORT_SCHEMA_VERSION = "deterministic-crypto-report/v1"
 DEFAULT_CONFIG_PATH = Path("config/crypto_sources.yml")
@@ -120,14 +122,14 @@ def bullet_list(values: list[Any]) -> str:
     return "\n".join(f"- {safe_text(value)}" for value in values)
 
 
-def front_matter(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[str, Any]) -> str:
+def front_matter(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[str, Any], editorial_article: dict[str, Any] | None = None) -> str:
     run = as_dict(snapshot.get("run"))
     exchange = as_dict(snapshot.get("exchange_crosscheck"))
     lines = ["---"]
     scalar_fields: list[tuple[str, Any]] = [
         ("schema_version", REPORT_SCHEMA_VERSION),
         ("report_type", "crypto_market_snapshot"),
-        ("source_snapshot", snapshot_path.as_posix()),
+        ("source_snapshot", editorial_article["source"]["path"] if editorial_article and editorial_article.get("source") else snapshot_path.as_posix()),
         ("generated_at_utc", run.get("generated_at_utc")),
         ("generated_at_local", run.get("generated_at_local")),
         ("timezone", run.get("timezone")),
@@ -143,6 +145,9 @@ def front_matter(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[st
     lines.extend(yaml_list("disabled_sources", [str(value) for value in as_list(quality.get("disabled_sources"))]))
     lines.append("no_investment_advice: true")
     lines.append("llm_generated: false")
+    if editorial_article is not None:
+        lines.extend(yaml.safe_dump({"editorial_article": editorial_article},
+                                    sort_keys=False, allow_unicode=True, width=10000).rstrip().splitlines())
     lines.append("---")
     return "\n".join(lines)
 
@@ -374,15 +379,16 @@ def scope_limitations() -> str:
 
 
 def render_report(snapshot: dict[str, Any], snapshot_path: Path, quality: dict[str, Any]) -> str:
+    assessment = assess(snapshot, snapshot_path, quality)
     parts = [
-        front_matter(snapshot, snapshot_path, quality),
+        front_matter(snapshot, snapshot_path, quality, assessment["projection"]),
         title(snapshot),
         "",
         "## Product boundary and non-investment-advice notice",
         "",
         "This report is deterministic demonstration content generated from one validated source snapshot. It is not financial advice, investment research, a recommendation, a trading signal, or a call to buy, sell, or hold any asset.",
         "",
-        research_brief(snapshot, snapshot_path, quality),
+        research_brief_from_assessment(assessment),
         "",
         snapshot_at_a_glance(snapshot, snapshot_path, quality),
         "",
