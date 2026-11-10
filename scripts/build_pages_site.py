@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from html import escape
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import quote, urljoin
 
@@ -750,6 +751,12 @@ def html_page(report: Report, asset_prefix: str, previous_report: Report | None 
 """
 
 
+def homepage_editorial_lead(reports: list[Report]) -> str:
+    """Use the Archive card contract for one source-bounded editorial lead."""
+    from site_generator.archive_cards import homepage_lead
+    return homepage_lead(reports, SimpleNamespace(validated_editorial_article=validated_editorial_article))
+
+
 def index_page(reports: list[Report]) -> str:
     latest = reports[0] if reports else None
     latest_block = f"""
@@ -783,6 +790,7 @@ def index_page(reports: list[Report]) -> str:
         {badges()}
       </header>
       <section class="content landing-content">
+        {homepage_editorial_lead(reports)}
         <section class="stats-grid" aria-label="Archive summary">{dashboard_cards(reports)}</section>
         <div class="explainer-grid">
           <section class="explainer-card"><h2>What this is</h2><p>CryptoPulse is a demonstration site showing how AI-generated market reports could be produced, archived, and published using GitHub Pages.</p></section>

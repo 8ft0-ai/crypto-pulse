@@ -88,12 +88,12 @@ def reframe_homepage() -> None:
     html = html.replace('<header class="hero landing-hero">', '<header class="hero landing-hero product-hero">', 1)
     html = html.replace(
         "<h1>AI-generated crypto market report publishing prototype</h1>",
-        "<h1>AI-generated crypto market intelligence, archived hourly.</h1>",
+        "<h1>Crypto market observations and historical reports</h1>",
         1,
     )
     html = html.replace(
         "<p>An experimental GitHub Pages site showing how AI-generated crypto market reports might be archived, rendered, and published automatically.</p>",
-        "<p>A static, searchable demo showing how scheduled AI reports can be generated, quality-labelled, source-attributed and published automatically.</p>",
+        "<p>Point-in-time evidence and retained AI-generated demo publications, with original sources and limits available for inspection. This archive is not live market coverage.</p>",
         1,
     )
 
