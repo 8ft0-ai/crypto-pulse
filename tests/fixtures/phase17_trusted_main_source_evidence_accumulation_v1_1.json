@@ -1,0 +1,27 @@
+{
+  "contract": "trusted-main-source-evidence-accumulation-proof-corpus/v1.1",
+  "scenarios": [
+    "fully-contiguous-25-hour-valid-population",
+    "missing-hour-later-valid",
+    "failed-run-diagnostic-only",
+    "delayed-success-actual-containing-hour",
+    "rerun-highest-attempt-different-hour",
+    "distinct-runs-same-hour-duplicate",
+    "artifact-hash-mismatch",
+    "successful-run-artifact-unavailable",
+    "current-main-validation-failure",
+    "already-trusted-identical",
+    "trusted-path-conflict",
+    "invalid-evidence-recovery-later-valid",
+    "duplicate-recovery-whole-set",
+    "unavailable-input-null-hour-recovery",
+    "recovery-drift-restores-hard-block",
+    "candidate-base-change-reclassifies",
+    "recovery-no-eligible-additions",
+    "byte-identical-replay"
+  ],
+  "window_hours": 25,
+  "recovery_issue": 523,
+  "owner_login": "8ft0-ai",
+  "identity_policy": "recompute-from-exact-materialised-inputs"
+}

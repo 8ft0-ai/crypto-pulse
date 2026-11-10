@@ -1,0 +1,123 @@
+/* Phase 16 temporal reader-state projection and presentation. */
+
+.temporal-reader-summary,
+.temporal-empty-state,
+.temporal-evidence-inspect {
+  border: 1px solid var(--line, #dbe4f0);
+  border-radius: 0.9rem;
+  padding: 1.15rem;
+  margin: 1.25rem 0;
+}
+
+.temporal-reader-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.temporal-reader-metrics div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line, #dbe4f0);
+  border-radius: 0.7rem;
+}
+
+.temporal-reader-metrics dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.temporal-reader-metrics dd {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.temporal-gap-summary h3 {
+  margin-bottom: 0.55rem;
+}
+
+.temporal-gap-summary ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.temporal-gap-summary li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line, #dbe4f0);
+}
+
+.temporal-gap-summary code {
+  overflow-wrap: anywhere;
+}
+
+.temporal-chart-note,
+.temporal-empty-state,
+.temporal-evidence-inspect > p {
+  margin: 0.75rem 0 0;
+}
+
+.temporal-evidence-visual {
+  margin: 1.25rem 0;
+  overflow-x: auto;
+}
+
+.temporal-evidence-visual svg {
+  min-width: 760px;
+  max-width: none;
+}
+
+.temporal-evidence-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.temporal-evidence-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.temporal-evidence-table th,
+.temporal-evidence-table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--line, #dbe4f0);
+  text-align: left;
+  vertical-align: top;
+}
+
+.temporal-evidence-table td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .temporal-reader-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media print {
+  .temporal-reader-summary,
+  .temporal-empty-state,
+  .temporal-evidence-inspect {
+    break-inside: avoid;
+  }
+
+  .temporal-evidence-visual {
+    overflow: visible;
+  }
+
+  .temporal-evidence-table {
+    font-size: 0.72rem;
+  }
+}

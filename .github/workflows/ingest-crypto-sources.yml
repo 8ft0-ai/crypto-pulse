@@ -1,0 +1,459 @@
+name: Ingest Crypto Sources
+run-name: "Crypto source ingestion ${{ inputs.dispatch_correlation_id || github.run_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      intended_hour_utc:
+        description: "Canonical UTC hour YYYY-MM-DDTHH:00:00Z"
+        required: true
+        type: string
+      dispatch_correlation_id:
+        description: "Deterministic cp-YYYYMMDDHH identifier for this intended UTC hour"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: crypto-source-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Fetch source snapshot and open PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Validate bounded scheduler request
+        env:
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          python scripts/crypto_ingestion_slot.py request \
+            --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" \
+            --correlation "$DISPATCH_CORRELATION"
+
+      - name: Fetch source data
+        id: ingest
+        run: |
+          set -euo pipefail
+          snapshot_path="$(python scripts/ingest_crypto_sources.py \
+            --config config/crypto_sources.yml \
+            --output-root data/crypto/hourly \
+            --timezone Australia/Sydney)"
+
+          if [[ -z "$snapshot_path" ]]; then
+            echo "Ingestion script did not report a snapshot path." >&2
+            exit 1
+          fi
+
+          echo "snapshot_path=$snapshot_path" >> "$GITHUB_OUTPUT"
+          echo "Generated source snapshot: $snapshot_path"
+
+      - name: Validate source snapshot
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_snapshot.py "$SNAPSHOT_PATH"
+
+      - name: Validate observation hour
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          python scripts/validate_crypto_observation_hour.py "$SNAPSHOT_PATH"
+
+      - name: Check source-hour acceptance vacancy
+        id: slot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+        run: |
+          set -euo pipefail
+          artifact_name="$(python scripts/crypto_ingestion_slot.py prepare \
+            --snapshot "$SNAPSHOT_PATH" --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" --correlation "$DISPATCH_CORRELATION")"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact_name&per_page=100" \
+            > "$RUNNER_TEMP/crypto-hour-existing.json"
+          python scripts/crypto_ingestion_slot.py vacant \
+            --listing "$RUNNER_TEMP/crypto-hour-existing.json" --name "$artifact_name"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR evidence
+        id: evidence
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("scripts").resolve()))
+          from validate_crypto_snapshot import classify_snapshot_quality, load_config
+
+          snapshot_path = Path(os.environ["SNAPSHOT_PATH"])
+          snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+          config = load_config(Path("config/crypto_sources.yml"))
+          quality = classify_snapshot_quality(snapshot, config)
+          run = snapshot.get("run") if isinstance(snapshot.get("run"), dict) else {}
+          generated_at_utc = run.get("generated_at_utc", "not recorded")
+          observation_hour_utc = run.get("observation_hour_utc", "not recorded")
+
+          def bullet_list(values: list[str]) -> str:
+              if not values:
+                  return "- None recorded."
+              return "\n".join(f"- {value}" for value in values)
+
+          def source_status(name: str) -> str:
+              payload = snapshot.get("sources", {}).get(name)
+              if not isinstance(payload, dict):
+                  return "missing"
+              return str(payload.get("status", "unknown"))
+
+          def source_lines(names: list[str]) -> str:
+              if not names:
+                  return "- None configured."
+              return "\n".join(f"- `{name}`: `{source_status(name)}`" for name in names)
+
+          def exchange_config_rows() -> list[dict[str, object]]:
+              exchange = config.get("exchange_crosschecks") if isinstance(config, dict) else None
+              rows = exchange.get("sources") if isinstance(exchange, dict) else None
+              return [row for row in rows if isinstance(row, dict) and row.get("name")] if isinstance(rows, list) else []
+
+          def disabled_source_lines() -> str:
+              rows = [row for row in exchange_config_rows() if not bool(row.get("enabled", True))]
+              if not rows:
+                  return "- None configured."
+              lines = []
+              for row in rows:
+                  name = str(row.get("name"))
+                  reason = str(row.get("reason", "disabled for MVP"))
+                  lines.append(f"- `{name}`: disabled / optional only; {reason}")
+              return "\n".join(lines)
+
+          exchange_config = config.get("exchange_crosschecks") if isinstance(config, dict) else {}
+          exchange_snapshot = snapshot.get("exchange_crosscheck") if isinstance(snapshot.get("exchange_crosscheck"), dict) else {}
+          exchange_strategy = str(exchange_config.get("strategy", exchange_snapshot.get("strategy", "not configured"))) if isinstance(exchange_config, dict) else "not configured"
+          selected_exchange = exchange_snapshot.get("selected") or "none"
+          exchange_source_names = [str(name) for name in quality.get("optional_exchange_sources", [])]
+          exchange_status_lines = source_lines(exchange_source_names)
+
+          quality_status = str(quality.get("status", "unknown"))
+          required_source_names = [str(name) for name in quality.get("required_sources", [])]
+          blocking_issues = [str(item) for item in quality.get("blocking_issues", [])]
+          non_blocking_warnings = [str(item) for item in quality.get("non_blocking_warnings", [])]
+
+          source_status_lines = []
+          for name, payload in sorted(snapshot.get("sources", {}).items()):
+              status = payload.get("status", "unknown") if isinstance(payload, dict) else "unknown"
+              fetched_at = payload.get("fetched_at_utc", "not recorded") if isinstance(payload, dict) else "not recorded"
+              source_status_lines.append(f"- `{name}`: `{status}` at `{fetched_at}`")
+
+          warnings = [str(item) for item in snapshot.get("warnings", [])]
+          errors = [str(item) for item in snapshot.get("errors", [])]
+          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+
+          body = f"""## Summary
+
+          Updates the rolling scheduled crypto source snapshot generated by GitHub Actions.
+
+          Snapshot path:
+
+          ```text
+          {snapshot_path.as_posix()}
+          ```
+
+          ## Observation timing
+
+          Actual `generated_at_utc`: `{generated_at_utc}`
+          Containing `observation_hour_utc`: `{observation_hour_utc}`
+
+          `observation_hour_utc` is the canonical UTC hour containing the actual generation time; it is not the exact capture time.
+
+          ## Snapshot quality
+
+          Status: `{quality_status}`
+
+          Required sources:
+          {source_lines(required_source_names)}
+
+          Exchange cross-checks:
+          - strategy: `{exchange_strategy}`
+          - selected: `{selected_exchange}`
+          {exchange_status_lines}
+
+          Disabled / non-MVP sources:
+          {disabled_source_lines()}
+
+          Blocking issues:
+          {bullet_list(blocking_issues)}
+
+          Non-blocking warnings:
+          {bullet_list(non_blocking_warnings)}
+
+          ## Source status
+
+          {chr(10).join(source_status_lines) if source_status_lines else "- No source statuses recorded."}
+
+          ## Warnings
+
+          {bullet_list(warnings)}
+
+          ## Errors
+
+          {bullet_list(errors)}
+
+          ## Verification
+
+          - Ran `python scripts/ingest_crypto_sources.py --config config/crypto_sources.yml --output-root data/crypto/hourly --timezone Australia/Sydney`.
+          - Ran `python scripts/validate_crypto_snapshot.py {snapshot_path.as_posix()}`.
+          - Ran `python scripts/validate_crypto_observation_hour.py {snapshot_path.as_posix()}`.
+          - Committed only generated source snapshots under `data/crypto/hourly/...`.
+          - Did not commit generated `_site/` output.
+
+          ## Rolling PR behaviour
+
+          - Branch: `automation/source-snapshot-rolling`.
+          - This PR is reused and refreshed by scheduled ingestion runs.
+          - Newer scheduled runs update this PR body with the latest snapshot evidence.
+
+          ## Scope limitations
+
+          - This PR adds source evidence only.
+          - This PR does not generate a Markdown market report.
+          - This PR does not call an LLM.
+          - This PR does not auto-merge.
+
+          Workflow run: {run_url}
+          """
+
+          body = "\n".join(line.strip() for line in body.strip().splitlines()) + "\n"
+          pr_body_path = Path(os.environ["RUNNER_TEMP"]) / "crypto-source-ingestion-pr-body.md"
+          pr_body_path.write_text(body, encoding="utf-8")
+
+          title = "Update rolling crypto source snapshot"
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"pr_title={title}\n")
+          PY
+
+      - name: Inspect generated snapshot changes
+        id: publish_context
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+
+          echo "Generated snapshot path: $SNAPSHOT_PATH"
+          echo "Full working tree status:"
+          git status --porcelain --untracked-files=all
+
+          echo "Snapshot-scoped status:"
+          git status --porcelain --untracked-files=all -- data/crypto/hourly
+
+          if [[ -z "$(git status --porcelain -- data/crypto/hourly)" ]]; then
+            echo "No source snapshot changes; refuse success without immutable intent." >&2
+            exit 1
+          fi
+
+          unexpected_changes="$(git status --porcelain --untracked-files=all | awk '$2 !~ /^data\/crypto\/hourly\// { print }')"
+          echo "Unexpected changes:"
+          if [[ -n "$unexpected_changes" ]]; then
+            printf '%s\n' "$unexpected_changes"
+            exit 1
+          fi
+          echo "None."
+
+          branch="automation/source-snapshot-rolling"
+          echo "Publish branch: $branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create rolling automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git checkout -B "$PUBLISH_BRANCH"
+
+      - name: Commit generated snapshot
+        if: steps.publish_context.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/crypto/hourly
+          echo "Files staged for commit:"
+          git diff --cached --name-only
+          git commit -m "Update rolling crypto source snapshot"
+
+      - name: Build immutable publication source intent
+        if: steps.publish_context.outputs.should_publish == 'true'
+        id: publication_intent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/deterministic-publication-intent"
+          mkdir -p "$work/payload"
+          workflow_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.workflow_id')"
+          snapshot_commit_sha="$(git rev-parse HEAD)"
+          artifact_name="deterministic-publication-intent-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          python scripts/deterministic_site_publication.py build-intent \
+            --snapshot "$SNAPSHOT_PATH" \
+            --config config/crypto_sources.yml \
+            --snapshot-commit-sha "$snapshot_commit_sha" \
+            --main-base-sha "$GITHUB_SHA" \
+            --source-workflow-id "$workflow_id" \
+            --source-run-id "$GITHUB_RUN_ID" \
+            --source-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --source-workflow-head-sha "$GITHUB_SHA" \
+            --output "$work/deterministic-publication-intent.json"
+
+          cp "$SNAPSHOT_PATH" "$work/payload/snapshot.json"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable publication source intent
+        if: steps.publish_context.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.publication_intent.outputs.artifact_name }}
+          path: |
+            ${{ runner.temp }}/deterministic-publication-intent/deterministic-publication-intent.json
+            ${{ runner.temp }}/deterministic-publication-intent/payload/snapshot.json
+          if-no-files-found: error
+          retention-days: 35
+
+      - name: Push rolling automation branch
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$PUBLISH_BRANCH" || true
+          git push --force-with-lease --set-upstream origin "$PUBLISH_BRANCH"
+
+      - name: Create or update rolling snapshot PR
+        id: rolling_pr
+        continue-on-error: true  # Rolling inspection PR is not source-publication authority.
+        if: steps.publish_context.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ steps.evidence.outputs.pr_title }}
+          PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
+        run: |
+          set -euo pipefail
+          pr_body_file="$RUNNER_TEMP/crypto-source-ingestion-pr-body.md"
+          head_ref="${GITHUB_REPOSITORY_OWNER}:${PUBLISH_BRANCH}"
+          manual_pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${PUBLISH_BRANCH}?expand=1"
+          existing_pr="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --base main \
+            --head "$PUBLISH_BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          echo "Publishing rolling generated snapshot PR."
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Base: main"
+          echo "Head: $head_ref"
+          echo "Title: $PR_TITLE"
+          echo "Manual PR URL: $manual_pr_url"
+
+          if [[ -n "$existing_pr" ]]; then
+            echo "Updating existing rolling generated snapshot PR #$existing_pr."
+            gh pr edit "$existing_pr" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$PR_TITLE" \
+              --body-file "$pr_body_file"
+          else
+            echo "Creating rolling generated snapshot PR."
+            if ! gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$PR_TITLE" \
+              --body-file "$pr_body_file" \
+              --base main \
+              --head "$head_ref"; then
+              echo "Failed to create generated snapshot PR." >&2
+              echo "The generated snapshot branch has already been pushed successfully." >&2
+              echo "Manual PR URL: $manual_pr_url" >&2
+              echo "Check repository Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests." >&2
+              gh auth status || true
+              exit 1
+            fi
+          fi
+
+      - name: Recheck uniqueness immediately before accepted-hour upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACCEPTED_HOUR_ARTIFACT: ${{ steps.slot.outputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ACCEPTED_HOUR_ARTIFACT&per_page=100" \
+            > "$RUNNER_TEMP/crypto-hour-final-existing.json"
+          python scripts/crypto_ingestion_slot.py vacant \
+            --listing "$RUNNER_TEMP/crypto-hour-final-existing.json" \
+            --name "$ACCEPTED_HOUR_ARTIFACT"
+
+      - name: Prepare accepted-hour receipt
+        env:
+          SNAPSHOT_PATH: ${{ steps.ingest.outputs.snapshot_path }}
+          SOURCE_EVENT: ${{ github.event_name }}
+          INTENDED_HOUR: ${{ inputs.intended_hour_utc || '' }}
+          DISPATCH_CORRELATION: ${{ inputs.dispatch_correlation_id || '' }}
+          SOURCE_INTENT_ARTIFACT: ${{ steps.publication_intent.outputs.artifact_name }}
+          ROLLING_PR_OUTCOME: ${{ steps.rolling_pr.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/crypto-hour-accepted"
+          python scripts/crypto_ingestion_slot.py accept \
+            --snapshot "$SNAPSHOT_PATH" --event "$SOURCE_EVENT" \
+            --intended-hour "$INTENDED_HOUR" --correlation "$DISPATCH_CORRELATION" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --snapshot-commit "$(git rev-parse HEAD)" \
+            --source-intent "$SOURCE_INTENT_ARTIFACT" \
+            --rolling-pr-outcome "$ROLLING_PR_OUTCOME" \
+            --output "$RUNNER_TEMP/crypto-hour-accepted/receipt.json"
+
+      - name: Upload accepted-hour receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.slot.outputs.artifact_name }}
+          path: ${{ runner.temp }}/crypto-hour-accepted/receipt.json
+          if-no-files-found: error
+          retention-days: 35

@@ -1,0 +1,38 @@
+.archive-taxonomy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin: .85rem 0;
+}
+
+.archive-taxonomy span {
+  display: inline-flex;
+  align-items: center;
+  padding: .35rem .55rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 650;
+}
+
+.archive-taxonomy-evidence {
+  opacity: .82;
+}
+
+@media (max-width: 720px) {
+  .archive-taxonomy {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .archive-taxonomy span {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+@media print {
+  .archive-taxonomy span {
+    border-color: currentColor;
+  }
+}

@@ -1,0 +1,2327 @@
+{
+  "schema_version": "phase10-comparison-proof-corpus/v1",
+  "frozen_contract": {
+    "comparison_schema_version": "crypto-snapshot-comparison/v1",
+    "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+    "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+    "validator": {
+      "path": "scripts/validate_crypto_snapshot.py",
+      "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+    },
+    "config": {
+      "path": "config/crypto_sources.yml",
+      "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+    }
+  },
+  "seed_commit": {
+    "author_name": "Phase 10 Proof",
+    "author_email": "phase10-proof@example.invalid",
+    "author_date": "2026-08-15T12:00:00+0000",
+    "committer_name": "Phase 10 Proof",
+    "committer_email": "phase10-proof@example.invalid",
+    "committer_date": "2026-08-15T12:00:00+0000",
+    "message": "Materialise Phase 10 proof case"
+  },
+  "case_order": [
+    "01-comparison-available-mixed-evidence",
+    "02-comparison-available-valid-degraded",
+    "03-validation-contract-mismatch",
+    "04-current-invalid",
+    "05-current-identity-invalid",
+    "06-candidate-set-unorderable",
+    "07-predecessor-missing",
+    "08-predecessor-ambiguous",
+    "09-predecessor-invalid",
+    "10-predecessor-identity-invalid",
+    "11-predecessor-out-of-window",
+    "12-pair-schema-incompatible",
+    "13-pair-semantics-incompatible",
+    "14-pure-adapter-missing-invalid-evidence"
+  ],
+  "cases": {
+    "01-comparison-available-mixed-evidence": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1100000000000,\"name\":\"Bitcoin\",\"price_usd\":61000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[\"optional exchange source coinbase_exchange has status: error\",\"optional exchange source okx has status: warning\",\"source binance fetched_at_utc is missing or unparseable\"],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-degraded\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"message\":\"synthetic disabled-source transition\",\"status\":\"error\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"message\":\"synthetic exchange outage\",\"status\":\"error\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"okx\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"message\":\"synthetic partial evidence\",\"status\":\"warning\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "7ac25378815b39f5472da0467bbf79a9b9aeea97",
+          "tree_sha": "a0e37c6d3e3c8ffdf56673039d5ed0bfd5e65765",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "4521946bf103ab1f3848e45a0e079d341b1e7715f17df81ffb389434a66fe5ec",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-degraded",
+          "non_blocking_warnings": [
+            "optional exchange source coinbase_exchange has status: error",
+            "optional exchange source okx has status: warning",
+            "source binance fetched_at_utc is missing or unparseable"
+          ]
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json",
+          "sha256": "7046fc4c5bc46c1da7f8ce736903dcc4a9e1fac58d4a4be29f23347066afa27f",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "elapsed_seconds": 3600,
+        "comparison_status": "comparison-available",
+        "metric_comparisons": [
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 60000
+            },
+            "current": {
+              "present": true,
+              "value": 61000
+            },
+            "comparison_state": "comparable",
+            "relation": "current-greater"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1200000000000
+            },
+            "current": {
+              "present": true,
+              "value": 1100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "current-less"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 10000000000
+            },
+            "current": {
+              "present": true,
+              "value": 10000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.1
+            },
+            "current": {
+              "present": true,
+              "value": 0.1
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.2
+            },
+            "current": {
+              "present": true,
+              "value": 1.2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.3
+            },
+            "current": {
+              "present": true,
+              "value": 2.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 2
+            },
+            "current": {
+              "present": true,
+              "value": 1
+            },
+            "comparison_state": "comparable",
+            "relation": "current-less"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 3000
+            },
+            "current": {
+              "present": true,
+              "value": 3000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 360000000000
+            },
+            "current": {
+              "present": true,
+              "value": 360000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 5000000000
+            },
+            "current": {
+              "present": true,
+              "value": 5000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.2
+            },
+            "current": {
+              "present": true,
+              "value": 0.2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.3
+            },
+            "current": {
+              "present": true,
+              "value": 1.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.4
+            },
+            "current": {
+              "present": true,
+              "value": 2.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 2
+            },
+            "current": {
+              "present": true,
+              "value": 2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100
+            },
+            "current": {
+              "present": true,
+              "value": 100
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 55000000000
+            },
+            "current": {
+              "present": true,
+              "value": 55000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1000000000
+            },
+            "current": {
+              "present": true,
+              "value": 1000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.3
+            },
+            "current": {
+              "present": true,
+              "value": 0.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.4
+            },
+            "current": {
+              "present": true,
+              "value": 1.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.5
+            },
+            "current": {
+              "present": true,
+              "value": 2.5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 5
+            },
+            "current": {
+              "present": true,
+              "value": 5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "defi-aggregate",
+            "symbol": null,
+            "field": "total_tvl_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 50000000000
+            },
+            "current": {
+              "present": true,
+              "value": 50000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          }
+        ],
+        "source_availability_changes": [
+          {
+            "source": "coingecko",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "defillama",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "coinbase_exchange",
+            "predecessor_status": "ok",
+            "current_status": "error",
+            "predecessor_available": true,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "lost"
+          },
+          {
+            "source": "kraken",
+            "predecessor_status": "skipped",
+            "current_status": "ok",
+            "predecessor_available": false,
+            "current_available": true,
+            "status_changed": true,
+            "availability_change": "gained"
+          },
+          {
+            "source": "okx",
+            "predecessor_status": "skipped",
+            "current_status": "warning",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "binance",
+            "predecessor_status": "skipped",
+            "current_status": "error",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "bybit",
+            "predecessor_status": "missing",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "cryptocompare",
+            "predecessor_status": "skipped",
+            "current_status": "missing",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          }
+        ],
+        "comparison_id": "2c6a2e8b20ff668c1d96a6b2caafad300a391d09c454669a7166b5787d70dd7f"
+      }
+    },
+    "02-comparison-available-valid-degraded": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":null,\"sources\":{\"coinbase_exchange\":[],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[\"optional exchange source coinbase_exchange has status: error\",\"optional exchange source kraken has status: error\",\"optional exchange source okx has status: error\",\"no optional exchange cross-check source succeeded\"],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-degraded\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"message\":\"synthetic exchange outage\",\"status\":\"error\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"message\":\"synthetic exchange outage\",\"status\":\"error\"},\"okx\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"message\":\"synthetic exchange outage\",\"status\":\"error\"}},\"warnings\":[\"coinbase_exchange exchange cross-check completed with status error\",\"kraken exchange cross-check completed with status error\",\"okx exchange cross-check completed with status error\"]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "c1c5cafcdcf899ffb72179a593e079b171b91333",
+          "tree_sha": "b596ca5c25654c977d24687e1d4756ae26dacf68",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "ccc4acd0420e15cfb0d501aaefcf3a022dfdcb4d2ac110eff356046171268e25",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-degraded",
+          "non_blocking_warnings": [
+            "optional exchange source coinbase_exchange has status: error",
+            "optional exchange source kraken has status: error",
+            "optional exchange source okx has status: error",
+            "no optional exchange cross-check source succeeded"
+          ]
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json",
+          "sha256": "610c09a6cef21ca078e7e150f269f79dd2bd960ba15a5f32f797c7230db9a0e0",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "elapsed_seconds": 3600,
+        "comparison_status": "comparison-available",
+        "metric_comparisons": [
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 60000
+            },
+            "current": {
+              "present": true,
+              "value": 60000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1200000000000
+            },
+            "current": {
+              "present": true,
+              "value": 1200000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 10000000000
+            },
+            "current": {
+              "present": true,
+              "value": 10000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.1
+            },
+            "current": {
+              "present": true,
+              "value": 0.1
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.2
+            },
+            "current": {
+              "present": true,
+              "value": 1.2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.3
+            },
+            "current": {
+              "present": true,
+              "value": 2.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 1
+            },
+            "current": {
+              "present": true,
+              "value": 1
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 3000
+            },
+            "current": {
+              "present": true,
+              "value": 3000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 360000000000
+            },
+            "current": {
+              "present": true,
+              "value": 360000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 5000000000
+            },
+            "current": {
+              "present": true,
+              "value": 5000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.2
+            },
+            "current": {
+              "present": true,
+              "value": 0.2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.3
+            },
+            "current": {
+              "present": true,
+              "value": 1.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.4
+            },
+            "current": {
+              "present": true,
+              "value": 2.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 2
+            },
+            "current": {
+              "present": true,
+              "value": 2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100
+            },
+            "current": {
+              "present": true,
+              "value": 100
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 55000000000
+            },
+            "current": {
+              "present": true,
+              "value": 55000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1000000000
+            },
+            "current": {
+              "present": true,
+              "value": 1000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.3
+            },
+            "current": {
+              "present": true,
+              "value": 0.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.4
+            },
+            "current": {
+              "present": true,
+              "value": 1.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.5
+            },
+            "current": {
+              "present": true,
+              "value": 2.5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 5
+            },
+            "current": {
+              "present": true,
+              "value": 5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "defi-aggregate",
+            "symbol": null,
+            "field": "total_tvl_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 50000000000
+            },
+            "current": {
+              "present": true,
+              "value": 50000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          }
+        ],
+        "source_availability_changes": [
+          {
+            "source": "coingecko",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "defillama",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "coinbase_exchange",
+            "predecessor_status": "ok",
+            "current_status": "error",
+            "predecessor_available": true,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "lost"
+          },
+          {
+            "source": "kraken",
+            "predecessor_status": "skipped",
+            "current_status": "error",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "okx",
+            "predecessor_status": "skipped",
+            "current_status": "error",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": true,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "binance",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "bybit",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "cryptocompare",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          }
+        ],
+        "comparison_id": "7b5c9b1e897b464b24a7cb11420caf61a9635a92663e2105deabdf22bddd4e9f"
+      }
+    },
+    "03-validation-contract-mismatch": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {
+        "scripts/validate_crypto_snapshot.py": "# synthetic validator identity mismatch\n"
+      },
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "c8e1841408e3019a933695b57e171f1cc45ac877",
+          "tree_sha": "ca4e625003e869b1e3113ab627350dec6ad625fb",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "e16224b643686510512fb59b3eec0338c0ff8478"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": null,
+          "sha256": null,
+          "schema_version": null,
+          "generated_at_utc": null,
+          "quality_status": null,
+          "non_blocking_warnings": null
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "validation-contract-mismatch",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "b0fab12224b485fc95aff72b3d0a00a7bbd0f479dbe5b7acb89f54a97e039c1e"
+      }
+    },
+    "04-current-invalid": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"error\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "87b65e6a72aee2051c8075e4f7236a9be1ba8bb7",
+          "tree_sha": "98cf26b1a535e91dbb0d16ddcc77759b7b200ffd",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "d615e59d2687b93b21a09b64a8c1c22c7c2ae331611aaf2dc3a501cf2987bf59",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": null,
+          "non_blocking_warnings": null
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "current-invalid",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "c36b0f5e26a1900c69745547079d38974e223e80120190cdc238db9865e2683e"
+      }
+    },
+    "05-current-identity-invalid": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1501_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1501_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "332e628e268a7091a07e9d978896f1da252b7be4",
+          "tree_sha": "7ad517ddc7dbe6e9a4a681c82ea60b3a04023ec5",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1501_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": null,
+          "non_blocking_warnings": null
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "current-identity-invalid",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "01eb5baa4d2814f8a463167617e3dfa3c9d9ade741e1849f8981342ccd9fbb62"
+      }
+    },
+    "06-candidate-set-unorderable": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/malformed_source_snapshot.json": "{not-json"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "5ab003f1196cd736d6a376ff5cf9d9c6c49de176",
+          "tree_sha": "a9e8f8e547d475abbdda2e3e50793bda20db5fc8",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "candidate-set-unorderable",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "cbae9690464e821f2e9f3ac4752b3b82d5b0d76d0e61ae162f3249f7e60ca00b"
+      }
+    },
+    "07-predecessor-missing": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "66a700b93d98ac1e98c3539802bb5b2ef6c27627",
+          "tree_sha": "7817a400dd7290556c67ac8c3963e750362833f6",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "predecessor-missing",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "5587d5bbe8d7190eb042e2bf2fb6f62fc1fe286006743d2bc9c3267a21c6e380"
+      }
+    },
+    "08-predecessor-ambiguous": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/duplicate_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "f262ba1fbc9e7e1aed85aa6f1ce2313c4ff0e493",
+          "tree_sha": "e118a60323c3441541ca4cf17422cd5b409e8a6b",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": null,
+        "elapsed_seconds": null,
+        "comparison_status": "predecessor-ambiguous",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "43661dab214e4aac935091719da9db56ccd2abe621b2acc59a89227b142f85b0"
+      }
+    },
+    "09-predecessor-invalid": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"error\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1300_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T03:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T03:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T03:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T13:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T03:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T03:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T03:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T03:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "f7aa0a81788c568aa7a12d53dc6626e6ecf1e7b2",
+          "tree_sha": "c282e82391ed829e91f2214147305e9b60fd45cc",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json",
+          "sha256": "5604f232e426844f7833ac8dd0a5ef48d5e4ece4ba482bc03ed33caa586d585e",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": null,
+          "non_blocking_warnings": null
+        },
+        "elapsed_seconds": null,
+        "comparison_status": "predecessor-invalid",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "3bf7d311523d90cb19a6ab18327c7e0b9ec32b38662464d2d12ee49be001583d"
+      }
+    },
+    "10-predecessor-identity-invalid": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1401_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "4e0b5966244f1c643badd5ca58ccdd73c475bc1d",
+          "tree_sha": "4af3eff1de99d4c21cbf52c167ba464ba1d58bfb",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1401_AEST_source_snapshot.json",
+          "sha256": "610c09a6cef21ca078e7e150f269f79dd2bd960ba15a5f32f797c7230db9a0e0",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": null,
+          "non_blocking_warnings": null
+        },
+        "elapsed_seconds": null,
+        "comparison_status": "predecessor-identity-invalid",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "c32ec7b5a49ee2217b96bb0211093469b7554735013880fd60e3e4aedb82392e"
+      }
+    },
+    "11-predecessor-out-of-window": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1359_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T03:59:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T03:59:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T03:59:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T13:59:00+10:00\",\"generated_at_utc\":\"2026-07-08T03:59:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T03:59:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T03:59:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T03:59:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "19d459c2c252295f28eb6f85c5f77c7e05719db9",
+          "tree_sha": "f0633d6b120eb36c4457368b1595cf2166d38b6b",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1359_AEST_source_snapshot.json",
+          "sha256": "183f2d39479dd0ffbd5b57492090d0a18fcd99c38906f888e73700ca50524bcb",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T03:59:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "elapsed_seconds": 3660,
+        "comparison_status": "predecessor-out-of-window",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "f9c57428780fcb81e14a43086261f82fc8b75fe9685df2f9b30140821b748148"
+      }
+    },
+    "12-pair-schema-incompatible": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.1\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "019143f2aec43bfd2deb4ce001e936bdbcda1a3b",
+          "tree_sha": "602b96fd5b7bc878d0b6a5a6e71d153c5d71d251",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "96e725e67232efd79732b70009139f8d7086db60c18e4f551816bb491814a94b",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json",
+          "sha256": "aca11f422cce38e6ae7cfe789d4078f816dcc42a57bcf4c4bdbf22c7ec798c62",
+          "schema_version": "0.1",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "elapsed_seconds": 3600,
+        "comparison_status": "pair-schema-incompatible",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "8e2eb34eb76f016e3fee397e2edc3c952106aec5fe20eaf9cb7c3366d89821fa"
+      }
+    },
+    "13-pair-semantics-incompatible": {
+      "kind": "comparison-record",
+      "repository_files": {
+        "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T04:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T14:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T04:00:00Z\",\"producer\":\"scripts/ingest_crypto_sources.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T04:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}",
+        "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json": "{\"defi\":{\"stablecoins\":[{\"circulating_usd\":100000000000,\"name\":\"Tether\",\"price_usd\":1.0,\"symbol\":\"USDT\"},{\"circulating_usd\":50000000000,\"name\":\"USD Coin\",\"price_usd\":1.0,\"symbol\":\"USDC\"}],\"total_tvl_usd\":100000000000},\"errors\":[],\"exchange_crosscheck\":{\"selected\":\"coinbase_exchange\",\"sources\":{\"coinbase_exchange\":[{\"pair\":\"BTC-USD\",\"price\":\"60000\",\"quote\":\"USD\",\"symbol\":\"BTC\"},{\"pair\":\"ETH-USD\",\"price\":\"3000\",\"quote\":\"USD\",\"symbol\":\"ETH\"},{\"pair\":\"SOL-USD\",\"price\":\"100\",\"quote\":\"USD\",\"symbol\":\"SOL\"}],\"kraken\":[],\"okx\":[]},\"strategy\":\"first_successful\"},\"market\":{\"assets\":[{\"change_1h_pct\":0.1,\"change_24h_pct\":1.2,\"change_7d_pct\":2.3,\"id\":\"bitcoin\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":1,\"market_cap_usd\":1200000000000,\"name\":\"Bitcoin\",\"price_usd\":60000,\"symbol\":\"BTC\",\"volume_24h_usd\":10000000000},{\"change_1h_pct\":0.2,\"change_24h_pct\":1.3,\"change_7d_pct\":2.4,\"id\":\"ethereum\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":2,\"market_cap_usd\":360000000000,\"name\":\"Ethereum\",\"price_usd\":3000,\"symbol\":\"ETH\",\"volume_24h_usd\":5000000000},{\"change_1h_pct\":0.3,\"change_24h_pct\":1.4,\"change_7d_pct\":2.5,\"id\":\"solana\",\"last_updated\":\"2026-07-08T05:00:00Z\",\"market_cap_rank\":5,\"market_cap_usd\":55000000000,\"name\":\"Solana\",\"price_usd\":100,\"symbol\":\"SOL\",\"volume_24h_usd\":1000000000}]},\"quality\":{\"blocking_issues\":[],\"disabled_sources\":[\"binance\",\"bybit\",\"cryptocompare\"],\"non_blocking_warnings\":[],\"optional_exchange_sources\":[\"coinbase_exchange\",\"kraken\",\"okx\"],\"required_sources\":[\"coingecko\",\"defillama\"],\"status\":\"valid-ok\"},\"run\":{\"cadence\":\"hourly\",\"generated_at_local\":\"2026-07-08T15:00:00+10:00\",\"generated_at_utc\":\"2026-07-08T05:00:00Z\",\"producer\":\"other.py\",\"timezone\":\"Australia/Sydney\"},\"schema_version\":\"0.2\",\"sources\":{\"binance\":{\"reason\":\"GitHub-hosted runners returned HTTP 451\",\"status\":\"skipped\"},\"bybit\":{\"reason\":\"GitHub-hosted runners returned HTTP 403\",\"status\":\"skipped\"},\"coinbase_exchange\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"coingecko\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"cryptocompare\":{\"reason\":\"No-secrets MVP returned HTTP 401 without an API key\",\"status\":\"skipped\"},\"defillama\":{\"fetched_at_utc\":\"2026-07-08T05:00:00Z\",\"status\":\"ok\"},\"kraken\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"},\"okx\":{\"reason\":\"not attempted after coinbase_exchange satisfied first_successful strategy\",\"status\":\"skipped\"}},\"warnings\":[]}"
+      },
+      "current_repository_path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+      "contract_override": {},
+      "expected": {
+        "comparison_schema_version": "crypto-snapshot-comparison/v1",
+        "predecessor_policy_version": "phase10-predecessor-exact-hour/v1",
+        "semantic_contract_version": "phase10-snapshot-semantics-0.2/v1",
+        "repository_context": {
+          "commit_sha": "061115d90ddaa100dc0d34b1168bc1bd7a4bc9b8",
+          "tree_sha": "a955771b88c5339d252091e3d8b2b651ede44022",
+          "validator": {
+            "path": "scripts/validate_crypto_snapshot.py",
+            "git_blob_sha": "b8c7fcc850bf0f5076f7d084bb6be9c24a9b7d3a"
+          },
+          "config": {
+            "path": "config/crypto_sources.yml",
+            "git_blob_sha": "73c5a3f3db81954951801c7d348d09a4c6296d73"
+          }
+        },
+        "current": {
+          "path": "data/crypto/hourly/2026/07/08/1500_AEST_source_snapshot.json",
+          "sha256": "ec5a2f3f0d5222a08506661dc805ace7400adbec620c282ff83e421374e874c5",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "predecessor": {
+          "path": "data/crypto/hourly/2026/07/08/1400_AEST_source_snapshot.json",
+          "sha256": "610c09a6cef21ca078e7e150f269f79dd2bd960ba15a5f32f797c7230db9a0e0",
+          "schema_version": "0.2",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "quality_status": "valid-ok",
+          "non_blocking_warnings": []
+        },
+        "elapsed_seconds": 3600,
+        "comparison_status": "pair-semantics-incompatible",
+        "metric_comparisons": [],
+        "source_availability_changes": [],
+        "comparison_id": "6fceb73c094a23869324f982a495c9b73266a566fc40819145b176f50189e9cd"
+      }
+    },
+    "14-pure-adapter-missing-invalid-evidence": {
+      "kind": "pure-adapter",
+      "current_snapshot": {
+        "defi": {
+          "stablecoins": [
+            {
+              "circulating_usd": 100000000000,
+              "name": "Tether",
+              "price_usd": 1.0,
+              "symbol": "USDT"
+            },
+            {
+              "circulating_usd": 50000000000,
+              "name": "USD Coin",
+              "price_usd": 1.0,
+              "symbol": "USDC"
+            }
+          ],
+          "total_tvl_usd": 100000000000
+        },
+        "errors": [],
+        "exchange_crosscheck": {
+          "selected": "coinbase_exchange",
+          "sources": {
+            "coinbase_exchange": [
+              {
+                "pair": "BTC-USD",
+                "price": "60000",
+                "quote": "USD",
+                "symbol": "BTC"
+              },
+              {
+                "pair": "ETH-USD",
+                "price": "3000",
+                "quote": "USD",
+                "symbol": "ETH"
+              },
+              {
+                "pair": "SOL-USD",
+                "price": "100",
+                "quote": "USD",
+                "symbol": "SOL"
+              }
+            ],
+            "kraken": [],
+            "okx": []
+          },
+          "strategy": "first_successful"
+        },
+        "market": {
+          "assets": [
+            {
+              "change_1h_pct": 0.1,
+              "change_24h_pct": "bad",
+              "change_7d_pct": 2.3,
+              "id": "bitcoin",
+              "last_updated": "2026-07-08T05:00:00Z",
+              "market_cap_rank": 1,
+              "market_cap_usd": 1200000000000,
+              "name": "Bitcoin",
+              "symbol": "BTC",
+              "volume_24h_usd": true
+            },
+            {
+              "change_1h_pct": 0.2,
+              "change_24h_pct": 1.3,
+              "change_7d_pct": 2.4,
+              "id": "ethereum",
+              "last_updated": "2026-07-08T05:00:00Z",
+              "market_cap_rank": 2,
+              "market_cap_usd": 360000000000,
+              "name": "Ethereum",
+              "price_usd": 3000,
+              "symbol": "ETH",
+              "volume_24h_usd": 5000000000
+            },
+            {
+              "change_1h_pct": 0.3,
+              "change_24h_pct": 1.4,
+              "change_7d_pct": 2.5,
+              "id": "solana",
+              "last_updated": "2026-07-08T05:00:00Z",
+              "market_cap_rank": 5,
+              "market_cap_usd": 55000000000,
+              "name": "Solana",
+              "price_usd": 100,
+              "symbol": "SOL",
+              "volume_24h_usd": 1000000000
+            }
+          ]
+        },
+        "quality": {
+          "blocking_issues": [],
+          "disabled_sources": [
+            "binance",
+            "bybit",
+            "cryptocompare"
+          ],
+          "non_blocking_warnings": [],
+          "optional_exchange_sources": [
+            "coinbase_exchange",
+            "kraken",
+            "okx"
+          ],
+          "required_sources": [
+            "coingecko",
+            "defillama"
+          ],
+          "status": "valid-ok"
+        },
+        "run": {
+          "cadence": "hourly",
+          "generated_at_local": "2026-07-08T15:00:00+10:00",
+          "generated_at_utc": "2026-07-08T05:00:00Z",
+          "timezone": "Australia/Sydney",
+          "producer": "scripts/ingest_crypto_sources.py"
+        },
+        "schema_version": "0.2",
+        "sources": {
+          "binance": {
+            "reason": "GitHub-hosted runners returned HTTP 451",
+            "status": "skipped"
+          },
+          "bybit": {
+            "reason": "GitHub-hosted runners returned HTTP 403",
+            "status": "skipped"
+          },
+          "coinbase_exchange": {
+            "fetched_at_utc": "2026-07-08T05:00:00Z",
+            "status": "ok"
+          },
+          "coingecko": {
+            "fetched_at_utc": "2026-07-08T05:00:00Z",
+            "status": "ok"
+          },
+          "cryptocompare": {
+            "reason": "No-secrets MVP returned HTTP 401 without an API key",
+            "status": "skipped"
+          },
+          "defillama": {
+            "fetched_at_utc": "2026-07-08T05:00:00Z",
+            "status": "ok"
+          },
+          "kraken": {
+            "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+            "status": "skipped"
+          },
+          "okx": {
+            "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+            "status": "skipped"
+          }
+        },
+        "warnings": []
+      },
+      "predecessor_snapshot": {
+        "defi": {
+          "stablecoins": [
+            {
+              "circulating_usd": 100000000000,
+              "name": "Tether",
+              "price_usd": 1.0,
+              "symbol": "USDT"
+            },
+            {
+              "circulating_usd": 50000000000,
+              "name": "USD Coin",
+              "price_usd": 1.0,
+              "symbol": "USDC"
+            }
+          ],
+          "total_tvl_usd": 100000000000
+        },
+        "errors": [],
+        "exchange_crosscheck": {
+          "selected": "coinbase_exchange",
+          "sources": {
+            "coinbase_exchange": [
+              {
+                "pair": "BTC-USD",
+                "price": "60000",
+                "quote": "USD",
+                "symbol": "BTC"
+              },
+              {
+                "pair": "ETH-USD",
+                "price": "3000",
+                "quote": "USD",
+                "symbol": "ETH"
+              },
+              {
+                "pair": "SOL-USD",
+                "price": "100",
+                "quote": "USD",
+                "symbol": "SOL"
+              }
+            ],
+            "kraken": [],
+            "okx": []
+          },
+          "strategy": "first_successful"
+        },
+        "market": {
+          "assets": [
+            {
+              "change_1h_pct": "NaN",
+              "change_24h_pct": "Infinity",
+              "change_7d_pct": 2.3,
+              "id": "bitcoin",
+              "last_updated": "2026-07-08T04:00:00Z",
+              "market_cap_rank": 1,
+              "name": "Bitcoin",
+              "symbol": "BTC",
+              "volume_24h_usd": 10000000000
+            },
+            {
+              "change_1h_pct": 0.2,
+              "change_24h_pct": 1.3,
+              "change_7d_pct": 2.4,
+              "id": "ethereum",
+              "last_updated": "2026-07-08T04:00:00Z",
+              "market_cap_rank": 2,
+              "market_cap_usd": 360000000000,
+              "name": "Ethereum",
+              "price_usd": 3000,
+              "symbol": "ETH",
+              "volume_24h_usd": 5000000000
+            },
+            {
+              "change_1h_pct": 0.3,
+              "change_24h_pct": 1.4,
+              "change_7d_pct": 2.5,
+              "id": "solana",
+              "last_updated": "2026-07-08T04:00:00Z",
+              "market_cap_rank": 5,
+              "market_cap_usd": 55000000000,
+              "name": "Solana",
+              "price_usd": 100,
+              "symbol": "SOL",
+              "volume_24h_usd": 1000000000
+            }
+          ]
+        },
+        "quality": {
+          "blocking_issues": [],
+          "disabled_sources": [
+            "binance",
+            "bybit",
+            "cryptocompare"
+          ],
+          "non_blocking_warnings": [],
+          "optional_exchange_sources": [
+            "coinbase_exchange",
+            "kraken",
+            "okx"
+          ],
+          "required_sources": [
+            "coingecko",
+            "defillama"
+          ],
+          "status": "valid-ok"
+        },
+        "run": {
+          "cadence": "hourly",
+          "generated_at_local": "2026-07-08T14:00:00+10:00",
+          "generated_at_utc": "2026-07-08T04:00:00Z",
+          "timezone": "Australia/Sydney",
+          "producer": "scripts/ingest_crypto_sources.py"
+        },
+        "schema_version": "0.2",
+        "sources": {
+          "binance": {
+            "reason": "GitHub-hosted runners returned HTTP 451",
+            "status": "skipped"
+          },
+          "bybit": {
+            "reason": "GitHub-hosted runners returned HTTP 403",
+            "status": "skipped"
+          },
+          "coinbase_exchange": {
+            "fetched_at_utc": "2026-07-08T04:00:00Z",
+            "status": "ok"
+          },
+          "coingecko": {
+            "fetched_at_utc": "2026-07-08T04:00:00Z",
+            "status": "ok"
+          },
+          "cryptocompare": {
+            "reason": "No-secrets MVP returned HTTP 401 without an API key",
+            "status": "skipped"
+          },
+          "defillama": {
+            "fetched_at_utc": "2026-07-08T04:00:00Z",
+            "status": "ok"
+          },
+          "kraken": {
+            "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+            "status": "skipped"
+          },
+          "okx": {
+            "reason": "not attempted after coinbase_exchange satisfied first_successful strategy",
+            "status": "skipped"
+          }
+        },
+        "warnings": []
+      },
+      "expected": {
+        "metric_comparisons": [
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": false,
+              "value": null
+            },
+            "current": {
+              "present": false,
+              "value": null
+            },
+            "comparison_state": "unavailable-current",
+            "relation": null
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": false,
+              "value": null
+            },
+            "current": {
+              "present": true,
+              "value": 1200000000000
+            },
+            "comparison_state": "unavailable-predecessor",
+            "relation": null
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 10000000000
+            },
+            "current": {
+              "present": true,
+              "value": true
+            },
+            "comparison_state": "invalid-current",
+            "relation": null
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": "NaN"
+            },
+            "current": {
+              "present": true,
+              "value": 0.1
+            },
+            "comparison_state": "invalid-predecessor",
+            "relation": null
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": "Infinity"
+            },
+            "current": {
+              "present": true,
+              "value": "bad"
+            },
+            "comparison_state": "invalid-current",
+            "relation": null
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.3
+            },
+            "current": {
+              "present": true,
+              "value": 2.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "BTC",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 1
+            },
+            "current": {
+              "present": true,
+              "value": 1
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 3000
+            },
+            "current": {
+              "present": true,
+              "value": 3000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 360000000000
+            },
+            "current": {
+              "present": true,
+              "value": 360000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 5000000000
+            },
+            "current": {
+              "present": true,
+              "value": 5000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.2
+            },
+            "current": {
+              "present": true,
+              "value": 0.2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.3
+            },
+            "current": {
+              "present": true,
+              "value": 1.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.4
+            },
+            "current": {
+              "present": true,
+              "value": 2.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "ETH",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 2
+            },
+            "current": {
+              "present": true,
+              "value": 2
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100
+            },
+            "current": {
+              "present": true,
+              "value": 100
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_usd",
+            "predecessor": {
+              "present": true,
+              "value": 55000000000
+            },
+            "current": {
+              "present": true,
+              "value": 55000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "volume_24h_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1000000000
+            },
+            "current": {
+              "present": true,
+              "value": 1000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_1h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 0.3
+            },
+            "current": {
+              "present": true,
+              "value": 0.3
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_24h_pct",
+            "predecessor": {
+              "present": true,
+              "value": 1.4
+            },
+            "current": {
+              "present": true,
+              "value": 1.4
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "change_7d_pct",
+            "predecessor": {
+              "present": true,
+              "value": 2.5
+            },
+            "current": {
+              "present": true,
+              "value": 2.5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "market-asset",
+            "symbol": "SOL",
+            "field": "market_cap_rank",
+            "predecessor": {
+              "present": true,
+              "value": 5
+            },
+            "current": {
+              "present": true,
+              "value": 5
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "defi-aggregate",
+            "symbol": null,
+            "field": "total_tvl_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDT",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 100000000000
+            },
+            "current": {
+              "present": true,
+              "value": 100000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "price_usd",
+            "predecessor": {
+              "present": true,
+              "value": 1.0
+            },
+            "current": {
+              "present": true,
+              "value": 1.0
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          },
+          {
+            "family": "stablecoin",
+            "symbol": "USDC",
+            "field": "circulating_usd",
+            "predecessor": {
+              "present": true,
+              "value": 50000000000
+            },
+            "current": {
+              "present": true,
+              "value": 50000000000
+            },
+            "comparison_state": "comparable",
+            "relation": "equal"
+          }
+        ],
+        "source_availability_changes": [
+          {
+            "source": "coingecko",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "defillama",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "coinbase_exchange",
+            "predecessor_status": "ok",
+            "current_status": "ok",
+            "predecessor_available": true,
+            "current_available": true,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "kraken",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "okx",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "binance",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "bybit",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          },
+          {
+            "source": "cryptocompare",
+            "predecessor_status": "skipped",
+            "current_status": "skipped",
+            "predecessor_available": false,
+            "current_available": false,
+            "status_changed": false,
+            "availability_change": "unchanged"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+version: 1
+case_key: historical-degraded-sparse
+expected_candidate_count: 201
+stage0_preparation_config: config/low-cost-candidate-selector-stage-0.yml
+selector_prompt: prompts/crypto-market-candidate-selection-compact-v1.txt
+selection_schema: schemas/crypto-market-candidate-selection-v1.json
+ranking_config: config/claim-candidate-ranking-v1.yml
+max_output_tokens: 2048
+reasoning_effort: minimal
+maximum_discovery_calls: 2
+maximum_reproduction_calls: 1
+maximum_paid_calls: 3
+maximum_semantic_repairs: 0
+maximum_network_retries: 0
+maximum_call_cost_usd: 0.025
+maximum_total_cost_usd: 0.060
+provider_slug_by_name:
+  Inception: inception
+  DeepInfra: deepinfra
+  Fireworks: fireworks
+  Together: together
+  Novita: novita
+  Cerebras: cerebras
+  Groq: groq
+models:
+  - key: mercury-2
+    model: inception/mercury-2
+    preferred_provider_slug: inception
+    maximum_prompt_price_per_million: 0.30
+    maximum_completion_price_per_million: 0.90
+  - key: gpt-oss-120b
+    model: openai/gpt-oss-120b
+    preferred_provider_slug: deepinfra
+    maximum_prompt_price_per_million: 0.10
+    maximum_completion_price_per_million: 0.50

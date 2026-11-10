@@ -1,0 +1,338 @@
+name: Governed LLM review PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_path:
+        description: "Repository-relative validated snapshot path under data/crypto/hourly/"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-llm-analysis-rolling-pr
+  cancel-in-progress: false
+
+env:
+  ROLLING_BRANCH: automation/governed-llm-analysis-rolling
+  ROLLING_PR_TITLE: Update governed LLM analysis
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from the main branch." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Validate snapshot and prepare evidence
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml markdown
+
+      - name: Validate snapshot input path
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from llm_analysis.publication import publication_paths
+          publication_paths(os.environ["SNAPSHOT_PATH"])
+          PY
+
+      - name: Validate selected snapshot before provider access
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        run: python scripts/validate_crypto_snapshot.py "$SNAPSHOT_PATH"
+
+      - name: Build and schema-check evidence bundle
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/governed-llm-prepared"
+          python -m llm_analysis.evidence_bundle "$SNAPSHOT_PATH" \
+            --repository-root . \
+            --source-config config/crypto_sources.yml \
+            --evidence-schema schemas/crypto-market-evidence-bundle-v1.json \
+            --output "$RUNNER_TEMP/governed-llm-prepared/evidence-bundle.json" \
+            --metadata-output "$RUNNER_TEMP/governed-llm-prepared/preparation-metadata.json"
+
+      - name: Upload prepared evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-review-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  generate:
+    name: Generate and independently accept analysis
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml markdown
+
+      - name: Download prepared evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: governed-llm-review-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-prepared
+
+      - name: Run governed generation and acceptance
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.dry_run \
+            --repository-root . \
+            --snapshot "$SNAPSHOT_PATH" \
+            --prepared-evidence-bundle "$RUNNER_TEMP/governed-llm-prepared/evidence-bundle.json" \
+            --output-dir "$RUNNER_TEMP/governed-llm-review" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Upload scrubbed generation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-llm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-review/
+          if-no-files-found: error
+          retention-days: 14
+
+  prove-and-publish:
+    name: Prove source files and update rolling PR
+    needs: [prepare, generate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      changed: ${{ steps.scope.outputs.changed }}
+      pr_number: ${{ steps.pr.outputs.number }}
+    steps:
+      - name: Check out exact trusted main commit with push capability
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation dependencies
+        run: pip install pyyaml markdown
+
+      - name: Download accepted generation artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: governed-llm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-llm-review
+
+      - name: Prepare source-controlled analysis and report
+        env:
+          SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/governed-llm-publication"
+          python -m llm_analysis.publication \
+            --repository-root . \
+            --snapshot "$SNAPSHOT_PATH" \
+            --artifact-dir "$RUNNER_TEMP/governed-llm-review" \
+            --trusted-main-sha "$TRUSTED_SHA" \
+            --workflow-run-url "$WORKFLOW_RUN_URL" \
+            --manifest-output "$RUNNER_TEMP/governed-llm-publication/manifest.json" \
+            --pr-body-output "$RUNNER_TEMP/governed-llm-publication/pr-body.md"
+
+      - name: Detect exact no-op against rolling branch or main
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$ROLLING_BRANCH:refs/remotes/origin/$ROLLING_BRANCH" || true
+          compare_ref="${{ needs.prepare.outputs.trusted_sha }}"
+          if git rev-parse --verify "refs/remotes/origin/$ROLLING_BRANCH" >/dev/null 2>&1; then
+            compare_ref="refs/remotes/origin/$ROLLING_BRANCH"
+          fi
+          mapfile -t expected < <(python - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads(Path(os.environ["RUNNER_TEMP"] + "/governed-llm-publication/manifest.json").read_text())
+          print("\n".join(manifest["changed_files"]))
+          PY
+          )
+          git add -N -- "${expected[@]}"
+          if git diff --quiet "$compare_ref" -- "${expected[@]}"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No material source-controlled change; no commit or PR update is required." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stage and validate exact changed-file scope
+        if: steps.scope.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t expected < <(python - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads(Path(os.environ["RUNNER_TEMP"] + "/governed-llm-publication/manifest.json").read_text())
+          print("\n".join(manifest["changed_files"]))
+          PY
+          )
+          git add -- "${expected[@]}"
+          git diff --cached --name-only > "$RUNNER_TEMP/governed-llm-publication/changed-files.txt"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from llm_analysis.publication import validate_changed_files
+          root = Path(os.environ["RUNNER_TEMP"]) / "governed-llm-publication"
+          manifest = json.loads((root / "manifest.json").read_text())
+          changed = (root / "changed-files.txt").read_text().splitlines()
+          validate_changed_files(changed, tuple(manifest["changed_files"]))
+          PY
+
+      - name: Run full repository unit tests before push
+        if: steps.scope.outputs.changed == 'true'
+        run: python -m unittest discover -s tests
+
+      - name: Build static site before push
+        if: steps.scope.outputs.changed == 'true'
+        run: python -m site_generator
+
+      - name: Verify rendered report and generated-output boundary
+        if: steps.scope.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_path=$(python - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads(Path(os.environ["RUNNER_TEMP"] + "/governed-llm-publication/manifest.json").read_text())
+          print(manifest["paths"]["report"])
+          PY
+          )
+          rendered="_site/archive/${report_path#reports/crypto/hourly/}"
+          rendered="${rendered%.md}.html"
+          test -f "$rendered"
+          if git diff --cached --name-only | grep -E '^_site/'; then
+            echo "Generated _site output must not be committed." >&2
+            exit 1
+          fi
+
+      - name: Commit and push rolling branch
+        if: steps.scope.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$ROLLING_BRANCH"
+          git commit -m "Update governed LLM analysis"
+          git push --force-with-lease origin "HEAD:refs/heads/$ROLLING_BRANCH"
+
+      - name: Open or update rolling review PR
+        id: pr
+        if: steps.scope.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_BODY_PATH: ${{ runner.temp }}/governed-llm-publication/pr-body.md
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = process.env.ROLLING_BRANCH;
+            const base = 'main';
+            const title = process.env.ROLLING_PR_TITLE;
+            const body = fs.readFileSync(process.env.PR_BODY_PATH, 'utf8');
+            const existing = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base });
+            let number;
+            if (existing.data.length) {
+              number = existing.data[0].number;
+              await github.rest.pulls.update({ owner, repo, pull_number: number, title, body });
+              core.notice(`Updated rolling governed-analysis PR #${number}`);
+            } else {
+              const created = await github.rest.pulls.create({ owner, repo, title, body, head, base });
+              number = created.data.number;
+              core.notice(`Created rolling governed-analysis PR #${number}`);
+            }
+            core.setOutput('number', String(number));
+
+      - name: Record publication summary
+        if: always()
+        shell: bash
+        run: |
+          echo "# Governed LLM rolling review" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Rolling branch: \`$ROLLING_BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Material change: \`${{ steps.scope.outputs.changed || 'unknown' }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Pull request: \`${{ steps.pr.outputs.number || 'not created or unchanged' }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Direct publication: \`no\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Auto-merge: \`no\`" >> "$GITHUB_STEP_SUMMARY"

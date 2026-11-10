@@ -1,0 +1,105 @@
+/* Phase 16 reader-facing evidence components. */
+.reader-evidence {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.reader-safety,
+.reader-observation,
+.reader-taxonomy,
+.reader-report-summary,
+.reader-evidence-inspect {
+  border: 1px solid var(--line, #d8dee8);
+  border-radius: 0.9rem;
+  padding: 1.15rem;
+}
+
+.reader-safety {
+  border-width: 2px;
+}
+
+.reader-safety p,
+.reader-taxonomy p,
+.reader-report-summary p,
+.reader-evidence-health p,
+.reader-surface-note {
+  margin: 0.45rem 0;
+}
+
+.reader-evidence-time {
+  font-weight: 600;
+}
+
+.reader-market-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.reader-market-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line, #d8dee8);
+  border-radius: 0.75rem;
+}
+
+.reader-market-card span,
+.reader-market-card small {
+  opacity: 0.78;
+}
+
+.reader-market-card strong {
+  font-size: 1.35rem;
+}
+
+.reader-evidence-health {
+  margin-top: 0.9rem;
+}
+
+.reader-report-evidence,
+.reader-evidence-inspect dl {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.9rem 0 0;
+}
+
+.reader-report-evidence div,
+.reader-evidence-inspect dl div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.reader-report-evidence dt,
+.reader-evidence-inspect dt {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reader-report-evidence dd,
+.reader-evidence-inspect dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reader-evidence-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.reader-evidence-inspect summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .reader-market-grid {
+    grid-template-columns: 1fr;
+  }
+}

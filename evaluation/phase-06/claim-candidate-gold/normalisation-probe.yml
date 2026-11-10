@@ -1,0 +1,27 @@
+classification: evaluation-only
+source_case: adversarial-source-disagreement
+kind: coinbase_btc_usd_to_canonical_asset_price_v1
+expected_previous_bundle_id: sha256:7ad5c0cb63467b430f831b4da1cc8406626c792c04cf579e87e1757cc1331da1
+expected_bundle_id: sha256:a5358ca532515f3ed3349c603b978ee986b54b5a608854131af44efd539b1862
+expected_candidate_count: 241
+expected_ordered_candidate_sha256: fd2e3784a476a98ba3305b5579c1b076543cf3a46d027fcdbb31c92d8346a2df
+expectation:
+  name: normalised-btc-source-disagreement
+  rationale: An explicit evidence transformation creates a new bundle and a same-subject cross-source not-equal candidate.
+  match:
+    intent: comparison
+    metric: price_usd
+    comparison_relation: not_equal
+    evidence_ids:
+    - exchange.coinbase_exchange.bitcoin.price_usd
+    - market.asset.bitcoin.price_usd
+  expected_features:
+    cross_source: true
+    conflict_status: divergent
+    corroboration_count: 2
+omissions:
+- name: not-a-historical-fact
+  rationale: The projection is evaluation-only evidence for a future normalisation contract and is never a report input.
+  evidence_ids:
+  - exchange.coinbase_exchange.bitcoin.price_usd
+  - market.asset.bitcoin.price_usd

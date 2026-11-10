@@ -1,0 +1,19 @@
+version: 1
+profile: public-data-semantic-plan
+base_public_data_profile: config/llm-public-data-demo.yml
+benchmark_config: config/llm-evaluation-gpt-4o-mini-semantic-plan.yml
+contract:
+  prompt_path: prompts/crypto-market-claim-plan-v1.md
+  claim_plan_schema_path: schemas/crypto-market-claim-plan-v1.json
+  evidence_schema_path: schemas/crypto-market-evidence-bundle-v1.json
+  prompt_version: crypto-market-claim-plan/v1
+  claim_plan_schema_version: crypto-market-claim-plan/v1
+  evidence_schema_version: crypto-market-evidence-bundle/v1
+  renderer_version: crypto-market-claim-plan-renderer/v1
+request_policy:
+  exact_model: openai/gpt-4o-mini
+  cross_model_fallback: false
+  maximum_generation_cost_usd: 0.01
+  maximum_experiment_cost_usd: 0.15
+  automatic_generation: false
+  publication: false

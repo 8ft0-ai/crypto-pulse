@@ -1,0 +1,1 @@
+{"additionalProperties":false,"properties":{"selected_candidate_ids":{"items":{"pattern":"^claim-candidate:sha256:[0-9a-f]{64}$","type":"string"},"maxItems":7,"minItems":1,"type":"array"}},"required":["selected_candidate_ids"],"title":"CryptoPulse bounded candidate-ID selection v1","type":"object"}

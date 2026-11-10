@@ -1,0 +1,91 @@
+version: 1
+plan_id: semantic-plan-model-catalogue-screen/v1
+base_selection_config: config/semantic-plan-model-selection.yml
+smoke_case_key: historical-normal-crosschecked
+maximum_total_cost_usd: 0.15
+candidates:
+  - key: deepseek-v4-flash
+    model: deepseek/deepseek-v4-flash
+    role: catalogue_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 0.10
+    maximum_completion_price_per_million: 0.20
+    maximum_generation_cost_usd: 0.005
+    maximum_model_cost_usd: 0.010
+    send_temperature: true
+    max_output_tokens: 12000
+    ensure_user_message: true
+    reasoning:
+      enabled: true
+      effort: high
+      exclude: true
+  - key: gpt-5-6-luna
+    model: openai/gpt-5.6-luna
+    role: catalogue_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 1.25
+    maximum_completion_price_per_million: 7.00
+    maximum_generation_cost_usd: 0.040
+    maximum_model_cost_usd: 0.055
+    send_temperature: false
+    max_output_tokens: 4000
+    ensure_user_message: false
+    reasoning:
+      enabled: false
+      effort: none
+      exclude: true
+  - key: qwen3-6-flash
+    model: qwen/qwen3.6-flash
+    role: catalogue_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 0.25
+    maximum_completion_price_per_million: 1.50
+    maximum_generation_cost_usd: 0.010
+    maximum_model_cost_usd: 0.015
+    send_temperature: true
+    max_output_tokens: 4000
+    ensure_user_message: true
+    reasoning:
+      enabled: false
+      effort: null
+      exclude: true
+  - key: mimo-v2-5-pro
+    model: xiaomi/mimo-v2.5-pro
+    role: catalogue_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 0.60
+    maximum_completion_price_per_million: 1.20
+    maximum_generation_cost_usd: 0.010
+    maximum_model_cost_usd: 0.015
+    send_temperature: true
+    max_output_tokens: 4000
+    ensure_user_message: true
+    reasoning:
+      enabled: false
+      effort: null
+      exclude: true
+  - key: seed-2-0-mini
+    model: bytedance-seed/seed-2.0-mini
+    role: catalogue_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 0.15
+    maximum_completion_price_per_million: 0.60
+    maximum_generation_cost_usd: 0.005
+    maximum_model_cost_usd: 0.010
+    send_temperature: true
+    max_output_tokens: 4000
+    ensure_user_message: true
+    reasoning:
+      enabled: true
+      effort: minimal
+      exclude: true

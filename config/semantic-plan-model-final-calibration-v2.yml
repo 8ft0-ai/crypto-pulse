@@ -1,0 +1,42 @@
+version: 1
+plan_id: semantic-plan-model-final-calibration/v2
+prompt:
+  path: prompts/crypto-market-claim-plan-v2.md
+  version: crypto-market-claim-plan/v2
+base_selection_config: config/semantic-plan-model-selection.yml
+smoke_case_key: historical-normal-crosschecked
+maximum_total_cost_usd: 0.25
+candidates:
+  - key: gpt-5-6-sol
+    model: openai/gpt-5.6-sol
+    role: quality_benchmark
+    deployment_eligible: false
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 6.00
+    maximum_completion_price_per_million: 36.00
+    maximum_generation_cost_usd: 0.150
+    maximum_model_cost_usd: 0.180
+    send_temperature: false
+    max_output_tokens: 4000
+    route_probe_max_output_tokens: 64
+    ensure_user_message: false
+    reasoning: null
+  - key: nex-n2-mini
+    model: nex-agi/nex-n2-mini
+    role: primary_candidate
+    deployment_eligible: true
+    availability_checked_at: "2026-07-13"
+    known_expiration_date: null
+    maximum_prompt_price_per_million: 0.05
+    maximum_completion_price_per_million: 0.20
+    maximum_generation_cost_usd: 0.020
+    maximum_model_cost_usd: 0.030
+    send_temperature: true
+    max_output_tokens: 4000
+    route_probe_max_output_tokens: 64
+    ensure_user_message: true
+    reasoning: null
+excluded_models:
+  - model: minimax/minimax-m3
+    reason: Completed calibration output failed the central semantic intent taxonomy and does not advance.

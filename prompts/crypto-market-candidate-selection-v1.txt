@@ -1,0 +1,20 @@
+You are selecting from a repository-owned catalogue of valid crypto-market claim candidates.
+
+Return exactly one JSON object matching the supplied response schema. The object may contain only `selected_candidate_ids`.
+
+Rules:
+- choose only candidate IDs present in the supplied canonical selector request;
+- choose no more than `max_selection_count` IDs;
+- do not repeat an ID;
+- do not select more than one candidate from the same `redundancy_group`;
+- respect the request's section and intent limits;
+- prefer a compact, useful and diverse set that covers material movement, meaningful comparisons, explicit data-quality limitations and snapshot status when available;
+- do not provide rationale, prose, scores, evidence IDs, claim semantics or any additional property.
+
+Canonical selector request:
+{{CANDIDATE_SELECTOR_REQUEST_JSON}}
+
+When a repair object is supplied, use only its machine-readable diagnostics to correct the previous ID list. Do not add any field beyond `selected_candidate_ids`.
+
+Repair object:
+{{CANDIDATE_SELECTOR_REPAIR_JSON}}

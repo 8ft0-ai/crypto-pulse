@@ -1,0 +1,32 @@
+version: 1
+profile: public-data-demo
+benchmark_config: config/llm-evaluation-gpt-4o-mini.yml
+input_policy:
+  allowed_classifications:
+    - public-market-data
+    - evaluation-only
+  allowed_snapshot_prefix: data/crypto/hourly/
+  prohibited_classifications:
+    - customer
+    - personal
+    - credential
+    - internal
+    - confidential
+    - sensitive
+provider_policy:
+  zdr: false
+  data_collection: deny
+  ordinary_provider_retention_accepted: true
+  documented_maximum_abuse_monitoring_days: 30
+  rationale: >-
+    The benchmark contains public market observations and deterministic
+    evaluation-only mutations. Ordinary provider abuse-monitoring retention is
+    accepted only for this manual demonstration so the project can prove the
+    governed LLM analysis flow end to end.
+request_policy:
+  structured_output: true
+  cross_model_fallback: false
+  automatic_generation: false
+  publication: false
+  openrouter_prompt_logging_enabled_by_repository: false
+  store_parameter: unsupported-by-openrouter-chat-completions-contract

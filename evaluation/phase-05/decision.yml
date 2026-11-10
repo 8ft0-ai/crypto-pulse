@@ -1,0 +1,95 @@
+version: 1
+decision_id: phase-05-governed-llm-no-go-2026-07-11
+status: no-go
+reviewed_at_utc: "2026-07-11T06:09:45.578579Z"
+parent_issue: 181
+issue: 188
+
+source_run:
+  workflow: Governed LLM model evaluation
+  run_id: 29142348720
+  run_url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29142348720
+  trusted_main_sha: 501d1f67852f5e022a4fb5661f2a26adbbe251a8
+  artifact:
+    name: governed-llm-evaluation-29142348720-1
+    artifact_id: 8245573081
+    digest: sha256:6632880479ef1883ab9ff6380758cd4a5a091eb4698eacb9a870b97be9b016a8
+    retained_until: "2026-08-10T06:09:45Z"
+  reviewed_file_hashes:
+    evaluation_summary_sha256: 43de3a619eaf47ecd041eeffa5d599f456a49d06a6653a0cf39beab2c40e993d
+    model_availability_sha256: 3da918f88901f75e694df81099af0e303af7b29b0094286b48894dab120ce48f
+    decision_candidate_sha256: 07fe294f93124c92b21bb06fc1006dc114f65b0ac960aeabc6bd771c529caf4b
+    reviewer_scorecard_sha256: dc50ee2777b10e5874d8751dd36b1a6133012acdfb644e4c4966b8d6bd43b4dd
+
+corpus:
+  path: evaluation/phase-05/corpus.yml
+  scoring_rubric: evaluation/phase-05/scoring-rubric.md
+  cases: 5
+  repeats_per_case: 2
+  required_runs_per_model: 10
+  total_planned_runs: 20
+  completed_run_records: 20
+
+contracts:
+  prompt_version: crypto-market-analysis/v1
+  analysis_schema_version: crypto-market-analysis/v1
+  evidence_schema_version: crypto-market-evidence-bundle/v1
+  temperature: 0.2
+  max_output_tokens: 4000
+  structured_output: true
+
+models:
+  - key: current-nemotron
+    role: current_candidate
+    requested_model: nvidia/nemotron-3-super-120b-a12b:free
+    catalogue_available: true
+    catalogue_eligible: true
+    catalogue_expiration_date: null
+    hard_passes: 0
+    required_runs: 10
+    disqualified: true
+    actual_providers: []
+    failure_counts:
+      ineligible_routing: 10
+    reason: No runtime endpoint matched the required zero-data-retention policy.
+
+  - key: alternative-qwen
+    role: eligible_alternative
+    requested_model: qwen/qwen3-next-80b-a3b-instruct:free
+    catalogue_available: true
+    catalogue_eligible: true
+    catalogue_expiration_date: "2026-07-19"
+    hard_passes: 0
+    required_runs: 10
+    disqualified: true
+    actual_providers: []
+    failure_counts:
+      provider_error_unspecified: 4
+      provider_rate_limit: 6
+    reason: All requests failed at the provider boundary; six explicitly hit the free-tier eight-requests-per-minute limit.
+
+results:
+  selected_model: null
+  accepted_model_outputs: 0
+  model_quality_evidence: unavailable
+  usefulness_readability_results: unavailable
+  latency_token_cost_results: unavailable
+  reproducibility_observation: Repeated provider-boundary failures were recorded, but no model output existed to assess output reproducibility.
+  estimated_cost_usd_total: 0
+  actual_providers_observed: []
+  recommendation: Reject both evaluated configurations for the Phase 5 production-proof path.
+
+boundaries:
+  zero_data_retention_required: true
+  cross_model_fallback_enabled: false
+  paid_model_approved: false
+  automatic_generation_after_snapshot_merge_approved: false
+  rolling_report_generation_approved: false
+  evaluation_output_reused_as_evidence: false
+  raw_provider_output_committed: false
+  generated_site_output_committed: false
+
+next_step:
+  issue_189_status: blocked
+  reason: Issue 189 requires an accepted manual dry run and accepted rolling report PR, which cannot be produced under the reviewed no-go result.
+  required_decision: Separately approve a routable model/provider configuration or explicitly revise the provider-policy and cost constraints before rerunning the fixed corpus.

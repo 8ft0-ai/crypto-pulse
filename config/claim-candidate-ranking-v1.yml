@@ -1,0 +1,134 @@
+version: 1
+ranking_version: phase-06-deterministic-ranking/v1
+max_total: 7
+max_per_section: 8
+section_order:
+  - market_summary
+  - key_observations
+  - risks_and_limitations
+  - data_quality
+  - source_status
+required_sections_if_available:
+  - market_summary
+  - key_observations
+required_slots:
+  - name: primary-market-price
+    section: market_summary
+    intent: absolute_observation
+    metrics:
+      - price_usd
+    evidence_scopes:
+      - primary_market
+  - name: daily-market-movement
+    section: key_observations
+    intent: directional_observation
+    metrics:
+      - change_24h_pct
+      - change_1d_pct
+    evidence_scopes:
+      - primary_market
+  - name: primary-market-price-comparison
+    section: key_observations
+    intent: comparison
+    metrics:
+      - price_usd
+    evidence_scopes:
+      - primary_market
+  - name: primary-market-movement-comparison
+    section: key_observations
+    intent: comparison
+    metrics:
+      - change_24h_pct
+      - change_1h_pct
+    evidence_scopes:
+      - primary_market
+  - name: explicit-data-quality-limitation
+    section: data_quality
+    intent: data_quality_limitation
+    metrics:
+      - status
+      - quality_status
+      - warning
+      - missing_symbols
+    evidence_scopes:
+      - governance
+  - name: snapshot-status
+    section: data_quality
+    intent: snapshot_status
+    metrics:
+      - status
+      - quality_status
+    evidence_scopes:
+      - governance
+section_limits:
+  market_summary: 1
+  key_observations: 4
+  risks_and_limitations: 0
+  data_quality: 2
+  source_status: 0
+intent_limits:
+  absolute_observation: 1
+  directional_observation: 3
+  comparison: 2
+  source_status: 0
+  data_quality_limitation: 1
+  snapshot_status: 1
+priorities:
+  conflict_status:
+    - divergent
+    - corroborated
+    - none
+  quality_significance:
+    - material
+    - minor
+    - not_applicable
+  materiality_bucket:
+    - high
+    - medium
+    - low
+    - not_applicable
+  intent:
+    - comparison
+    - data_quality_limitation
+    - directional_observation
+    - absolute_observation
+    - snapshot_status
+    - source_status
+  cross_source:
+    - true
+    - false
+  recency_bucket:
+    - current
+    - recent
+    - unknown
+    - stale
+metric_priority:
+  "*": 0
+  price_usd: 10
+  price: 9
+  change_24h_pct: 9
+  change_1d_pct: 9
+  change_7d_pct: 8
+  change_1h_pct: 7
+  market_cap_usd: 6
+  volume_24h_usd: 5
+  total_tvl_usd: 4
+  status: 4
+  quality_status: 4
+  circulating_usd: 3
+  missing_symbols: 3
+  warning: 2
+evidence_scope_priority:
+  primary_market: 10
+  exchange: 8
+  governance: 8
+  defi: 4
+  mixed: 1
+  other: 0
+comparison_relation_priority:
+  - not_equal
+  - opposite_direction
+  - approximately_equal
+  - greater_than
+  - less_than
+  - none

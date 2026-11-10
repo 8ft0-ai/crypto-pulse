@@ -1,0 +1,156 @@
+version: 1
+decision_id: phase-05-public-demo-no-go-2026-07-11
+status: public-demo-no-go
+reviewed_on: "2026-07-11"
+parent_issue: 199
+issue: 210
+diagnostic_issue: 224
+architecture_follow_up_issue: 228
+
+scope:
+  outcome_applies_to: current-model-authored-natural-prose-contract
+  governed_llm_capability_proved: true
+  model_intrinsically_rejected: false
+  model_comparison_required_before_contract_redesign: false
+
+source_run:
+  workflow: Governed GPT-4o mini public-data diagnostic
+  run_id: 29151358149
+  run_url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29151358149
+  evaluation_job_id: 86541288102
+  evaluation_job_url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29151358149/job/86541288102
+  trusted_main_sha: 96f1c680c700318b0ed1d26203d2cd0555f5f5ac
+  completed_at_utc: "2026-07-11T11:48:33.943963Z"
+  artifact:
+    name: governed-gpt4o-mini-public-demo-29151358149-1
+    artifact_id: 8248289872
+    digest: sha256:9e8d6187c3ec701040cd2f2021002a5966cf0aec333f1b2a15f4d56bffa7c282
+    retained_until: "2026-08-10T11:48:34Z"
+  reviewed_file_hashes:
+    actions_summary_sha256: b37d1525ae221aa6ce2f76d3c4ecabadea25c59bbfa1852aa2cc673570a669c5
+    attempt_records_sha256: 2d1044cf41e18f21a204ce5e654b82a10e9c0cd9755bd083234eb1e1a4e03863
+    decision_candidate_sha256: 01f0cac894a12ff54742fd21f7c9edb9fae30738fc88d6ee859255d51db0aa39
+    diagnostic_corpus_summary_sha256: 8be2a694835d20b926cd2d58b529784f1b6b5e1be02b87a024d6930f065d40c9
+    evaluation_summary_sha256: 894a60de1a6a67d07ab283120e055b582eb5d17fdd08a7bd60a2fa58ca506dd9
+    key_status_sha256: bc9d00a6f39e1c0aa8e2fbca793c1f1ac147a2c455b1ea676469931eb52e4172
+    model_availability_sha256: 794fbec135afca930c563afa3c6305d3d07e8d04c7d8c2cd7d0df05a6fb6f65d
+    paid_pricing_sha256: 34b82bb3b71c018a8f4938fadc52fab83ed585a3427485859307e0cf726f0bf2
+    public_data_demo_policy_sha256: 1e167394b92518a1e75bbd7e0dc7b5f60f57acd6cf4a58dc893fd4fcd93ce6c2
+    reviewer_scorecard_sha256: 82fc121557de602f1c60a4a2b9f587d3dd655245943a44e7f48f96db9a8d3c2f
+    viability_stages_sha256: e993fd6503821a88e86b95e700950af5c6636841d90a9f35b479868eb7f4c370
+
+configuration:
+  model: openai/gpt-4o-mini
+  actual_provider: OpenAI
+  input_classifications:
+    - public-market-data
+    - evaluation-only
+  zero_data_retention: false
+  data_collection: deny
+  ordinary_provider_retention_accepted: true
+  maximum_abuse_monitoring_days: 30
+  structured_output_required: true
+  cross_model_fallback_enabled: false
+  automatic_generation_enabled: false
+  publication_enabled: false
+  maximum_generation_cost_usd: 0.01
+  maximum_experiment_cost_usd: 0.15
+
+execution:
+  maximum_logical_calls: 12
+  completed_logical_calls: 12
+  http_attempts: 12
+  route_preflight_passes: 1
+  smoke_status: rejected
+  smoke_failure_code: analysis_rejected
+  continued_after_smoke_validation_failure: true
+  corpus_runs_completed: 10
+  hard_passes: 1
+  required_hard_passes: 10
+  actual_provider_counts:
+    OpenAI: 10
+  provider_fallback_runs: 0
+  cross_model_fallback_runs: 0
+  corpus_cost_usd: 0.0165696
+  total_cost_usd: 0.0185832
+  cost_metadata_complete: true
+  cost_ceiling_exceeded: false
+  latency_ms_mean: 39482.7
+  latency_ms_min: 20295
+  latency_ms_max: 61426
+  input_tokens_mean: 7964.0
+  output_tokens_mean: 1263.4
+  exact_completion_reproducibility_cases: 0
+  reproducibility_cases_observed: 5
+
+contract_results:
+  provider_completions: 10
+  structured_output_passes: 10
+  canonical_schema_passes: 10
+  referential_passes: 10
+  policy_passes: 10
+  prompt_injection_safe_runs: 2
+  prompt_injection_required_runs: 2
+  source_disagreement_safe_or_silent_runs: 2
+  source_disagreement_required_runs: 2
+  accepted_outputs: 1
+  rejected_outputs: 9
+  diagnostic_counts:
+    value_untraceable_number: 16
+    semantic_invalid_data_quality_support: 3
+    value_entity_mismatch: 1
+
+failure_distribution:
+  - class: rounded-negative-magnitude-without-approximation-wording
+    affected_runs: 6
+    diagnostic_count: 16
+    assessment: genuine_prompt_contract_failure
+    architectural_implication: deterministic_renderer_should_own_sign_and_rounding_text
+  - class: timestamp-observation-assigned-data-quality-limitation
+    affected_runs: 2
+    diagnostic_count: 2
+    assessment: claim_taxonomy_selection_failure
+    architectural_implication: derive_or_constrain_claim_intent_from_evidence_type_and_section
+  - class: selected-source-observation-assigned-data-quality-limitation
+    affected_runs: 1
+    diagnostic_count: 1
+    assessment: claim_taxonomy_selection_failure
+    architectural_implication: derive_or_constrain_claim_intent_from_evidence_type_and_section
+  - class: humanised-string-value-alias
+    affected_runs: 1
+    diagnostic_count: 1
+    assessment: validator_prompt_mismatch_attached_to_already_invalid_claim
+    architectural_implication: deterministic_renderer_should_own_labels
+
+review_decision:
+  current_contract: public-demo-no-go
+  capability_proof: achieved
+  selected_model: null
+  model_change: deferred
+  further_wording_specific_validator_patches: prohibited
+  next_architecture: semantic-claim-plan-plus-deterministic-renderer
+  architecture_issue: 228
+  qualification_requirement_after_redesign: 10-of-10-hard-passes
+
+planning_effect:
+  issue_210: close_as_public-demo-no-go_on_merge
+  issue_224: complete
+  issue_228: approved_for_shaping
+  issue_189: remains_blocked
+  issue_181: remains_open
+  issue_199: revised_policy_proof_complete_but_contract_not_qualified
+  automatic_generation_after_snapshot_merge: disabled
+  rolling_report_generation: disabled
+  model_comparison: deferred_until_contract_stable
+
+boundaries:
+  default_generation_zero_data_retention_unchanged: true
+  public_demo_only_policy_exception: true
+  data_collection_denied: true
+  cross_model_fallback_enabled: false
+  automatic_generation_approved: false
+  publication_approved: false
+  evaluation_output_reused_as_market_evidence: false
+  raw_provider_output_committed: false
+  secrets_committed: false
+  generated_site_output_committed: false

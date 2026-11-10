@@ -1,0 +1,195 @@
+name: Apply AI Patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: "Feature branch to create or update"
+        required: true
+        type: string
+      commit_message:
+        description: "Commit message for the applied patch"
+        required: true
+        type: string
+      pr_title:
+        description: "Pull request title"
+        required: true
+        type: string
+      pr_body:
+        description: "Pull request body"
+        required: true
+        type: string
+      patch_base64:
+        description: "Base64-encoded unified git patch"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-ai-patch:
+    name: Apply patch and open PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch_name='${{ inputs.branch_name }}'
+
+          if [[ ! "$branch_name" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+            echo "Invalid branch name: $branch_name" >&2
+            exit 1
+          fi
+
+          if [[ "$branch_name" == "main" || "$branch_name" == "master" ]]; then
+            echo "Refusing to write directly to protected branch: $branch_name" >&2
+            exit 1
+          fi
+
+          if [[ -z '${{ inputs.patch_base64 }}' ]]; then
+            echo "patch_base64 input must not be empty" >&2
+            exit 1
+          fi
+
+      - name: Configure Git identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create or reset feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_name='${{ inputs.branch_name }}'
+          git checkout -B "$branch_name" origin/main
+
+      - name: Decode patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          raw = os.environ["PATCH_BASE64"].strip()
+          try:
+              decoded = base64.b64decode(raw, validate=True)
+          except Exception as exc:
+              raise SystemExit(f"Invalid base64 patch: {exc}")
+
+          Path("ai.patch").write_bytes(decoded)
+          if not decoded.strip():
+              raise SystemExit("Decoded patch is empty")
+          PY
+        env:
+          PATCH_BASE64: ${{ inputs.patch_base64 }}
+
+      - name: Reject unsafe patch paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep -E '^(diff --git a/|\+\+\+ b/|--- a/)' ai.patch | grep -E '(^diff --git a/_site/| b/_site/| a/_site/)' ; then
+            echo "Patch modifies generated _site/ output, which is not allowed." >&2
+            exit 1
+          fi
+
+          if grep -E '^(diff --git a/|\+\+\+ b/|--- a/)' ai.patch | grep -E '(\.git/|(^|/)/|\.\./)' ; then
+            echo "Patch contains a suspicious path." >&2
+            exit 1
+          fi
+
+      - name: Check patch applies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check ai.patch
+
+      - name: Apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply ai.patch
+
+      - name: Show changed files
+        shell: bash
+        run: |
+          git status --short
+          git diff --stat
+
+      - name: Refuse empty patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Patch applied cleanly but produced no changes." >&2
+            exit 1
+          fi
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m '${{ inputs.commit_message }}'
+
+      - name: Push branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_name='${{ inputs.branch_name }}'
+          git push --force-with-lease origin "$branch_name"
+
+      - name: Open or update pull request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = '${{ inputs.branch_name }}';
+            const base = 'main';
+            const title = `${{ inputs.pr_title }}`;
+            const body = `${{ inputs.pr_body }}`;
+
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${head}`,
+              base,
+            });
+
+            if (existing.data.length > 0) {
+              const pr = existing.data[0];
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                title,
+                body,
+              });
+              core.notice(`Updated PR #${pr.number}: ${pr.html_url}`);
+            } else {
+              const pr = await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                body,
+                head,
+                base,
+              });
+              core.notice(`Created PR #${pr.data.number}: ${pr.data.html_url}`);
+            }

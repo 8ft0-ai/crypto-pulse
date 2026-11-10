@@ -1,0 +1,812 @@
+schema_version: delivery-graph/v1
+
+nodes:
+  - id: pre-phase-baseline
+    type: baseline
+    title: Pre-phase baseline
+    status: complete
+    summary: Early repository history before formal phase-managed delivery, including demo positioning, site UX, process hardening, ingestion MVP work, scheduled ingestion automation, and snapshot quality hardening.
+    record: planning/delivery/pre-phase-baseline.md
+
+  - id: phase-1
+    type: phase
+    title: Phase 1 — Source evidence spine
+    status: complete
+    summary: Scheduled ingestion can produce a scoped valid-ok source snapshot PR.
+    record: planning/delivery/phase-01-source-evidence-spine.md
+
+  - id: phase-2
+    type: phase
+    title: Phase 2 — Deterministic report review loop
+    status: complete
+    summary: A merged valid-ok source snapshot can produce a reviewed deterministic Markdown report PR and render through the static site generator without committing _site output.
+    record: planning/delivery/phase-02-deterministic-report-review-loop.md
+
+  - id: phase-3
+    type: phase
+    title: Phase 3 — Self-proving generated report PRs
+    status: complete
+    summary: Generated report PRs carry their own pre-PR proof, with downstream PR validation retained as defence in depth.
+    record: planning/delivery/phase-03-self-proving-generated-report-prs.md
+
+  - id: issue-75
+    type: issue
+    title: Build source evidence v1 and deterministic report spine
+    number: 75
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/75
+    status: closed
+
+  - id: issue-90
+    type: issue
+    title: Phase 2 — Prove deterministic report generation and review loop
+    number: 90
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/90
+    status: closed
+
+  - id: issue-115
+    type: issue
+    title: Phase 3 — Make generated report PRs self-proving
+    number: 115
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/115
+    status: closed
+
+  - id: issue-122
+    type: issue
+    title: Prove end-to-end self-proving generated report flow
+    number: 122
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/122
+    status: closed
+
+  - id: issue-123
+    type: issue
+    title: Phase 3 close-out evidence
+    number: 123
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/123
+    status: closed
+
+  - id: issue-149
+    type: issue
+    title: Use a rolling source snapshot PR for scheduled ingestion
+    number: 149
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/149
+    status: closed
+
+  - id: pr-89
+    type: pull_request
+    title: Add crypto source snapshot 1742_AEST_source_snapshot
+    number: 89
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/89
+    status: merged
+    merge_commit: 178703aef4be8fc0ecf35677e1ffeffe7d4d4a52
+
+  - id: pr-104
+    type: pull_request
+    title: Add deterministic crypto report 1742_AEST
+    number: 104
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/104
+    status: merged
+    merge_commit: f6083aff44377b6819ce66d56da848e289124eb8
+
+  - id: pr-132
+    type: pull_request
+    title: Add deterministic crypto report 2031_AEST
+    number: 132
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/132
+    status: merged
+    merge_commit: 5a77e5aa315f72c76363a7286396c67c8ec43405
+
+  - id: pr-134
+    type: pull_request
+    title: Record Phase 3 close-out evidence
+    number: 134
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/134
+    status: merged
+    merge_commit: 06039f42d3b4eb20889c7fafe4d983a1f2dde3f1
+
+  - id: pr-152
+    type: pull_request
+    title: Use rolling source snapshot PR for ingestion
+    number: 152
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/152
+    status: merged
+    merge_commit: d6567af92330aed9ff75636b2d6286488450f413
+
+  - id: run-28926128310
+    type: workflow_run
+    title: Source snapshot workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28926128310
+    conclusion: success
+
+  - id: run-28940526728
+    type: workflow_run
+    title: Deterministic report generation workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940526728
+    conclusion: success
+
+  - id: run-28940544039
+    type: workflow_run
+    title: Phase 2 downstream PR validation
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28940544039
+    conclusion: success
+
+  - id: run-28999816016
+    type: workflow_run
+    title: Self-proving report generation workflow run
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/28999816016
+    conclusion: success
+
+  - id: run-29000320882
+    type: workflow_run
+    title: Phase 3 downstream PR validation
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/29000320882
+    conclusion: success
+
+  - id: artifact-source-snapshot-1742
+    type: artifact
+    title: Source snapshot 1742_AEST
+    path: data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json
+    artifact_kind: source_snapshot
+    committed: true
+
+  - id: artifact-report-1742
+    type: artifact
+    title: Deterministic report 1742_AEST
+    path: reports/crypto/hourly/2026/07/08/1742_AEST.md
+    artifact_kind: report
+    committed: true
+
+  - id: artifact-rendered-1742
+    type: artifact
+    title: Rendered archive path 1742_AEST
+    path: _site/archive/2026/07/08/1742_AEST.html
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: artifact-report-2031
+    type: artifact
+    title: Deterministic report 2031_AEST
+    path: reports/crypto/hourly/2026/07/08/2031_AEST.md
+    artifact_kind: report
+    committed: true
+
+  - id: artifact-rendered-2031
+    type: artifact
+    title: Rendered archive path 2031_AEST
+    path: _site/archive/2026/07/08/2031_AEST.html
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: artifact-evidence-builder
+    type: artifact
+    title: Report PR evidence builder
+    path: scripts/build_report_pr_evidence.py
+    artifact_kind: script
+    committed: true
+
+  - id: artifact-scope-validator
+    type: artifact
+    title: Generated report scope validator
+    path: scripts/validate_generated_report_pr_scope.py
+    artifact_kind: script
+    committed: true
+
+  - id: artifact-delivery-index
+    type: artifact
+    title: Delivery records index
+    path: planning/delivery/index.md
+    artifact_kind: documentation
+    committed: true
+
+  - id: problem-approval-gated-validation
+    type: problem
+    title: Generated PR validation can be approval-gated
+    summary: Generated PRs from automation can require downstream PR validation approval before proof is visible.
+
+  - id: problem-snapshot-pr-backlog
+    type: problem
+    title: Generated snapshot PR backlog
+    summary: Scheduled ingestion originally opened a new generated source snapshot PR each run, creating review inventory faster than the demo needed.
+
+  - id: decision-self-proof-before-pr
+    type: decision
+    title: Prove generated report before opening PR
+    summary: Keep the existing workflow identity and make the generating workflow run validation, tests, site build, rendered-path proof, changed-file scope validation, and PR evidence construction before opening the generated PR.
+
+  - id: decision-rolling-source-snapshot-pr
+    type: decision
+    title: Use one rolling source snapshot PR
+    summary: Keep the scheduled ingestion demo running while updating a stable rolling branch and PR instead of opening a new snapshot PR every run.
+
+  - id: boundary-no-committed-site
+    type: boundary
+    title: No committed _site output
+    summary: Generated _site output may be built for proof, but must remain disposable and uncommitted.
+
+  - id: boundary-no-credential-expansion
+    type: boundary
+    title: No credential expansion
+    summary: Phase 3 deliberately avoided expanding repository credentials.
+
+  - id: boundary-no-llm-report-narrative
+    type: boundary
+    title: No LLM-generated report narrative
+    summary: Deterministic reports remain non-LLM generated in the proven flow.
+
+  - id: boundary-no-advice-like-content
+    type: boundary
+    title: No advice-like report content
+    summary: Reports remain demo content and must not become recommendations or trading guidance.
+
+  - id: lesson-source-snapshots-as-evidence
+    type: lesson
+    title: Treat source snapshots as immutable evidence
+    summary: Source ingestion, report generation, and site publication should remain separate, reviewable steps.
+
+  - id: lesson-layered-validation
+    type: lesson
+    title: Treat pre-PR proof and downstream validation as layered controls
+    summary: Self-proofing makes generated PRs reviewable before downstream validation, but does not make downstream validation unnecessary.
+
+  - id: phase-12
+    type: phase
+    title: Phase 12 — Canonical observation-hour evidence
+    status: complete
+    summary: Future source snapshots preserve actual generation and fetch timestamps while adding separately validated canonical containing-hour identity for later governed consumers.
+    record: planning/delivery/phase-12-canonical-observation-hour-evidence.md
+
+  - id: issue-436
+    type: issue
+    title: Phase 12 delivery control — canonical observation-hour evidence
+    number: 436
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/436
+    status: closed
+
+  - id: pr-440
+    type: pull_request
+    title: Enforce Phase 12 observation-hour workflow evidence
+    number: 440
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/440
+    status: merged
+    merge_commit: cb251970eb671d39cfcb8650b03b8fa55f6dfa23
+
+  - id: artifact-observation-hour-validator
+    type: artifact
+    title: Observation-hour evidence validator
+    path: scripts/validate_crypto_observation_hour.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-observation-hour-identity
+    type: boundary
+    title: Observation-hour identity preserves actual time
+    summary: Phase 12 identifies the UTC hour containing actual generation time without changing run.generated_at_utc, historical evidence, or frozen Phase 10 exact-time semantics.
+
+  - id: phase-13
+    type: phase
+    title: Phase 13 — Deterministic observation-hour comparison and temporal evidence
+    status: complete
+    summary: Phase-12 slot identity is consumed through separately versioned exact adjacent-hour comparison and deterministic repository-bound temporal-series evidence.
+    record: planning/delivery/phase-13-observation-hour-temporal-evidence.md
+
+  - id: issue-446
+    type: issue
+    title: Phase 13 delivery control — observation-hour temporal evidence
+    number: 446
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/446
+    status: closed
+
+  - id: pr-452
+    type: pull_request
+    title: Add Phase 13 observation-hour temporal proof corpus
+    number: 452
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/452
+    status: merged
+    merge_commit: 43cbf6a62afbc83d97f6f677795b0fe61c50738a
+
+  - id: artifact-observation-hour-series
+    type: artifact
+    title: Canonical observation-hour temporal series
+    path: scripts/crypto_observation_hour_series.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-phase13-public-integration
+    type: boundary
+    title: Public temporal integration remains separately governed
+    summary: Phase 13 proves offline observation-hour comparison and series evidence but does not authorise renderer, report, site or publication integration.
+
+  - id: phase-15
+    type: phase
+    title: Phase 15 — Public deterministic temporal evidence
+    status: complete
+    summary: One repository-bound BTC.price_usd series over exactly 24 canonical observation-hour slots is now exposed through the existing public site pipeline with explicit gaps, provenance and demo/non-advice framing.
+    record: planning/delivery/phase-15-public-deterministic-temporal-evidence.md
+
+  - id: issue-482
+    type: issue
+    title: Phase 15 delivery control — public deterministic temporal evidence
+    number: 482
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/482
+    status: close-out-pending
+
+  - id: pr-490
+    type: pull_request
+    title: Integrate Phase 15 deterministic temporal evidence
+    number: 490
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/490
+    status: merged
+    merge_commit: 99c4ced3001bb227d599173bb5a17011d23eea53
+
+  - id: run-32528437373
+    type: workflow_run
+    title: Publish Phase 15 temporal evidence to GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/32528437373
+    conclusion: success
+
+  - id: artifact-phase15-temporal-page
+    type: artifact
+    title: Public deterministic temporal evidence page
+    path: _site/temporal.html
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: boundary-phase15-narrow-public-evidence
+    type: boundary
+    title: Public temporal evidence remains narrow and non-advisory
+    summary: The public Phase 15 contract remains metric / BTC.price_usd / 24 canonical UTC-hour slots from one checked-out repository commit; Phase 14 activation, broader series, market-card scope, narrative, forecast and advice remain separately governed.
+
+  - id: phase-16
+    type: phase
+    title: Phase 16 — Reader-facing evidence experience
+    status: complete
+    summary: Home, Most recent, Temporal evidence and Archive now present one coherent reader experience over distinct repository-owned report, observation and temporal authorities with explicit sparse evidence and demo/non-advice framing.
+    record: planning/delivery/phase-16-reader-facing-evidence-experience.md
+
+  - id: issue-501
+    type: issue
+    title: Phase 16 delivery control — reader-facing evidence experience
+    number: 501
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/501
+    status: close-out-pending
+
+  - id: pr-507
+    type: pull_request
+    title: "Phase 16 Slice 3: add Archive reader model"
+    number: 507
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/507
+    status: merged
+    merge_commit: ee46ae895036b60bccfab99e4f462bf5f53c15cd
+
+  - id: run-32633849094
+    type: workflow_run
+    title: Publish Phase 16 reader experience to GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/32633849094
+    conclusion: success
+
+  - id: artifact-phase16-reader-site
+    type: artifact
+    title: Public Phase 16 reader-facing evidence surfaces
+    path: _site/
+    artifact_kind: rendered_proof
+    committed: false
+
+  - id: boundary-phase16-authority-separation
+    type: boundary
+    title: Reader presentation preserves evidence authority separation
+    summary: Report chronology, current deterministic observation, archived report content and the Phase 15 temporal record remain distinct; Phase 16 adds no evidence accumulation, publication activation, model authority, advice or committed generated site output.
+
+  - id: phase-17
+    type: phase
+    title: Phase 17 — Trusted-main source-evidence accumulation and freshness
+    status: complete
+    summary: Immutable Phase-12-valid scheduled evidence can be accumulated into bounded source-only candidates, separately promoted to protected main, consumed by unchanged temporal/public readers, and refreshed daily without automatic merge authority.
+    record: planning/delivery/phase-17-trusted-main-source-evidence-accumulation.md
+
+  - id: issue-523
+    type: issue
+    title: Phase 17 delivery control — trusted-main source-evidence accumulation
+    number: 523
+    url: https://github.com/8ft0-ai/crypto-pulse/issues/523
+    status: closed
+
+  - id: pr-535
+    type: pull_request
+    title: Phase 17 source-evidence accumulation candidate
+    number: 535
+    url: https://github.com/8ft0-ai/crypto-pulse/pull/535
+    status: merged
+    merge_commit: 877670ac6739fcfda1614c407a90c7417b1c7320
+
+  - id: run-33333144803
+    type: workflow_run
+    title: Publish Phase 17 promoted source evidence through GitHub Pages
+    url: https://github.com/8ft0-ai/crypto-pulse/actions/runs/33333144803
+    conclusion: success
+
+  - id: artifact-phase17-source-evidence-accumulator
+    type: artifact
+    title: Trusted-main source-evidence accumulator
+    path: scripts/trusted_main_source_evidence_accumulation.py
+    artifact_kind: script
+    committed: true
+
+  - id: boundary-phase17-candidate-refresh-no-auto-merge
+    type: boundary
+    title: Daily candidate refresh does not grant merge authority
+    summary: Scheduled automation may create or refresh a disposable source-only candidate, but each protected-main source-evidence merge still requires exact-head validation, fresh review, separate owner authority and an expected-head guard.
+
+edges:
+  - from: pre-phase-baseline
+    to: phase-1
+    type: enabled
+    label: enabled formal phase delivery
+
+  - from: issue-75
+    to: phase-1
+    type: implemented_by
+    label: controlled
+
+  - from: phase-1
+    to: pr-89
+    type: proved_by
+    label: proved by
+
+  - from: pr-89
+    to: run-28926128310
+    type: generated_by
+    label: generated by
+
+  - from: pr-89
+    to: artifact-source-snapshot-1742
+    type: produced
+    label: produced
+
+  - from: artifact-source-snapshot-1742
+    to: phase-2
+    type: enabled
+    label: enabled
+
+  - from: phase-1
+    to: phase-2
+    type: enabled
+    label: enabled
+
+  - from: phase-1
+    to: lesson-source-snapshots-as-evidence
+    type: carried_forward_to
+    label: carried forward
+
+  - from: phase-2
+    to: issue-90
+    type: depends_on
+    label: governed by
+
+  - from: phase-2
+    to: pr-104
+    type: proved_by
+    label: proved by
+
+  - from: pr-104
+    to: run-28940526728
+    type: generated_by
+    label: generated by
+
+  - from: pr-104
+    to: run-28940544039
+    type: validated_by
+    label: validated by
+
+  - from: pr-104
+    to: artifact-report-1742
+    type: produced
+    label: produced
+
+  - from: run-28940544039
+    to: artifact-rendered-1742
+    type: produced
+    label: proved rendered path
+
+  - from: phase-2
+    to: problem-approval-gated-validation
+    type: revealed_problem
+    label: revealed problem
+
+  - from: problem-approval-gated-validation
+    to: phase-3
+    type: motivated
+    label: motivated
+
+  - from: phase-3
+    to: issue-115
+    type: depends_on
+    label: governed by
+
+  - from: phase-3
+    to: decision-self-proof-before-pr
+    type: resolved_by
+    label: resolved by
+
+  - from: decision-self-proof-before-pr
+    to: pr-132
+    type: proved_by
+    label: proved by
+
+  - from: phase-3
+    to: pr-132
+    type: proved_by
+    label: proved by
+
+  - from: pr-132
+    to: issue-122
+    type: proved_by
+    label: closed proof issue
+
+  - from: pr-132
+    to: run-28999816016
+    type: generated_by
+    label: generated by
+
+  - from: pr-132
+    to: run-29000320882
+    type: validated_by
+    label: validated by
+
+  - from: pr-132
+    to: artifact-report-2031
+    type: produced
+    label: produced
+
+  - from: run-28999816016
+    to: artifact-rendered-2031
+    type: produced
+    label: proved rendered path
+
+  - from: phase-3
+    to: artifact-evidence-builder
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-3
+    to: artifact-scope-validator
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-3
+    to: pr-134
+    type: closed_out_by
+    label: closed out by
+
+  - from: pr-134
+    to: issue-123
+    type: recorded_by
+    label: recorded in
+
+  - from: phase-1
+    to: problem-snapshot-pr-backlog
+    type: carried_forward_to
+    label: exposed operating friction
+
+  - from: problem-snapshot-pr-backlog
+    to: decision-rolling-source-snapshot-pr
+    type: motivated
+    label: motivated
+
+  - from: decision-rolling-source-snapshot-pr
+    to: pr-152
+    type: implemented_by
+    label: implemented by
+
+  - from: pr-152
+    to: issue-149
+    type: recorded_by
+    label: closed issue
+
+  - from: pr-152
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-1
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-2
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-credential-expansion
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-llm-report-narrative
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: boundary-no-advice-like-content
+    type: preserved
+    label: preserved
+
+  - from: phase-3
+    to: lesson-layered-validation
+    type: carried_forward_to
+    label: carried forward
+
+  - from: phase-1
+    to: phase-12
+    type: carried_forward_to
+    label: extended source evidence spine
+
+  - from: phase-12
+    to: issue-436
+    type: depends_on
+    label: governed by
+
+  - from: phase-12
+    to: pr-440
+    type: proved_by
+    label: proved rolling enforcement
+
+  - from: phase-12
+    to: artifact-observation-hour-validator
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-12
+    to: boundary-observation-hour-identity
+    type: produced
+    label: established
+
+  - from: phase-12
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-12
+    to: phase-13
+    type: enabled
+    label: enabled slot-ready consumer
+
+  - from: phase-13
+    to: issue-446
+    type: depends_on
+    label: governed by
+
+  - from: phase-13
+    to: pr-452
+    type: proved_by
+    label: proved offline corpus
+
+  - from: phase-13
+    to: artifact-observation-hour-series
+    type: produced
+    label: produced canonical series
+
+  - from: phase-13
+    to: boundary-phase13-public-integration
+    type: preserved
+    label: kept separate
+
+  - from: phase-13
+    to: phase-15
+    type: enabled
+    label: enabled governed public integration
+
+  - from: boundary-phase13-public-integration
+    to: phase-15
+    type: resolved_by
+    label: resolved by separately governed Phase 15
+
+  - from: phase-15
+    to: issue-482
+    type: depends_on
+    label: governed by
+
+  - from: phase-15
+    to: pr-490
+    type: proved_by
+    label: proved public integration
+
+  - from: phase-15
+    to: run-32528437373
+    type: proved_by
+    label: proved automatic Pages publication
+
+  - from: run-32528437373
+    to: artifact-phase15-temporal-page
+    type: produced
+    label: deployed exact temporal artifact
+
+  - from: phase-15
+    to: boundary-phase15-narrow-public-evidence
+    type: preserved
+    label: preserved narrow public boundary
+
+  - from: phase-15
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-15
+    to: phase-16
+    type: enabled
+    label: enabled bounded reader projection
+
+  - from: phase-16
+    to: issue-501
+    type: depends_on
+    label: governed by
+
+  - from: phase-16
+    to: pr-507
+    type: proved_by
+    label: proved final reader integration
+
+  - from: pr-507
+    to: run-32633849094
+    type: validated_by
+    label: deployed by exact-commit Pages run
+
+  - from: run-32633849094
+    to: artifact-phase16-reader-site
+    type: produced
+    label: deployed exact reader surfaces
+
+  - from: phase-16
+    to: boundary-phase16-authority-separation
+    type: preserved
+    label: preserved authority separation
+
+  - from: phase-16
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved
+
+  - from: phase-16
+    to: phase-17
+    type: motivated
+    label: sparse trusted evidence motivated accumulation
+
+  - from: phase-12
+    to: phase-17
+    type: enabled
+    label: canonical observation-hour identity enabled accumulation
+
+  - from: phase-17
+    to: issue-523
+    type: depends_on
+    label: governed by
+
+  - from: phase-17
+    to: pr-535
+    type: proved_by
+    label: proved bounded real source promotion
+
+  - from: phase-17
+    to: run-33333144803
+    type: proved_by
+    label: proved unchanged public chain
+
+  - from: phase-17
+    to: artifact-phase17-source-evidence-accumulator
+    type: implemented_by
+    label: implemented by
+
+  - from: phase-17
+    to: boundary-phase17-candidate-refresh-no-auto-merge
+    type: preserved
+    label: preserved candidate-specific merge governance
+
+  - from: phase-17
+    to: boundary-no-committed-site
+    type: preserved
+    label: preserved

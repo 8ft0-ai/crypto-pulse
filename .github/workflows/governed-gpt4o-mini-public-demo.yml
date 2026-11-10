@@ -1,0 +1,157 @@
+name: Governed GPT-4o mini semantic claim-plan proof
+
+# Historical compatibility references retained for the bounded public-data policy.
+# These modules and their reviewed evidence remain source-controlled but are not
+# invoked by this redesigned workflow:
+# llm_analysis.public_demo_benchmark
+# llm_analysis.public_demo_benchmark_projection prepare
+# llm_analysis.public_demo_benchmark_projection run
+# llm_analysis.public_demo_diagnostic prepare
+# llm_analysis.public_demo_diagnostic run
+# llm_analysis.semantic_plan_benchmark run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governed-gpt4o-mini-semantic-plan-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Require trusted main dispatch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main workflow refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "This workflow must be dispatched from the main branch." >&2
+            exit 1
+          fi
+
+  prepare:
+    name: Freeze and classify semantic-plan corpus
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record trusted main commit
+        id: trusted
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Validate public boundary and build deterministic evidence bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.semantic_plan_benchmark prepare \
+            --repository-root . \
+            --profile config/llm-public-data-semantic-plan.yml \
+            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan-prepared"
+
+      - name: Upload prepared semantic-plan corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-gpt4o-mini-semantic-plan-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan-prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+  evaluate:
+    name: Run bounded protected semantic claim-plan corpus
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: governed-llm-dry-run
+    steps:
+      - name: Check out exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted commit
+        env:
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependency
+        run: pip install pyyaml
+
+      - name: Download prepared semantic-plan corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: governed-gpt4o-mini-semantic-plan-prepared-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan-prepared
+
+      - name: Run controlled semantic claim-plan corpus
+        id: benchmark
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TRUSTED_SHA: ${{ needs.prepare.outputs.trusted_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m llm_analysis.semantic_plan_protected_runner run \
+            --repository-root . \
+            --profile config/llm-public-data-semantic-plan.yml \
+            --viability-config config/llm-evaluation-viability.yml \
+            --prepared-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan-prepared" \
+            --output-dir "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan" \
+            --trusted-main-sha "$TRUSTED_SHA"
+
+      - name: Publish semantic-plan summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan/actions-summary.md" ]]; then
+            cat "$RUNNER_TEMP/governed-gpt4o-mini-semantic-plan/actions-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Governed GPT-4o mini semantic claim-plan proof" >> "$GITHUB_STEP_SUMMARY"
+            echo "The protected run failed before a complete summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload non-published semantic-plan artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governed-gpt4o-mini-semantic-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/governed-gpt4o-mini-semantic-plan/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail when protected infrastructure failed
+        if: steps.benchmark.outcome != 'success'
+        shell: bash
+        run: |
+          echo "The controlled semantic-plan benchmark did not complete. Review retained artefacts." >&2
+          exit 1

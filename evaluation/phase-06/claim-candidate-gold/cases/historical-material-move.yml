@@ -1,0 +1,92 @@
+key: historical-material-move
+classification: historical
+expected_candidate_count: 230
+expected_ordered_candidate_sha256: 4ec53cafdd4399dd910f2eab56a1c064fbe65f1857110c8f4ac4288d450037d0
+expectations:
+- name: btc-price
+  rationale: Bitcoin spot price anchors the later historical snapshot.
+  match:
+    intent: absolute_observation
+    metric: price_usd
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.bitcoin.price_usd
+- name: sol-24h-direction
+  rationale: The material Solana 24-hour decline is available with high materiality.
+  match:
+    intent: directional_observation
+    metric: change_24h_pct
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.solana.change_24h_pct
+- name: eth-7d-direction
+  rationale: The strong Ethereum seven-day movement is available with high materiality.
+  match:
+    intent: directional_observation
+    metric: change_7d_pct
+    comparison_relation: none
+    evidence_ids:
+    - market.asset.ethereum.change_7d_pct
+- name: btc-eth-1h-opposite
+  rationale: Equal-field one-hour movements support an opposite-direction comparison.
+  match:
+    intent: comparison
+    metric: change_1h_pct
+    comparison_relation: opposite_direction
+    evidence_ids:
+    - market.asset.bitcoin.change_1h_pct
+    - market.asset.ethereum.change_1h_pct
+- name: eth-sol-24h-comparison
+  rationale: Ethereum and Solana 24-hour movements are comparable without mixing horizons.
+  match:
+    intent: comparison
+    metric: change_24h_pct
+    comparison_relation: greater_than
+    evidence_ids:
+    - market.asset.ethereum.change_24h_pct
+    - market.asset.solana.change_24h_pct
+- name: coinbase-status
+  rationale: The successful exchange source remains visible as bounded status.
+  match:
+    intent: source_status
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - source.coinbase_exchange.status
+- name: binance-limitation
+  rationale: The skipped optional Binance source remains an explicit limitation.
+  match:
+    intent: data_quality_limitation
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - source.binance.reason
+    - source.binance.status
+- name: snapshot-status
+  rationale: The valid-ok later snapshot status remains available.
+  match:
+    intent: snapshot_status
+    metric: status
+    comparison_relation: none
+    evidence_ids:
+    - quality.snapshot.status
+forbidden:
+- name: no-mixed-horizon-comparison
+  rationale: Ethereum seven-day and Solana 24-hour movements are not the same metric.
+  predicate: evidence_ids_together
+  evidence_ids:
+  - market.asset.ethereum.change_7d_pct
+  - market.asset.solana.change_24h_pct
+- name: no-incompatible-comparison
+  rationale: Every comparison must retain exact field and unit compatibility.
+  predicate: comparison_field_or_unit_mismatch
+- name: no-mixed-source-status
+  rationale: One source-status candidate cannot cite multiple source subjects.
+  predicate: mixed_source_status
+forbidden_text: []
+omissions:
+- name: headline-mixed-horizon-comparison
+  rationale: The scenario highlights separate ETH seven-day and SOL 24-hour moves; they remain separate candidates rather than a false direct comparison.
+  evidence_ids:
+  - market.asset.ethereum.change_7d_pct
+  - market.asset.solana.change_24h_pct

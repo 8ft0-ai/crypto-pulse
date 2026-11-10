@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8ft0-ai.github.io/crypto-pulse/schemas/crypto-market-claim-plan-v1.json",
+  "title": "CryptoPulse governed semantic claim plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_plan_version",
+    "prompt_version",
+    "evidence_bundle_id",
+    "analysis_order",
+    "sections"
+  ],
+  "properties": {
+    "claim_plan_version": {
+      "const": "crypto-market-claim-plan/v1"
+    },
+    "prompt_version": {
+      "const": "crypto-market-claim-plan/v1"
+    },
+    "evidence_bundle_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "analysis_order": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "market_summary",
+          "key_observations",
+          "risks_and_limitations",
+          "data_quality",
+          "source_status"
+        ]
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "intent",
+        "evidence_ids",
+        "comparison_relation",
+        "confidence"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "pattern": "^claim-[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+        },
+        "intent": {
+          "enum": [
+            "absolute_observation",
+            "directional_observation",
+            "comparison",
+            "source_status",
+            "data_quality_limitation",
+            "snapshot_status"
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+          }
+        },
+        "comparison_relation": {
+          "enum": [
+            "none",
+            "greater_than",
+            "less_than",
+            "approximately_equal",
+            "not_equal",
+            "opposite_direction"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section_kind",
+        "claims"
+      ],
+      "properties": {
+        "section_kind": {
+          "enum": [
+            "market_summary",
+            "key_observations",
+            "risks_and_limitations",
+            "data_quality",
+            "source_status"
+          ]
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,151 @@
+# CryptoPulse delivery graph
+
+This file is generated from `planning/delivery/delivery.yaml` by `scripts/render_delivery_graph.py`.
+
+The graph is a curated navigation layer over GitHub issues, pull requests, workflow runs, commits, and delivery records. It is not the canonical audit trail.
+
+```mermaid
+flowchart LR
+  pre_phase_baseline["Baseline\nPre-phase baseline"]
+  phase_1["Phase\nPhase 1 — Source evidence spine"]
+  phase_2["Phase\nPhase 2 — Deterministic report review loop"]
+  phase_3["Phase\nPhase 3 — Self-proving generated report PRs"]
+  issue_75["Issue #75\nBuild source evidence v1 and deterministic report spine"]
+  issue_90["Issue #90\nPhase 2 — Prove deterministic report generation and review loop"]
+  issue_115["Issue #115\nPhase 3 — Make generated report PRs self-proving"]
+  issue_122["Issue #122\nProve end-to-end self-proving generated report flow"]
+  issue_123["Issue #123\nPhase 3 close-out evidence"]
+  issue_149["Issue #149\nUse a rolling source snapshot PR for scheduled ingestion"]
+  pr_89["PR #89\nAdd crypto source snapshot 1742_AEST_source_snapshot"]
+  pr_104["PR #104\nAdd deterministic crypto report 1742_AEST"]
+  pr_132["PR #132\nAdd deterministic crypto report 2031_AEST"]
+  pr_134["PR #134\nRecord Phase 3 close-out evidence"]
+  pr_152["PR #152\nUse rolling source snapshot PR for ingestion"]
+  run_28926128310["Workflow Run\nSource snapshot workflow run"]
+  run_28940526728["Workflow Run\nDeterministic report generation workflow run"]
+  run_28940544039["Workflow Run\nPhase 2 downstream PR validation"]
+  run_28999816016["Workflow Run\nSelf-proving report generation workflow run"]
+  run_29000320882["Workflow Run\nPhase 3 downstream PR validation"]
+  artifact_source_snapshot_1742["Artifact\nSource snapshot 1742_AEST"]
+  artifact_report_1742["Artifact\nDeterministic report 1742_AEST"]
+  artifact_rendered_1742["Artifact\nRendered archive path 1742_AEST"]
+  artifact_report_2031["Artifact\nDeterministic report 2031_AEST"]
+  artifact_rendered_2031["Artifact\nRendered archive path 2031_AEST"]
+  artifact_evidence_builder["Artifact\nReport PR evidence builder"]
+  artifact_scope_validator["Artifact\nGenerated report scope validator"]
+  artifact_delivery_index["Artifact\nDelivery records index"]
+  problem_approval_gated_validation["Problem\nGenerated PR validation can be approval-gated"]
+  problem_snapshot_pr_backlog["Problem\nGenerated snapshot PR backlog"]
+  decision_self_proof_before_pr["Decision\nProve generated report before opening PR"]
+  decision_rolling_source_snapshot_pr["Decision\nUse one rolling source snapshot PR"]
+  boundary_no_committed_site["Boundary\nNo committed _site output"]
+  boundary_no_credential_expansion["Boundary\nNo credential expansion"]
+  boundary_no_llm_report_narrative["Boundary\nNo LLM-generated report narrative"]
+  boundary_no_advice_like_content["Boundary\nNo advice-like report content"]
+  lesson_source_snapshots_as_evidence["Lesson\nTreat source snapshots as immutable evidence"]
+  lesson_layered_validation["Lesson\nTreat pre-PR proof and downstream validation as layered controls"]
+  phase_12["Phase\nPhase 12 — Canonical observation-hour evidence"]
+  issue_436["Issue #436\nPhase 12 delivery control — canonical observation-hour evidence"]
+  pr_440["PR #440\nEnforce Phase 12 observation-hour workflow evidence"]
+  artifact_observation_hour_validator["Artifact\nObservation-hour evidence validator"]
+  boundary_observation_hour_identity["Boundary\nObservation-hour identity preserves actual time"]
+  phase_13["Phase\nPhase 13 — Deterministic observation-hour comparison and temporal evidence"]
+  issue_446["Issue #446\nPhase 13 delivery control — observation-hour temporal evidence"]
+  pr_452["PR #452\nAdd Phase 13 observation-hour temporal proof corpus"]
+  artifact_observation_hour_series["Artifact\nCanonical observation-hour temporal series"]
+  boundary_phase13_public_integration["Boundary\nPublic temporal integration remains separately governed"]
+  phase_15["Phase\nPhase 15 — Public deterministic temporal evidence"]
+  issue_482["Issue #482\nPhase 15 delivery control — public deterministic temporal evidence"]
+  pr_490["PR #490\nIntegrate Phase 15 deterministic temporal evidence"]
+  run_32528437373["Workflow Run\nPublish Phase 15 temporal evidence to GitHub Pages"]
+  artifact_phase15_temporal_page["Artifact\nPublic deterministic temporal evidence page"]
+  boundary_phase15_narrow_public_evidence["Boundary\nPublic temporal evidence remains narrow and non-advisory"]
+  phase_16["Phase\nPhase 16 — Reader-facing evidence experience"]
+  issue_501["Issue #501\nPhase 16 delivery control — reader-facing evidence experience"]
+  pr_507["PR #507\nPhase 16 Slice 3: add Archive reader model"]
+  run_32633849094["Workflow Run\nPublish Phase 16 reader experience to GitHub Pages"]
+  artifact_phase16_reader_site["Artifact\nPublic Phase 16 reader-facing evidence surfaces"]
+  boundary_phase16_authority_separation["Boundary\nReader presentation preserves evidence authority separation"]
+  phase_17["Phase\nPhase 17 — Trusted-main source-evidence accumulation and freshness"]
+  issue_523["Issue #523\nPhase 17 delivery control — trusted-main source-evidence accumulation"]
+  pr_535["PR #535\nPhase 17 source-evidence accumulation candidate"]
+  run_33333144803["Workflow Run\nPublish Phase 17 promoted source evidence through GitHub Pages"]
+  artifact_phase17_source_evidence_accumulator["Artifact\nTrusted-main source-evidence accumulator"]
+  boundary_phase17_candidate_refresh_no_auto_merge["Boundary\nDaily candidate refresh does not grant merge authority"]
+
+  pre_phase_baseline -->|enabled formal phase delivery| phase_1
+  issue_75 -->|controlled| phase_1
+  phase_1 -->|proved by| pr_89
+  pr_89 -->|generated by| run_28926128310
+  pr_89 -->|produced| artifact_source_snapshot_1742
+  artifact_source_snapshot_1742 -->|enabled| phase_2
+  phase_1 -->|enabled| phase_2
+  phase_1 -->|carried forward| lesson_source_snapshots_as_evidence
+  phase_2 -->|governed by| issue_90
+  phase_2 -->|proved by| pr_104
+  pr_104 -->|generated by| run_28940526728
+  pr_104 -->|validated by| run_28940544039
+  pr_104 -->|produced| artifact_report_1742
+  run_28940544039 -->|proved rendered path| artifact_rendered_1742
+  phase_2 -->|revealed problem| problem_approval_gated_validation
+  problem_approval_gated_validation -->|motivated| phase_3
+  phase_3 -->|governed by| issue_115
+  phase_3 -->|resolved by| decision_self_proof_before_pr
+  decision_self_proof_before_pr -->|proved by| pr_132
+  phase_3 -->|proved by| pr_132
+  pr_132 -->|closed proof issue| issue_122
+  pr_132 -->|generated by| run_28999816016
+  pr_132 -->|validated by| run_29000320882
+  pr_132 -->|produced| artifact_report_2031
+  run_28999816016 -->|proved rendered path| artifact_rendered_2031
+  phase_3 -->|implemented by| artifact_evidence_builder
+  phase_3 -->|implemented by| artifact_scope_validator
+  phase_3 -->|closed out by| pr_134
+  pr_134 -->|recorded in| issue_123
+  phase_1 -->|exposed operating friction| problem_snapshot_pr_backlog
+  problem_snapshot_pr_backlog -->|motivated| decision_rolling_source_snapshot_pr
+  decision_rolling_source_snapshot_pr -->|implemented by| pr_152
+  pr_152 -->|closed issue| issue_149
+  pr_152 -->|preserved| boundary_no_committed_site
+  phase_1 -->|preserved| boundary_no_committed_site
+  phase_2 -->|preserved| boundary_no_committed_site
+  phase_3 -->|preserved| boundary_no_committed_site
+  phase_3 -->|preserved| boundary_no_credential_expansion
+  phase_3 -->|preserved| boundary_no_llm_report_narrative
+  phase_3 -->|preserved| boundary_no_advice_like_content
+  phase_3 -->|carried forward| lesson_layered_validation
+  phase_1 -->|extended source evidence spine| phase_12
+  phase_12 -->|governed by| issue_436
+  phase_12 -->|proved rolling enforcement| pr_440
+  phase_12 -->|implemented by| artifact_observation_hour_validator
+  phase_12 -->|established| boundary_observation_hour_identity
+  phase_12 -->|preserved| boundary_no_committed_site
+  phase_12 -->|enabled slot-ready consumer| phase_13
+  phase_13 -->|governed by| issue_446
+  phase_13 -->|proved offline corpus| pr_452
+  phase_13 -->|produced canonical series| artifact_observation_hour_series
+  phase_13 -->|kept separate| boundary_phase13_public_integration
+  phase_13 -->|enabled governed public integration| phase_15
+  boundary_phase13_public_integration -->|resolved by separately governed Phase 15| phase_15
+  phase_15 -->|governed by| issue_482
+  phase_15 -->|proved public integration| pr_490
+  phase_15 -->|proved automatic Pages publication| run_32528437373
+  run_32528437373 -->|deployed exact temporal artifact| artifact_phase15_temporal_page
+  phase_15 -->|preserved narrow public boundary| boundary_phase15_narrow_public_evidence
+  phase_15 -->|preserved| boundary_no_committed_site
+  phase_15 -->|enabled bounded reader projection| phase_16
+  phase_16 -->|governed by| issue_501
+  phase_16 -->|proved final reader integration| pr_507
+  pr_507 -->|deployed by exact-commit Pages run| run_32633849094
+  run_32633849094 -->|deployed exact reader surfaces| artifact_phase16_reader_site
+  phase_16 -->|preserved authority separation| boundary_phase16_authority_separation
+  phase_16 -->|preserved| boundary_no_committed_site
+  phase_16 -->|sparse trusted evidence motivated accumulation| phase_17
+  phase_12 -->|canonical observation-hour identity enabled accumulation| phase_17
+  phase_17 -->|governed by| issue_523
+  phase_17 -->|proved bounded real source promotion| pr_535
+  phase_17 -->|proved unchanged public chain| run_33333144803
+  phase_17 -->|implemented by| artifact_phase17_source_evidence_accumulator
+  phase_17 -->|preserved candidate-specific merge governance| boundary_phase17_candidate_refresh_no_auto_merge
+  phase_17 -->|preserved| boundary_no_committed_site
+```
