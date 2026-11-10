@@ -784,6 +784,83 @@ a:hover { text-decoration: underline; }
   padding-left: 24px;
 }
 
+/* Slice 2: evidence navigation and shared methodology; no global restyling. */
+.editorial-evidence-nav,
+.editorial-evidence,
+.methodology-content {
+  box-sizing: border-box;
+  max-width: 780px;
+  margin: 24px auto;
+}
+
+.editorial-evidence-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 12px 28px;
+  border-block: 1px solid #cbd5e1;
+}
+
+.editorial-evidence,
+.methodology-content {
+  padding: 14px 28px 22px;
+  line-height: 1.65;
+}
+
+.editorial-evidence-item {
+  padding-block: 16px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.editorial-evidence-item h3 {
+  margin-top: 0;
+}
+
+.editorial-evidence-qualification {
+  border-left: 3px solid #64748b;
+  padding-left: 12px;
+}
+
+.editorial-source-revision {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.editorial-evidence a,
+.editorial-evidence-nav a,
+.methodology-content a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.editorial-evidence-nav a:focus-visible,
+.editorial-evidence a:focus-visible,
+.methodology-content a:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .editorial-evidence-nav,
+  .editorial-evidence,
+  .methodology-content {
+    max-width: 100%;
+    margin: 16px 0;
+    padding: 12px 8px;
+  }
+}
+
+@media print {
+  .editorial-evidence-nav,
+  .editorial-evidence,
+  .methodology-content {
+    max-width: none;
+  }
+}
+
 .editorial-article a,
 .editorial-audit a {
   text-decoration: underline;
