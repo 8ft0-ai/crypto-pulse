@@ -17,6 +17,9 @@ from typing import Any
 STYLE_NAME = "cryptopulse-reader-evidence.css"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 HOME_HERO_RE = re.compile(r'(<header class="[^"]*\blanding-hero\b[^"]*">.*?</header>)', re.DOTALL)
+HOME_EDITORIAL_LEAD_RE = re.compile(
+    r'(<section class="homepage-editorial-lead"[^>]*>.*?</section>)', re.DOTALL
+)
 LATEST_HERO_RE = re.compile(r'(<header class="[^"]*\breport-hero\b[^"]*">.*?</header>)', re.DOTALL)
 LATEST_MARKET_READ_RE = re.compile(r'\s*<section class="latest-market-read".*?</section>\s*', re.DOTALL)
 LATEST_FEATURE_RE = re.compile(r'\s*<section class="latest-feature">.*?</section>\s*', re.DOTALL)
@@ -396,6 +399,13 @@ def _reader_demo_framing(source: str) -> str:
     if source.count(old_body) != 1:
         raise ReaderEvidenceIntegrationError("expected exactly one demo notice body")
     source = source.replace(old_body, new_body, 1)
+    # Base notice already has this lead-in; do not duplicate it in the
+    # published reader-facing safety notice.
+    source = source.replace(
+        "CryptoPulse is a prototype demonstration. CryptoPulse is a prototype demonstration",
+        "CryptoPulse is a prototype demonstration",
+        1,
+    )
     source = source.replace("<span>AI-generated</span>", "<span>Repository evidence</span>", 1)
     return source
 
@@ -419,7 +429,17 @@ def transform_home(source: str, context: dict[str, Any]) -> str:
         source = _replace_required_once(source, HERO_ACTIONS_RE, actions, "homepage hero actions")
 
     panel = render_reader_panel(context, surface="home")
-    source = _replace_required_once(source, HOME_HERO_RE, lambda_match_wrapper(panel), "homepage hero")
+    # A source-bound homepage story leads; Phase 16 retains its distinct
+    # repository-observation authority immediately afterwards.
+    if HOME_EDITORIAL_LEAD_RE.search(source):
+        source = _replace_required_once(
+            source, HOME_EDITORIAL_LEAD_RE, lambda_match_wrapper(panel),
+            "homepage editorial lead",
+        )
+    else:
+        source = _replace_required_once(
+            source, HOME_HERO_RE, lambda_match_wrapper(panel), "homepage hero",
+        )
     return _stylesheet(source)
 
 

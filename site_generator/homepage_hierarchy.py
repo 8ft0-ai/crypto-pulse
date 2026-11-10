@@ -68,6 +68,9 @@ def apply(base: Any) -> None:
     copy_style(base)
     html = index_path.read_text(encoding="utf-8")
     html = reorder_sections(html)
+    html = html.replace(
+        '<div class="explainer-grid">', '<div class="explainer-grid" id="about">', 1
+    )
     html = prioritise_ctas(html)
     html = add_style(html)
     index_path.write_text(html, encoding="utf-8")
