@@ -405,6 +405,8 @@ def _active_page(base: Any, html_file: Path) -> str:
         return "temporal"
     if rel == "search.html":
         return "search"
+    if rel == "methodology.html":
+        return "methodology"
     if rel == "archive/index.html":
         return "archive"
     return ""
@@ -433,6 +435,7 @@ def _reader_nav(base: Any, prefix: str, active: str, temporal_available: bool) -
         [
             _nav_link(f"{prefix}archive/index.html", "Archive", "archive", active),
             _nav_link(f"{prefix}search.html", "Search", "search", active),
+            _nav_link(f"{prefix}methodology.html", "Methodology", "methodology", active),
             f'<a href="{escape(base.GITHUB_URL, quote=True)}">GitHub</a>',
         ]
     )

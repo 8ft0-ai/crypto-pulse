@@ -141,7 +141,7 @@ def source_panel(source_items: list[str]) -> str:
     if source_items:
         source_body = '<ul class="source-list">' + ''.join(f"<li>{inline_markdown(item)}</li>" for item in source_items) + '</ul>'
     else:
-        source_body = '<p>No explicit source list was found in the archived Markdown report. Treat the report as unaudited AI-generated demo content.</p>'
+        source_body = '<p>No explicit source-citation list was extracted from this original Markdown. This is distinct from source-snapshot provenance: consult any archived evidence links and the separate supporting-evidence section. Historical AI-generated prose is not independently verified.</p>'
     return f"""
       <section class="metadata-panel source-panel" aria-label="Report source attribution">
         <div>
@@ -282,6 +282,7 @@ def nav(asset_prefix: str = "") -> str:
         <a href="{asset_prefix}index.html">Home</a>
         <a href="{asset_prefix}latest.html">Latest</a>
         <a href="{asset_prefix}archive/index.html">Archive</a>
+        <a href="{asset_prefix}methodology.html">Methodology</a>
         <a href="{asset_prefix}feed.xml">RSS</a>
         <a href="{asset_prefix}manifest.json">Manifest</a>
         <a href="{asset_prefix}search-index.json">Search index</a>
@@ -455,11 +456,18 @@ def validated_editorial_article(report: Report) -> dict[str, Any] | None:
         raise EditorialArticleError("inconclusive state requires reason")
     if state == "factual_update" and any(c["category"] == "market" for c in claims):
         raise EditorialArticleError("factual update cannot contain market findings")
+    if state == "finding" and any(
+        caveat not in claim["caveats"]
+        for claim in claims if claim["category"] == "market"
+        for caveat in article["caveats"]
+    ):
+        raise EditorialArticleError("material caveat is missing beside an affected finding")
     return article
 
 
-def editorial_article(report: Report) -> str:
-    article = validated_editorial_article(report)
+def editorial_article(report: Report, article: dict[str, Any] | None = None) -> str:
+    if article is None:
+        article = validated_editorial_article(report)
     if article is None:
         # An old report's own excerpt is not a new verified market conclusion.
         return (
@@ -497,35 +505,182 @@ def editorial_article(report: Report) -> str:
         rows.extend(f'<li><a href="{escape(source["url"], quote=True)}">Pinned archived JSON ({escape(source["sha256"][:12])}…)</a></li>'
                     for source in claim["sources"])
         rows.extend(['</ul>', '</article>'])
-    assurance = [claim for claim in article["claims"] if claim["category"] == "assurance"]
-    if assurance:
-        rows.append('<section class="editorial-assurance"><h3>Supporting source checks</h3>')
-        rows.extend(f'<p>{escape(claim["finding"])} {escape(claim["uncertainty"])}</p>' for claim in assurance)
-        rows.append('</section>')
+    # Claim-local warnings from the producer are already beside each finding.
+    # For a no-finding outcome the report-wide caveats must remain in the article.
     if state != "finding" and article.get("caveats"):
         rows.extend(f'<p class="editorial-caveat">{escape(item)}</p>' for item in article["caveats"])
     if state == "inconclusive":
         rows.append(f'<p class="editorial-uncertainty">{escape(article["reason"])}</p>')
-    if article["source"]:
-        source = article["source"]
-        rows.append(f'<p class="editorial-primary-source"><a href="{escape(source["url"], quote=True)}">Inspect exact archived source JSON</a> '
-                    f'(SHA-256 {escape(source["sha256"])})</p>')
     rows.append('</section>')
     return "\n".join(rows)
 
 
+def archived_markdown_url(report: Report) -> str:
+    """Exact archived Markdown at the site-build checkout, not a market-data source."""
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        capture_output=True, text=True, timeout=5,
+    ).stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise EditorialArticleError("cannot pin original Markdown to a commit")
+    return f"{GITHUB_URL}/blob/{revision}/{quote(report.source_rel, safe='/')}"
+
+
+# Only reproduce existing commit-pinned GitHub JSON links from legacy deterministic
+# reports. This is citation navigation, not a retrospective source validation.
+LEGACY_JSON_CITATION_RE = re.compile(
+    r"\[[^\]\n]+\]\((https://github\.com/8ft0-ai/crypto-pulse/blob/"
+    r"[0-9a-f]{40}/(data/crypto/hourly/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.json))\)"
+)
+
+
+def legacy_report_json_citations(report: Report) -> list[tuple[str, str, str | None]]:
+    """Return only original immutable JSON citations, never newly admitted claims."""
+    if report.metadata.get("llm_generated") is not False:
+        return []
+    if not isinstance(report.metadata.get("source_snapshot"), str):
+        return []
+    _, markdown_body = split_front_matter(report.source_path.read_text(encoding="utf-8"))
+    citations: list[tuple[str, str, str | None]] = []
+    seen: set[str] = set()
+    for match in LEGACY_JSON_CITATION_RE.finditer(markdown_body):
+        url, source_path = match.groups()
+        if url in seen:
+            continue
+        seen.add(url)
+        label = ("Original report primary snapshot citation"
+                 if source_path == report.metadata["source_snapshot"]
+                 else "Original report comparison/other snapshot citation")
+        digest = re.match(r"\s*\(SHA-256 \x60([0-9a-f]{64})\x60\)", markdown_body[match.end():])
+        citations.append((label, url, digest.group(1) if digest else None))
+    return citations
+
+
+def supporting_evidence(report: Report, article: dict[str, Any] | None, markdown_url: str, asset_prefix: str) -> str:
+    """Present existing claim evidence separately from original report citations."""
+    rows = [
+        '<section id="supporting-evidence" class="editorial-evidence" aria-labelledby="supporting-evidence-heading">',
+        '<h2 id="supporting-evidence-heading">Supporting evidence</h2>',
+    ]
+    if article is not None:
+        if article["source"]:
+            rows.append(f'<p>Assessment timestamp: <time>{escape(article["as_of_utc"])}</time>. '
+                        'The cited JSON records—not the archived Markdown citations—are the source-snapshot evidence. '
+                        f'<a href="{escape(article["source"]["url"], quote=True)}">Inspect exact primary source JSON</a>.</p>')
+            claims = sorted(article["claims"], key=lambda claim: claim["category"] != "market")
+            for index, claim in enumerate(claims, 1):
+                role = "Source assurance (not a market finding)" if claim["category"] == "assurance" else "Market observation"
+                rows.extend([
+                    f'<section class="editorial-evidence-item" aria-labelledby="evidence-{index}">',
+                    f'<h3 id="evidence-{index}">{escape(claim["headline"])} — {role}</h3>',
+                    f'<p><strong>Figures and comparison window.</strong> {escape(claim["finding"])}</p>',
+                    f'<p class="editorial-evidence-qualification">{escape(claim["uncertainty"])}</p>',
+                    '<ol class="editorial-snapshot-links">',
+                ])
+                for number, source in enumerate(claim["sources"]):
+                    label = "Current snapshot" if number == 0 else "Comparison snapshot"
+                    rows.append(
+                        f'<li><a href="{escape(source["url"], quote=True)}">{label}: '
+                        f'{escape(source["path"])}</a>'
+                        f'<span class="editorial-source-revision">Commit {escape(source["commit"])}; '
+                        f'SHA-256 {escape(source["sha256"])}</span></li>'
+                    )
+                rows.extend(['</ol>', '</section>'])
+            if not claims:
+                source = article["source"]
+                rows.append(
+                    '<p>No market finding was admitted; inspect the source and the local '
+                    'explanation above rather than interpreting missing comparisons as a result.</p>'
+                    f'<p><a href="{escape(source["url"], quote=True)}">Exact source snapshot: '
+                    f'{escape(source["path"])}</a> '
+                    f'(SHA-256 {escape(source["sha256"])})</p>'
+                )
+        else:
+            rows.append('<p>Essential source authority was not established. No snapshot link is presented as verified evidence.</p>')
+    else:
+        citations = legacy_report_json_citations(report)
+        if citations:
+            rows.append('<p>Original immutable JSON citations preserved from this historical report. '
+                        'These are not newly verified typed claims or an independent re-assessment '
+                        'of the source data.</p>')
+            rows.append('<ul class="editorial-snapshot-links" aria-label="Original report JSON citations">')
+            for label, url, digest in citations:
+                original_digest = (f' (SHA-256 stated in original report: {escape(digest)})'
+                                   if digest else '')
+                rows.append(f'<li><a href="{escape(url, quote=True)}">{escape(label)}</a>'
+                            f'{original_digest}</li>')
+            rows.append('</ul>')
+        else:
+            rows.append('<p>This historical Markdown has no new typed assessment. Its original citations and evidence links remain in the full report below; they are not retrospectively reclassified as verified snapshot claims.</p>')
+    rows.extend([
+        '<p class="editorial-evidence-archive"><strong>Original archived report:</strong> '
+        f'<a href="{escape(markdown_url, quote=True)}">Read its Markdown at the exact site-build commit</a>. '
+        'The report text and its embedded citations are distinct from the pinned JSON snapshot evidence.</p>',
+        f'<p>See <a href="{escape(asset_prefix)}methodology.html">methodology and general limitations</a> '
+        'for source alignment, generation types, admission states and reproducibility.</p>',
+        '</section>',
+    ])
+    return "\n".join(rows)
+
+
+def methodology_page() -> str:
+    """Reader-facing methodology from one maintained Markdown resource."""
+    source = SITE_SRC / "methodology.md"
+    body = render_markdown(source.read_text(encoding="utf-8"))
+    return f"""<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Methodology and limitations | {escape(SITE_NAME)}</title>
+  <link rel="stylesheet" href="assets/cryptopulse.css">
+</head>
+<body>
+  <main class="page">
+    <article class="brief">
+      {demo_banner()}
+      {nav()}
+      <header class="hero report-hero">
+        <div class="brandline"><span class="mark">CP</span> {escape(SITE_NAME)}</div>
+        <h1>Methodology and limitations</h1>
+        {badges()}
+      </header>
+      <section class="editorial-demo-warning" aria-label="Demo and non-advice status">
+        <strong>CryptoPulse AI-generated demo archive</strong>
+        <p>This is a demonstration, not investment research, financial advice, a recommendation or a trading signal. Reports may be inaccurate, incomplete, stale or hallucinated. Do not use for trading decisions.</p>
+      </section>
+      <section class="methodology-content" aria-label="Shared publication methodology">
+        {body}
+      </section>
+      {footer()}
+    </article>
+  </main>
+</body>
+</html>
+"""
+
+
 def archive_page_sections(report: Report, pager: str) -> str:
-    """Article first on canonical archive routes; existing audit is intact and inspectable."""
-    legacy = "editorial_article" not in report.metadata
-    audit_open = " open" if legacy else ""
+    """Article first; evidence and shared methods before the original technical record."""
+    article = validated_editorial_article(report)
+    markdown_url = archived_markdown_url(report)
+    asset_prefix = asset_prefix_for(report.output_path)
+    # The unchanged historical report remains available via keyboard-accessible disclosure.
+    audit_open = ""
     return f"""
       <section class="editorial-demo-warning" aria-label="Demo and non-advice status">
         <strong>CryptoPulse AI-generated demo archive</strong>
         <p>This is a demonstration, not investment research, financial advice, a recommendation or a trading signal. Reports can be inaccurate, incomplete or stale. Do not use for trading decisions.</p>
       </section>
-      {editorial_article(report)}
+      {editorial_article(report, article)}
+      <nav class="editorial-evidence-nav" aria-label="Article evidence and methodology">
+        <a href="#supporting-evidence">Supporting evidence</a>
+        <a href="#technical-record">Original report and technical record</a>
+        <a href="{asset_prefix}methodology.html">Methodology and limitations</a>
+      </nav>
+      {supporting_evidence(report, article, markdown_url, asset_prefix)}
       <details class="editorial-audit"{audit_open}>
-        <summary>Original archived report, evidence and technical record</summary>
+        <summary id="technical-record">Original archived report, evidence and technical record</summary>
         <section class="report-warning compact-warning">
           <div class="eyebrow">Report warning</div>
           <p>{escape(REPORT_NOTICE)}</p>
@@ -814,6 +969,7 @@ def build() -> None:
     reports = collect_reports()
     write_report_pages(reports)
     write_site_indexes(reports)
+    (OUT / "methodology.html").write_text(methodology_page(), encoding="utf-8")
     print(f"Built CryptoPulse Pages site with {len(reports)} report(s).")
 
 

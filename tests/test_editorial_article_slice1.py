@@ -142,7 +142,7 @@ class EditorialSliceOneTests(unittest.TestCase):
         historic = pages.html_page(archived, "../../../../", archive_article=True)
         self.assertIn("Original archived publication", historic)
         self.assertNotIn('id="editorial-headline"', historic)
-        self.assertIn('class="editorial-audit" open', historic)
+        self.assertIn('class="editorial-audit"', historic)
         self.assertIn("2107_AEDT", historic)
 
     def test_typed_projection_rejects_mismatch_and_escapes_user_fields(self):
