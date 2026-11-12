@@ -135,16 +135,14 @@ jobs:
               raise RuntimeError("resolved ingestion workflow path does not match frozen workflow identity")
           workflow_id = int(workflow["id"])
           created = f"{census['start_utc']}..{census['end_utc']}"
-          run_pages = paged(
-              f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
-              event="schedule",
-              created=created,
-              per_page="100",
-          )
           census_runs = {}
-          for page in run_pages:
-              for run in page.get("workflow_runs", []):
-                  census_runs[int(run["id"])] = run
+          for source_event in ("schedule", "workflow_dispatch"):
+              for page in paged(
+                  f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
+                  event=source_event, created=created, per_page="100",
+              ):
+                  for run in page.get("workflow_runs", []):
+                      census_runs[int(run["id"])] = run
 
           artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
           extension_candidates = set()
@@ -164,14 +162,14 @@ jobs:
           extension_ids = set()
           for run_id in sorted(extension_candidates):
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
-              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) in {"schedule", "workflow_dispatch"}:
                   extension_ids.add(run_id)
 
           discovered = sorted(set(census_runs) | extension_ids)
           runs = []
           for run_id in discovered:
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
-              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) not in {"schedule", "workflow_dispatch"}:
                   raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
               latest_attempt = int(latest["run_attempt"])
               attempts = [
@@ -180,7 +178,7 @@ jobs:
               ]
               if any(
                   int(attempt.get("workflow_id", 0) or 0) != workflow_id
-                  or str(attempt.get("event", "")) != "schedule"
+                  or str(attempt.get("event", "")) != str(latest.get("event", ""))
                   for attempt in attempts
               ):
                   raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
@@ -257,6 +255,26 @@ jobs:
                           )
                       with zipfile.ZipFile(archive) as zipped:
                           zipped.extractall(target)
+                      if attempt["event"] == "workflow_dispatch":
+                          accepted = attempt.get("accepted_hour_artifact")
+                          if accepted is not None and not accepted["expired"]:
+                              receipt_zip = target / "accepted-hour.zip"
+                              receipt_file = target / "accepted-hour/receipt.json"
+                              try:
+                                  with receipt_zip.open("wb") as stream:
+                                      subprocess.run(
+                                          ["gh", "api", f"/repos/{repo}/actions/artifacts/{accepted['id']}/zip"],
+                                          check=True, stdout=stream, stderr=subprocess.PIPE,
+                                      )
+                                  with zipfile.ZipFile(receipt_zip) as zipped:
+                                      if zipped.namelist() != ["receipt.json"]:
+                                          raise ValueError("accepted-hour carrier is not a single receipt")
+                                      receipt_file.parent.mkdir(parents=True, exist_ok=True)
+                                      receipt_file.write_bytes(zipped.read("receipt.json"))
+                              except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile, ValueError):
+                                  receipt_file.unlink(missing_ok=True)
+                              finally:
+                                  receipt_zip.unlink(missing_ok=True)
                   except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile):
                       # Metadata can race retention/deletion. Missing exact bytes remain
                       # a Slice A unavailable-input blocker rather than being dropped.
@@ -781,8 +799,12 @@ jobs:
               raise RuntimeError("resolved ingestion workflow path does not match frozen workflow identity")
           workflow_id = int(workflow["id"])
           created = f"{census['start_utc']}..{census['end_utc']}"
-          run_pages = paged(f"/repos/{repo}/actions/workflows/{workflow_id}/runs", event="schedule", created=created, per_page="100")
-          census_runs = {int(run["id"]): run for page in run_pages for run in page.get("workflow_runs", [])}
+          census_runs = {}
+          for source_event in ("schedule", "workflow_dispatch"):
+              for page in paged(f"/repos/{repo}/actions/workflows/{workflow_id}/runs",
+                                event=source_event, created=created, per_page="100"):
+                  for run in page.get("workflow_runs", []):
+                      census_runs[int(run["id"])] = run
           artifact_pages = paged(f"/repos/{repo}/actions/artifacts", per_page="100")
           extension_candidates = set()
           for page in artifact_pages:
@@ -799,18 +821,18 @@ jobs:
           extension_ids = set()
           for run_id in sorted(extension_candidates):
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
-              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) == "schedule":
+              if int(latest.get("workflow_id", 0) or 0) == workflow_id and str(latest.get("event", "")) in {"schedule", "workflow_dispatch"}:
                   extension_ids.add(run_id)
           runs = []
           for run_id in sorted(set(census_runs) | extension_ids):
               latest = gh_json(f"/repos/{repo}/actions/runs/{run_id}")
-              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) != "schedule":
+              if int(latest.get("workflow_id", 0) or 0) != workflow_id or str(latest.get("event", "")) not in {"schedule", "workflow_dispatch"}:
                   raise RuntimeError("discovered run does not match resolved scheduled ingestion workflow")
               upper = int(latest["run_attempt"])
               attempts = [gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}") for number in range(1, upper + 1)]
               if any(
                   int(attempt.get("workflow_id", 0) or 0) != workflow_id
-                  or str(attempt.get("event", "")) != "schedule"
+                  or str(attempt.get("event", "")) != str(latest.get("event", ""))
                   for attempt in attempts
               ):
                   raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
