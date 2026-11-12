@@ -70,6 +70,7 @@ def accepted_source():
         "accepted_hour_artifact": {
             "id": 999, "name": receipt["accepted_hour_artifact"],
             "expired": False,
+            "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]},
         },
     }
 
@@ -155,7 +156,7 @@ class CandidateCarrierTests(unittest.TestCase):
         })
         raw["artifacts"].append({
             "id": 9002, "name": "crypto-hour-accepted-20260827T01",
-            "expired": False, "workflow_run": {"id": 100},
+            "expired": False, "workflow_run": {"id": 100, "head_sha": attempt["head_sha"]},
         })
         return capture
 
@@ -164,6 +165,10 @@ class CandidateCarrierTests(unittest.TestCase):
         attempt = closure["runs"][0]["attempts"][0]
         self.assertEqual(attempt["event"], "workflow_dispatch")
         self.assertEqual(attempt["accepted_hour_artifact"]["id"], 9002)
+        self.assertEqual(
+            attempt["accepted_hour_artifact"]["workflow_run"],
+            {"id": 100, "head_sha": attempt["head_sha"]},
+        )
         self.assertEqual(attempt["dispatch_source_run"]["actor"]["login"], "8ft0-ai")
 
     def test_duplicate_or_foreign_receipt_artifact_rejected(self):
@@ -176,6 +181,18 @@ class CandidateCarrierTests(unittest.TestCase):
         with self.assertRaisesRegex(candidate.CandidateError, "another run"):
             candidate.build_source_population_closure(capture)
 
+    def test_missing_carrier_expiry_rejected(self):
+        capture = self.capture()
+        del capture["runs"][0]["artifacts"][-1]["expired"]
+        with self.assertRaisesRegex(candidate.CandidateError, "explicitly be unexpired"):
+            candidate.build_source_population_closure(capture)
+
+    def test_contradictory_carrier_head_sha_rejected(self):
+        capture = self.capture()
+        capture["runs"][0]["artifacts"][-1]["workflow_run"]["head_sha"] = "f" * 40
+        with self.assertRaisesRegex(candidate.CandidateError, "head SHA differs"):
+            candidate.build_source_population_closure(capture)
+
     def test_bundled_receipt_bytes_and_digest_replay(self):
         source = accepted_source()
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,6 +202,10 @@ class CandidateCarrierTests(unittest.TestCase):
             replayed = candidate.source_inputs_from_bundle(root)[0]
             self.assertEqual(replayed["accepted_hour_receipt_bytes"], source["accepted_hour_receipt_bytes"])
             self.assertEqual(replayed["dispatch_source_run"], source["dispatch_source_run"])
+            self.assertEqual(
+                replayed["accepted_hour_artifact"]["workflow_run"],
+                source["accepted_hour_artifact"]["workflow_run"],
+            )
             tampered = root / row["accepted_hour_receipt_path"]
             tampered.write_bytes(b"{}")
             with self.assertRaisesRegex(candidate.CandidateError, "hash mismatch"):

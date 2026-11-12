@@ -238,14 +238,25 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
                     raise CandidateError("ambiguous accepted-hour artifact for dispatched run")
                 carrier = receipts[0] if receipts else None
                 if carrier is not None:
-                    carrier_run = carrier.get("workflow_run") or {}
-                    if int(carrier_run.get("id", 0) or 0) != run["run_id"]:
+                    if carrier.get("expired") is not False:
+                        raise CandidateError("accepted-hour artifact must explicitly be unexpired")
+                    carrier_run = carrier.get("workflow_run")
+                    if not isinstance(carrier_run, dict) or (
+                        type(carrier_run.get("id")) is not int
+                        or carrier_run["id"] != run["run_id"]
+                    ):
                         raise CandidateError("accepted-hour artifact belongs to another run")
+                    if carrier_run.get("head_sha") != attempt["head_sha"]:
+                        raise CandidateError("accepted-hour artifact head SHA differs from source attempt")
                 attempt["accepted_hour_artifact"] = (
                     {
                         "id": _positive_int(carrier["id"], "accepted-hour artifact.id"),
                         "name": carrier["name"],
-                        "expired": bool(carrier.get("expired", False)),
+                        "expired": False,
+                        "workflow_run": {
+                            "id": carrier_run["id"],
+                            "head_sha": carrier_run["head_sha"],
+                        },
                     }
                     if carrier is not None else None
                 )

@@ -69,6 +69,13 @@ def _verify_candidate_source(
         raise ValueError("dispatched input lacks exact run and accepted-hour artifact metadata")
     if type(carrier.get("id")) is not int or carrier["id"] <= 0 or carrier.get("expired") is not False:
         raise ValueError("accepted-hour artifact identity is invalid or expired")
+    carrier_run = carrier.get("workflow_run")
+    if not isinstance(carrier_run, dict) or (
+        type(carrier_run.get("id")) is not int
+        or carrier_run["id"] != source.get("run_id")
+        or carrier_run.get("head_sha") != source.get("workflow_head_sha")
+    ):
+        raise ValueError("accepted-hour artifact run/head identity mismatch")
     if carrier.get("name") != receipt.get("accepted_hour_artifact"):
         raise ValueError("accepted-hour artifact name differs from exact receipt")
     for field, expected in (
