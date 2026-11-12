@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from datetime import timedelta
@@ -204,8 +205,63 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
     filtered = dict(capture)
     filtered["runs"] = admitted_runs
     filtered["retained_artifact_extension_run_ids"] = sorted(admitted_extension_ids)
-    closure = _LEGACY_BUILD_CLOSURE(filtered)
+    # Keep historical scheduled evidence unchanged, but admit exact accepted
+    # dispatch metadata through the same closed population.
+    closure = _legacy._ORIGINAL_BUILD_SOURCE_POPULATION_CLOSURE(filtered)
+    expected_workflow_id = _positive_int(capture.get("workflow_id"), "capture.workflow_id")
+    raw_by_run = {int(row["run_id"]): row for row in admitted_runs}
+    for run in closure["runs"]:
+        raw = raw_by_run[run["run_id"]]
+        raw_by_attempt = {int(row["run_attempt"]): row for row in raw["attempts"]}
+        for attempt in run["attempts"]:
+            if attempt["workflow_id"] != expected_workflow_id:
+                raise CandidateError("attempt workflow id does not match capture workflow")
+            if attempt["event"] not in {"schedule", "workflow_dispatch"}:
+                raise CandidateError("attempt event is not an authorised ingestion event")
+            if attempt["event"] == "workflow_dispatch":
+                raw_attempt = raw_by_attempt[attempt["run_attempt"]]
+                fields = (
+                    "id", "run_attempt", "workflow_id", "path", "head_sha",
+                    "head_branch", "status", "conclusion", "event", "actor",
+                    "repository", "created_at",
+                )
+                attempt["dispatch_source_run"] = {
+                    key: raw_attempt.get(key) for key in fields
+                }
+                receipts = [
+                    artifact for artifact in raw["artifacts"]
+                    if isinstance(artifact, dict)
+                    and re.fullmatch(r"crypto-hour-accepted-\d{8}T\d{2}",
+                                     str(artifact.get("name", ""))) is not None
+                ]
+                if len(receipts) > 1:
+                    raise CandidateError("ambiguous accepted-hour artifact for dispatched run")
+                carrier = receipts[0] if receipts else None
+                if carrier is not None:
+                    if carrier.get("expired") is not False:
+                        raise CandidateError("accepted-hour artifact must explicitly be unexpired")
+                    carrier_run = carrier.get("workflow_run")
+                    if not isinstance(carrier_run, dict) or (
+                        type(carrier_run.get("id")) is not int
+                        or carrier_run["id"] != run["run_id"]
+                    ):
+                        raise CandidateError("accepted-hour artifact belongs to another run")
+                    if carrier_run.get("head_sha") != attempt["head_sha"]:
+                        raise CandidateError("accepted-hour artifact head SHA differs from source attempt")
+                attempt["accepted_hour_artifact"] = (
+                    {
+                        "id": _positive_int(carrier["id"], "accepted-hour artifact.id"),
+                        "name": carrier["name"],
+                        "expired": False,
+                        "workflow_run": {
+                            "id": carrier_run["id"],
+                            "head_sha": carrier_run["head_sha"],
+                        },
+                    }
+                    if carrier is not None else None
+                )
     closure.pop("sha256", None)
+    closure["workflow_id"] = expected_workflow_id
     closure["contract"] = CLOSURE_CONTRACT
     closure["candidate_run_created_at_utc"] = _utc_text(end)
     closure["census"] = {
@@ -219,6 +275,79 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
     return closure
 
 
+# Preserve the exact accepted-hour receipt as a replayable input, rather than
+# promoting a dispatch through the historical schedule-only trust boundary.
+_ORIGINAL_SOURCE_INPUTS_FROM_CAPTURE = _legacy.source_inputs_from_capture
+_ORIGINAL_SERIALISABLE_SOURCE_INPUT = _legacy._serialisable_source_input
+_ORIGINAL_SOURCE_INPUTS_FROM_BUNDLE = _legacy.source_inputs_from_bundle
+
+
+def source_inputs_from_capture(capture: Mapping[str, Any], artifact_root: Path) -> list[dict[str, Any]]:
+    sources = _ORIGINAL_SOURCE_INPUTS_FROM_CAPTURE(capture, artifact_root)
+    closure = build_source_population_closure(capture)
+    metadata = {
+        (attempt["run_id"], attempt["run_attempt"]): attempt
+        for run in closure["runs"] for attempt in run["attempts"]
+        if attempt["event"] == "workflow_dispatch"
+    }
+    for source in sources:
+        if source["event"] != "workflow_dispatch":
+            continue
+        attempt = metadata[(source["run_id"], source["run_attempt"])]
+        source["dispatch_source_run"] = attempt["dispatch_source_run"]
+        source["accepted_hour_artifact"] = attempt["accepted_hour_artifact"]
+        receipt_path = (
+            Path(artifact_root) / str(source["run_id"]) /
+            str(source["run_attempt"]) / "accepted-hour" / "receipt.json"
+        )
+        source["accepted_hour_receipt_bytes"] = (
+            receipt_path.read_bytes() if receipt_path.is_file() else None
+        )
+    return sources
+
+
+def _serialisable_source_input(source: Mapping[str, Any], bundle_root: Path) -> dict[str, Any]:
+    row = _ORIGINAL_SERIALISABLE_SOURCE_INPUT(source, bundle_root)
+    if source.get("event") != "workflow_dispatch":
+        return row
+    receipt = source.get("accepted_hour_receipt_bytes")
+    if isinstance(receipt, (bytes, bytearray)):
+        rel = (Path("raw-inputs/sources") / str(source["run_id"]) /
+               str(source["run_attempt"]) / "accepted-hour" / "receipt.json")
+        target = Path(bundle_root) / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(bytes(receipt))
+        row["accepted_hour_receipt_path"] = rel.as_posix()
+        row["accepted_hour_receipt_sha256"] = sha256_bytes(bytes(receipt))
+    else:
+        row["accepted_hour_receipt_path"] = None
+        row["accepted_hour_receipt_sha256"] = None
+    return row
+
+
+def source_inputs_from_bundle(bundle_root: Path) -> list[dict[str, Any]]:
+    sources = _ORIGINAL_SOURCE_INPUTS_FROM_BUNDLE(bundle_root)
+    for source in sources:
+        if source.get("event") != "workflow_dispatch":
+            continue
+        rel = source.pop("accepted_hour_receipt_path", None)
+        digest = source.pop("accepted_hour_receipt_sha256", None)
+        if rel is None and digest is None:
+            source["accepted_hour_receipt_bytes"] = None
+            continue
+        expected = (
+            f'raw-inputs/sources/{source["run_id"]}/{source["run_attempt"]}/'
+            "accepted-hour/receipt.json"
+        )
+        if rel != expected:
+            raise CandidateError("bundled accepted-hour receipt path is not canonical")
+        raw = (Path(bundle_root) / expected).read_bytes()
+        if sha256_bytes(raw) != _sha256(digest, "accepted-hour receipt SHA"):
+            raise CandidateError("bundled accepted-hour receipt hash mismatch")
+        source["accepted_hour_receipt_bytes"] = raw
+    return sources
+
+
 # Patch the mature candidate implementation in-place so its prepare/replay,
 # materialisation, recovery and PR verification functions operate over v1.2.
 _legacy.accumulation = accumulation
@@ -226,6 +355,9 @@ _legacy.CLOSURE_CONTRACT = CLOSURE_CONTRACT
 _legacy.census_bounds = census_bounds
 _legacy.derive_window = derive_window
 _legacy.build_source_population_closure = build_source_population_closure
+_legacy.source_inputs_from_capture = source_inputs_from_capture
+_legacy._serialisable_source_input = _serialisable_source_input
+_legacy.source_inputs_from_bundle = source_inputs_from_bundle
 
 # Re-export patched functions for the public bounded wrapper.
 for _name in (

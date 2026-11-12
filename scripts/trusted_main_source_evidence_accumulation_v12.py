@@ -8,6 +8,8 @@ selected, without inventing records for missing wall-clock hours.
 """
 from __future__ import annotations
 
+import json
+from deterministic_ingestion_provenance import ProvenanceError, verify_source as verify_ingestion_source
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -21,6 +23,86 @@ for _name, _value in vars(_v11).items():
 CONTRACT = "trusted-main-source-evidence-accumulation/v1.2"
 MAX_ADDITIONS = 25
 GAP_SEMANTICS = "unobserved-hours-remain-absent"
+
+
+def _source_identity(source: Mapping[str, Any]) -> dict[str, Any]:
+    identity = _v11._identity(source)
+    if source.get("event") == "workflow_dispatch":
+        receipt = source.get("accepted_hour_receipt_bytes")
+        identity["accepted_hour_receipt_sha256"] = (
+            _v11.sha256_bytes(bytes(receipt))
+            if isinstance(receipt, (bytes, bytearray)) else None
+        )
+        carrier = source.get("accepted_hour_artifact")
+        identity["accepted_hour_artifact"] = (
+            dict(carrier) if isinstance(carrier, dict) else None
+        )
+        run = source.get("dispatch_source_run")
+        identity["dispatch_source_run_sha256"] = (
+            _v11.sha256_bytes(_v11.canonical_json_bytes(run))
+            if isinstance(run, dict) else None
+        )
+    return identity
+
+
+def _verify_candidate_source(
+    repository_root: Path, base_sha: str, config: dict[str, Any],
+    source: Mapping[str, Any],
+) -> dict[str, Any]:
+    if source.get("event") == "schedule":
+        return _v11._verify_source(repository_root, base_sha, config, source)
+    if source.get("event") != "workflow_dispatch":
+        raise ValueError("source event is not governed")
+    intent_raw = _v11._bytes(source.get("publication_intent_bytes"), "publication_intent_bytes")
+    snapshot_raw = _v11._bytes(source.get("snapshot_bytes"), "snapshot_bytes")
+    receipt_raw = _v11._bytes(source.get("accepted_hour_receipt_bytes"), "accepted_hour_receipt_bytes")
+    try:
+        intent = json.loads(intent_raw.decode("utf-8"))
+        receipt = json.loads(receipt_raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise ValueError("accepted dispatch evidence must be UTF-8 JSON") from exc
+    if not isinstance(intent, dict) or not isinstance(receipt, dict):
+        raise ValueError("accepted dispatch intent and receipt must be JSON objects")
+    run = source.get("dispatch_source_run")
+    carrier = source.get("accepted_hour_artifact")
+    if not isinstance(run, dict) or not isinstance(carrier, dict):
+        raise ValueError("dispatched input lacks exact run and accepted-hour artifact metadata")
+    if type(carrier.get("id")) is not int or carrier["id"] <= 0 or carrier.get("expired") is not False:
+        raise ValueError("accepted-hour artifact identity is invalid or expired")
+    carrier_run = carrier.get("workflow_run")
+    if not isinstance(carrier_run, dict) or (
+        type(carrier_run.get("id")) is not int
+        or carrier_run["id"] != source.get("run_id")
+        or carrier_run.get("head_sha") != source.get("workflow_head_sha")
+    ):
+        raise ValueError("accepted-hour artifact run/head identity mismatch")
+    if carrier.get("name") != receipt.get("accepted_hour_artifact"):
+        raise ValueError("accepted-hour artifact name differs from exact receipt")
+    for field, expected in (
+        ("id", source.get("run_id")), ("run_attempt", source.get("run_attempt")),
+        ("workflow_id", source.get("workflow_id")),
+        ("head_sha", source.get("workflow_head_sha")), ("event", "workflow_dispatch"),
+    ):
+        if run.get(field) != expected or type(run.get(field)) is not type(expected):
+            raise ValueError(f"dispatch run {field} differs from captured source identity")
+    if receipt.get("snapshot_sha256") != _v11.sha256_bytes(snapshot_raw):
+        raise ValueError("accepted-hour receipt does not bind exact snapshot bytes")
+    try:
+        verified_event = verify_ingestion_source(
+            run, intent, receipt=receipt, repository=_v11.EXPECTED_REPOSITORY,
+        )
+    except ProvenanceError as exc:
+        raise ValueError(f"untrusted dispatched source: {exc}") from exc
+    if verified_event != "workflow_dispatch":
+        raise ValueError("dispatch accepted-hour verification did not bind dispatch")
+    # Reuse the frozen v1.1 byte/path/Phase-12 verifier. Its internal
+    # schedule-only guard is bypassed only after authenticating the dispatch.
+    verified = _v11._verify_source(
+        repository_root, base_sha, config, {**source, "event": "schedule"},
+    )
+    verified["input_identity"] = _source_identity(source)
+    verified["accepted_hour_receipt_sha256"] = _v11.sha256_bytes(receipt_raw)
+    return verified
 
 
 def _source_order(record: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -84,15 +166,15 @@ def build_accumulation_manifest(
     supersession: list[dict[str, Any]] = []
     input_blockers: list[dict[str, Any]] = []
 
-    # Preserve v1.1 run/attempt semantics exactly: only scheduled successful
-    # attempts participate; among multiple successful attempts the highest
+    # Preserve v1.1 run/attempt semantics for scheduled sources while admitting
+    # receipt-verified owner-dispatched hours. Among successful attempts the highest
     # successful attempt supersedes earlier successful attempts.  A later
     # failed attempt is diagnostic-only and therefore cannot erase success.
     scheduled_success: dict[int, list[Mapping[str, Any]]] = {}
     for source in sorted(source_inputs, key=_v11._input_sort_key):
-        identity = _v11._identity(source)
-        if source.get("event") != _v11.EXPECTED_EVENT:
-            diagnostics.append(_v11._diagnostic("non-schedule-input", identity))
+        identity = _source_identity(source)
+        if source.get("event") not in {_v11.EXPECTED_EVENT, "workflow_dispatch"}:
+            diagnostics.append(_v11._diagnostic("unsupported-ingestion-input", identity))
             continue
         if source.get("conclusion") != _v11.EXPECTED_CONCLUSION:
             diagnostics.append(_v11._diagnostic("non-success-input", identity))
@@ -128,16 +210,16 @@ def build_accumulation_manifest(
                             "run_id": run_id,
                             "superseded_run_attempt": attempt,
                             "selected_run_attempt": highest,
-                            "input_identity": _v11._identity(row),
+                            "input_identity": _source_identity(row),
                         }
                     )
         highest_rows = by_attempt[highest]
         if len(highest_rows) > 1:
-            raw_identities = [_v11._identity(row) for row in highest_rows]
+            raw_identities = [_source_identity(row) for row in highest_rows]
             exact_payloads = {
                 _v11.canonical_json_bytes(
                     {
-                        **_v11._identity(row),
+                        **_source_identity(row),
                         "publication_intent_sha256": _v11.sha256_bytes(
                             _v11._bytes(row.get("publication_intent_bytes"), "publication_intent_bytes")
                         )
@@ -177,9 +259,9 @@ def build_accumulation_manifest(
     verified_all: list[dict[str, Any]] = []
     verified_after_anchor: list[dict[str, Any]] = []
     for source in sorted(winners, key=_v11._input_sort_key):
-        identity = _v11._identity(source)
+        identity = _source_identity(source)
         try:
-            candidate = _v11._verify_source(repository_root, base_sha, config, source)
+            candidate = _verify_candidate_source(repository_root, base_sha, config, source)
         except (_v11.AccumulationError, TypeError, ValueError) as exc:
             input_blockers.append(
                 _v11._blocker(
