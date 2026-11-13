@@ -14,6 +14,7 @@ on:
         type: string
   schedule:
     - cron: "47 0 * * *"
+    - cron: "47 12 * * *"
 
 permissions: {}
 
@@ -370,60 +371,12 @@ jobs:
           RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
-          from __future__ import annotations
-
-          import base64
-          import hashlib
-          import json
-          import os
-          import re
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          raw = os.environ.get("RECOVERY_COMMENT_IDS", "")
-          values = [item.strip() for item in re.split(r"[,\n]+", raw) if item.strip()]
-          ids = []
-          for value in values:
-              if not value.isdigit() or int(value) <= 0:
-                  raise SystemExit("recovery_comment_ids contains a non-positive integer")
-              number = int(value)
-              if number in ids:
-                  raise SystemExit("recovery_comment_ids contains a duplicate")
-              ids.append(number)
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          rows = []
-          for comment_id in ids:
-              completed = subprocess.run(
-                  ["gh", "api", f"/repos/{repo}/issues/comments/{comment_id}"],
-                  check=True,
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.PIPE,
-                  text=True,
-              )
-              comment = json.loads(completed.stdout)
-              issue_url = str(comment.get("issue_url", ""))
-              match = re.search(r"/issues/(\d+)$", issue_url)
-              if match is None:
-                  raise SystemExit("recovery carrier issue identity is ambiguous")
-              body = str(comment.get("body", "")).encode("utf-8")
-              rows.append(
-                  {
-                      "issue_number": int(match.group(1)),
-                      "comment_id": int(comment["id"]),
-                      "author_login": str((comment.get("user") or {}).get("login", "")),
-                      "body_base64": base64.b64encode(body).decode("ascii"),
-                      "body_sha256": hashlib.sha256(body).hexdigest(),
-                  }
-              )
-          Path(sys.argv[1]).write_text(
-              json.dumps(rows, sort_keys=True, separators=(",", ":")),
-              encoding="utf-8",
-          )
-          PY
-          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/recovery-capture.json"
+          python scripts/capture_recovery_carriers.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --event "$GITHUB_EVENT_NAME" \
+            --comment-ids "$RECOVERY_COMMENT_IDS" \
+            --source-capture "$RUNNER_TEMP/source-population-closure.json" \
+            --output "$RUNNER_TEMP/recovery-capture.json"
 
       - name: Build deterministic prepared bundle
         id: prepare
@@ -741,35 +694,6 @@ jobs:
           RECOVERY_COMMENT_IDS: ${{ env.RECOVERY_COMMENT_IDS }}
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/capture-recoveries.py" <<'PY'
-          from __future__ import annotations
-          import base64, hashlib, json, os, re, subprocess, sys
-          from pathlib import Path
-          raw = os.environ.get("RECOVERY_COMMENT_IDS", "")
-          values = [item.strip() for item in re.split(r"[,\n]+", raw) if item.strip()]
-          ids = []
-          for value in values:
-              if not value.isdigit() or int(value) <= 0 or int(value) in ids:
-                  raise SystemExit("invalid/duplicate recovery_comment_ids")
-              ids.append(int(value))
-          repo = os.environ["GITHUB_REPOSITORY"]
-          rows = []
-          for comment_id in ids:
-              completed = subprocess.run(["gh", "api", f"/repos/{repo}/issues/comments/{comment_id}"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-              comment = json.loads(completed.stdout)
-              match = re.search(r"/issues/(\d+)$", str(comment.get("issue_url", "")))
-              if match is None:
-                  raise SystemExit("recovery carrier issue identity is ambiguous")
-              body = str(comment.get("body", "")).encode("utf-8")
-              rows.append({
-                  "issue_number": int(match.group(1)),
-                  "comment_id": int(comment["id"]),
-                  "author_login": str((comment.get("user") or {}).get("login", "")),
-                  "body_base64": base64.b64encode(body).decode("ascii"),
-                  "body_sha256": hashlib.sha256(body).hexdigest(),
-              })
-          Path(sys.argv[1]).write_text(json.dumps(rows, sort_keys=True, separators=(",", ":")), encoding="utf-8")
-          PY
           cat > "$RUNNER_TEMP/capture-sources.py" <<'PY'
           from __future__ import annotations
           import json, os, re, subprocess, sys
@@ -906,7 +830,12 @@ jobs:
           set -euo pipefail
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
-          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/pre-push-recoveries.json"
+          python scripts/capture_recovery_carriers.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --event "$GITHUB_EVENT_NAME" \
+            --comment-ids "$RECOVERY_COMMENT_IDS" \
+            --source-capture "$RUNNER_TEMP/prepared-bundle/source-population-closure.json" \
+            --output "$RUNNER_TEMP/pre-push-recoveries.json"
           python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
             --bundle-root "$RUNNER_TEMP/prepared-bundle" \
             --current-capture "$RUNNER_TEMP/pre-push-recoveries.json"
@@ -946,7 +875,12 @@ jobs:
           set -euo pipefail
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
-          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/post-push-recoveries.json"
+          python scripts/capture_recovery_carriers.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --event "$GITHUB_EVENT_NAME" \
+            --comment-ids "$RECOVERY_COMMENT_IDS" \
+            --source-capture "$RUNNER_TEMP/prepared-bundle/source-population-closure.json" \
+            --output "$RUNNER_TEMP/post-push-recoveries.json"
           python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
             --bundle-root "$RUNNER_TEMP/prepared-bundle" \
             --current-capture "$RUNNER_TEMP/post-push-recoveries.json"
@@ -1003,7 +937,12 @@ jobs:
             --workflow-run-attempt "$GITHUB_RUN_ATTEMPT"
           live_main="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
           [[ "$live_main" == "$EXPECTED_MAIN_SHA" ]]
-          python "$RUNNER_TEMP/capture-recoveries.py" "$RUNNER_TEMP/final-recoveries.json"
+          python scripts/capture_recovery_carriers.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --event "$GITHUB_EVENT_NAME" \
+            --comment-ids "$RECOVERY_COMMENT_IDS" \
+            --source-capture "$RUNNER_TEMP/prepared-bundle/source-population-closure.json" \
+            --output "$RUNNER_TEMP/final-recoveries.json"
           python scripts/trusted_main_source_evidence_candidate.py verify-recoveries \
             --bundle-root "$RUNNER_TEMP/prepared-bundle" \
             --current-capture "$RUNNER_TEMP/final-recoveries.json"
