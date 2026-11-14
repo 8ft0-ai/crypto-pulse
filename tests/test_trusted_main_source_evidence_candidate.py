@@ -29,10 +29,10 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
     def base_capture(self) -> dict[str, object]:
         return copy.deepcopy(self.fixture["base_capture"])
 
-    def test_workflow_has_daily_and_manual_triggers_with_exact_two_job_permissions_and_concurrency(self) -> None:
+    def test_workflow_has_twice_daily_and_manual_triggers_with_exact_permissions_and_concurrency(self) -> None:
         workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
         self.assertEqual(set(workflow["on"]), {"workflow_dispatch", "schedule"})
-        self.assertEqual(workflow["on"]["schedule"], [{"cron": "47 0 * * *"}])
+        self.assertEqual(workflow["on"]["schedule"], [{"cron": "47 0 * * *"}, {"cron": "47 12 * * *"}])
         dispatch_inputs = workflow["on"]["workflow_dispatch"]["inputs"]
         self.assertEqual(set(dispatch_inputs), {"expected_main_sha", "recovery_comment_ids"})
         self.assertEqual(dispatch_inputs["expected_main_sha"]["required"], "true")
@@ -54,6 +54,8 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         self.assertNotIn("issue_comment:", text)
         self.assertNotIn("repository_dispatch:", text)
         self.assertNotIn("gh pr merge", text)
+        self.assertNotIn("gh workflow run pr-validation.yml", text)
+        self.assertNotIn("validate-candidate:", text)
         self.assertNotIn("enable-auto-merge", text)
         self.assertIn("persist-credentials: false", text)
 
