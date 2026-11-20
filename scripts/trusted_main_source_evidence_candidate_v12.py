@@ -218,6 +218,11 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
                 raise CandidateError("attempt workflow id does not match capture workflow")
             if attempt["event"] not in {"schedule", "workflow_dispatch"}:
                 raise CandidateError("attempt event is not an authorised ingestion event")
+            if attempt["event"] == "schedule" and attempt["conclusion"] == "success":
+                raw_attempt = raw_by_attempt[attempt["run_attempt"]]
+                # Preserve exact read-only GitHub job evidence in the closed
+                # census; its absence remains a hard blocker for candidates.
+                attempt["temporal_job_proof"] = raw_attempt.get("temporal_job_proof")
             if attempt["event"] == "workflow_dispatch":
                 raw_attempt = raw_by_attempt[attempt["run_attempt"]]
                 fields = (
@@ -288,12 +293,15 @@ def source_inputs_from_capture(capture: Mapping[str, Any], artifact_root: Path) 
     metadata = {
         (attempt["run_id"], attempt["run_attempt"]): attempt
         for run in closure["runs"] for attempt in run["attempts"]
-        if attempt["event"] == "workflow_dispatch"
     }
     for source in sources:
+        attempt = metadata[(source["run_id"], source["run_attempt"])]
+        if source["event"] == "schedule":
+            if source["conclusion"] == "success":
+                source["temporal_job_proof"] = attempt.get("temporal_job_proof")
+            continue
         if source["event"] != "workflow_dispatch":
             continue
-        attempt = metadata[(source["run_id"], source["run_attempt"])]
         source["dispatch_source_run"] = attempt["dispatch_source_run"]
         source["accepted_hour_artifact"] = attempt["accepted_hour_artifact"]
         receipt_path = (
@@ -348,6 +356,54 @@ def source_inputs_from_bundle(bundle_root: Path) -> list[dict[str, Any]]:
     return sources
 
 
+# Augment candidate PR review evidence without altering the frozen v1.1
+# renderer. The complete decision-critical bound is in the hashed manifest.
+_ORIGINAL_RENDER_PR_BODY = _legacy.render_pr_body
+
+
+def render_pr_body(
+    manifest: Mapping[str, Any], evidence: Mapping[str, Any],
+    candidate_commit_sha: str,
+) -> str:
+    body = _ORIGINAL_RENDER_PR_BODY(manifest, evidence, candidate_commit_sha)
+    rows = manifest.get("historical_ineligible_source_inputs", [])
+    if not isinstance(rows, list):
+        raise CandidateError("historical bound manifest is malformed")
+    section = (
+        "\n## Candidate-only historical temporal inadmissibility\n\n"
+        "Missing input bytes have no validated Phase-12 observation hour. "
+        "These complete-run proofs establish only candidate ineligibility "
+        "under the separately approved 24-hour post-job temporal ceiling. "
+        "They are neither recovery decisions nor source promotions.\n\n"
+    )
+    for row in rows:
+        identity = row["input_identity"]
+        proof = row["temporal_proof"]
+        section += (
+            f"- run \x60{identity['run_id']}\x60 attempt \x60{identity['run_attempt']}\x60; "
+            f"job \x60{proof['job_id']}\x60 completed "
+            f"\x60{proof['job_completed_at_utc']}\x60; latest admissible "
+            f"hour \x60{proof['latest_admissible_observation_hour_utc']}\x60; "
+            f"job proof SHA-256 \x60{proof['job_proof_sha256']}\x60; "
+            "canonical hour \x60null\x60.\n"
+        )
+    if not rows:
+        section += "- No historical input was excluded by this rule.\n"
+    section += (
+        f"\nComplete source-head Git-blob approvals and temporal evidence for "
+        f"all scheduled inputs are bound to \x60candidate_id\x60 "
+        f"\x60{manifest['candidate_id']}\x60 and the prepared bundle.\n"
+    )
+    body = body.replace(
+        "\n## Remaining blockers\n", section + "\n## Remaining blockers\n", 1
+    )
+    body = body.replace(
+        "- No recurring schedule.",
+        "- Scheduled refresh may create candidate PRs only; no automatic merge or report publication.",
+    )
+    return body
+
+
 # Patch the mature candidate implementation in-place so its prepare/replay,
 # materialisation, recovery and PR verification functions operate over v1.2.
 _legacy.accumulation = accumulation
@@ -358,6 +414,7 @@ _legacy.build_source_population_closure = build_source_population_closure
 _legacy.source_inputs_from_capture = source_inputs_from_capture
 _legacy._serialisable_source_input = _serialisable_source_input
 _legacy.source_inputs_from_bundle = source_inputs_from_bundle
+_legacy.render_pr_body = render_pr_body
 
 # Re-export patched functions for the public bounded wrapper.
 for _name in (

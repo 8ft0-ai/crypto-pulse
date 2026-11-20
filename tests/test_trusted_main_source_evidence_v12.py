@@ -86,6 +86,7 @@ class AccumulationV12Tests(unittest.TestCase):
         *,
         recoveries: list[dict[str, object]] | None = None,
         trusted_by_path: dict[str, bytes | None] | None = None,
+        temporal_bounds: dict[int, dict[str, object] | Exception] | None = None,
     ) -> dict[str, object]:
         verified_by_key = {
             (int(row["run_id"]), int(row["run_attempt"])): row for row in verified
@@ -102,6 +103,15 @@ class AccumulationV12Tests(unittest.TestCase):
                 raise ValueError("publication_intent_bytes must be exact bytes")
             return dict(verified_by_key[key])
 
+        def prove(repository_root: Path, source: dict[str, object]) -> dict[str, object]:
+            value = (temporal_bounds or {}).get(int(source["run_id"]))
+            if isinstance(value, Exception):
+                raise value
+            return value or {
+                "job_completed_at_utc": hour(100),
+                "latest_admissible_observation_hour_utc": hour(124),
+            }
+
         def git_bytes(repository_root: Path, sha: str, path: str) -> bytes | None:
             if trusted_by_path is None:
                 return None
@@ -113,6 +123,11 @@ class AccumulationV12Tests(unittest.TestCase):
             mock.patch.object(legacy, "_resolve_anchor", return_value=ANCHOR),
             mock.patch.object(legacy, "_verify_source", side_effect=verify),
             mock.patch.object(legacy, "_git_bytes_at", side_effect=git_bytes),
+            mock.patch.object(accumulation._temporal, "prove_bound", side_effect=prove),
+            mock.patch.object(
+                accumulation._temporal, "verify_exact_snapshot_timestamp",
+                return_value=None,
+            ),
         ):
             return accumulation.build_accumulation_manifest(
                 Path("."),
@@ -330,6 +345,65 @@ class AccumulationV12Tests(unittest.TestCase):
             manifest["blocking_findings"][0]["blocker_class"],
             "candidate-path-identity-conflict",
         )
+
+
+    def test_proven_historical_missing_input_does_not_block_new_genuine_hour(self) -> None:
+        old = self.source(800, raw=None)
+        new = self.source(801)
+        bounds = {
+            800: {
+                "job_completed_at_utc": hour(-48),
+                "latest_admissible_observation_hour_utc": hour(-24),
+                "job_id": 81,
+                "contract": "trusted-main-scheduled-source-temporal-admissibility/v1",
+            }
+        }
+        a = self.build([old, new], [self.verified(new, hour(1))], temporal_bounds=bounds)
+        b = self.build([new, old], [self.verified(new, hour(1))], temporal_bounds=bounds)
+        self.assertEqual(a["candidate_id"], b["candidate_id"])
+        self.assertFalse(a["blocking_findings"])
+        self.assertEqual(len(a["added_paths"]), 1)
+        self.assertEqual(len(a["historical_ineligible_source_inputs"]), 1)
+        historical = a["historical_ineligible_source_inputs"][0]
+        self.assertIsNone(historical["canonical_observation_hour_utc"])
+        self.assertEqual(historical["input_identity"]["run_id"], 800)
+        self.assertNotIn(800, [row["source_run_id"] for row in a["added_paths"]])
+        self.assertEqual(a["selection"]["selected_hours_utc"], [hour(1)])
+
+    def test_ambiguous_or_post_anchor_bound_remains_a_blocker(self) -> None:
+        old = self.source(802, raw=None)
+        new = self.source(803)
+        for proof in (
+            ValueError("job source-head mismatch"),
+            {
+                "job_completed_at_utc": hour(-1),
+                "latest_admissible_observation_hour_utc": hour(23),
+            },
+        ):
+            with self.subTest(proof=proof):
+                result = self.build(
+                    [old, new], [self.verified(new, hour(1))],
+                    temporal_bounds={802: proof},
+                )
+                self.assertFalse(result["added_paths"])
+                self.assertEqual(
+                    result["blocking_findings"][0]["blocker_class"],
+                    "source-input-unverifiable",
+                )
+                self.assertFalse(result["historical_ineligible_source_inputs"])
+
+    def test_historical_proof_is_decision_critical_to_candidate_id(self) -> None:
+        old = self.source(804, raw=None)
+        new = self.source(805)
+        p = {
+            "job_completed_at_utc": hour(-50),
+            "latest_admissible_observation_hour_utc": hour(-26),
+        }
+        q = {**p, "job_id": 77}
+        a = self.build([old, new], [self.verified(new, hour(1))], temporal_bounds={804: p})
+        b = self.build([old, new], [self.verified(new, hour(1))], temporal_bounds={804: q})
+        self.assertNotEqual(a["candidate_id"], b["candidate_id"])
+        self.assertEqual(a["added_paths"], b["added_paths"])
 
 
 class CandidatePopulationV12Tests(unittest.TestCase):
