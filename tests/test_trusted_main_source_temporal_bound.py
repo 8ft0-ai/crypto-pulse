@@ -46,6 +46,13 @@ def source() -> dict:
                         "completed_at": "2026-10-15T09:57:15Z",
                     },
                     {
+                        "name": "Validate source snapshot",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "started_at": "2026-10-15T09:57:15Z",
+                        "completed_at": "2026-10-15T09:57:15Z",
+                    },
+                    {
                         "name": "Validate observation hour",
                         "status": "completed",
                         "conclusion": "success",
@@ -106,6 +113,42 @@ class TemporalBoundTests(unittest.TestCase):
             candidate = source()
             mutate(candidate)
             with self.subTest(mutation=str(mutate)), self.assertRaises(ValueError):
+                self.prove(candidate)
+
+    def test_snapshot_validation_step_must_be_complete_and_consistent(self):
+        def steps(candidate):
+            return candidate["temporal_job_proof"]["jobs"][0]["steps"]
+
+        mutations = {
+            "absent": lambda x: steps(x).pop(1),
+            "failed": lambda x: steps(x)[1].update(conclusion="failure"),
+            "skipped": lambda x: steps(x)[1].update(
+                status="completed", conclusion="skipped"
+            ),
+            "pending": lambda x: steps(x)[1].update(
+                status="in_progress", conclusion=None
+            ),
+            "duplicated-success": lambda x: steps(x).append(deepcopy(steps(x)[1])),
+            "contradictory-failure": lambda x: steps(x).append(
+                {**steps(x)[1], "conclusion": "failure"}
+            ),
+            "list-out-of-order": lambda x: steps(x).__setitem__(
+                slice(1, 3), list(reversed(steps(x)[1:3]))
+            ),
+            "timestamp-before-generation": lambda x: steps(x)[1].update(
+                started_at="2026-10-15T09:57:13Z"
+            ),
+            "timestamp-after-hour-validation": lambda x: steps(x)[1].update(
+                completed_at="2026-10-15T09:57:16Z"
+            ),
+            "timestamp-outside-job": lambda x: steps(x)[1].update(
+                completed_at="2026-10-15T09:57:23Z"
+            ),
+        }
+        for label, mutate in mutations.items():
+            candidate = source()
+            mutate(candidate)
+            with self.subTest(case=label), self.assertRaises(ValueError):
                 self.prove(candidate)
 
     def test_later_approved_scheduled_workflow_blob(self):

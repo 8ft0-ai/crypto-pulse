@@ -103,12 +103,19 @@ def prove_bound(repository_root: Path, source: Mapping[str, Any]) -> dict[str, A
     steps = job.get("steps")
     if not isinstance(steps, list):
         raise ValueError("scheduled job steps are missing")
+    required_steps = (
+        "Fetch source data",
+        "Validate source snapshot",
+        "Validate observation hour",
+    )
     selected: dict[str, dict[str, Any]] = {}
+    observed_order: list[str] = []
     for step in steps:
         if not isinstance(step, dict):
             raise ValueError("malformed scheduled job step")
         name = step.get("name")
-        if name in {"Fetch source data", "Validate observation hour"}:
+        if name in required_steps:
+            observed_order.append(name)
             if name in selected:
                 raise ValueError("duplicate temporal-provenance job step")
             if step.get("status") != "completed" or step.get("conclusion") != "success":
@@ -118,10 +125,13 @@ def prove_bound(repository_root: Path, source: Mapping[str, Any]) -> dict[str, A
             if not (started <= s_start <= s_end <= completed):
                 raise ValueError("source step timing exceeds completed ingestion job")
             selected[name] = {"started": s_start, "completed": s_end}
-    if set(selected) != {"Fetch source data", "Validate observation hour"}:
+    if set(selected) != set(required_steps):
         raise ValueError("required source generation/validation steps are absent")
-    if selected["Fetch source data"]["completed"] > selected["Validate observation hour"]["started"]:
-        raise ValueError("observation-hour validation precedes source generation")
+    if tuple(observed_order) != required_steps:
+        raise ValueError("required source generation/validation steps are out of order")
+    for previous, following in zip(required_steps, required_steps[1:]):
+        if selected[previous]["completed"] > selected[following]["started"]:
+            raise ValueError("required source generation/validation step timing is out of order")
     upper = completed + MAX_POST_COMPLETION_SKEW
     return {
         "contract": CONTRACT,
