@@ -183,6 +183,28 @@ jobs:
                   for attempt in attempts
               ):
                   raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
+              for attempt in attempts:
+                  if attempt.get("event") == "schedule" and attempt.get("conclusion") == "success":
+                      number = int(attempt["run_attempt"])
+                      listing = gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}/jobs?per_page=100")
+                      attempt["temporal_job_proof"] = {
+                          "total_count": listing.get("total_count"),
+                          "jobs": [
+                              {
+                                  **{key: job.get(key) for key in (
+                                      "id", "run_id", "run_attempt", "head_sha",
+                                      "name", "status", "conclusion", "started_at", "completed_at",
+                                  )},
+                                  "steps": [
+                                      {key: step.get(key) for key in (
+                                          "name", "status", "conclusion", "started_at", "completed_at",
+                                      )}
+                                      for step in (job.get("steps") or [])
+                                  ],
+                              }
+                              for job in listing.get("jobs", [])
+                          ],
+                      }
               pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
               artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
               sources = []
@@ -760,6 +782,28 @@ jobs:
                   for attempt in attempts
               ):
                   raise RuntimeError("discovered attempt does not match resolved scheduled ingestion workflow")
+              for attempt in attempts:
+                  if attempt.get("event") == "schedule" and attempt.get("conclusion") == "success":
+                      number = int(attempt["run_attempt"])
+                      listing = gh_json(f"/repos/{repo}/actions/runs/{run_id}/attempts/{number}/jobs?per_page=100")
+                      attempt["temporal_job_proof"] = {
+                          "total_count": listing.get("total_count"),
+                          "jobs": [
+                              {
+                                  **{key: job.get(key) for key in (
+                                      "id", "run_id", "run_attempt", "head_sha",
+                                      "name", "status", "conclusion", "started_at", "completed_at",
+                                  )},
+                                  "steps": [
+                                      {key: step.get(key) for key in (
+                                          "name", "status", "conclusion", "started_at", "completed_at",
+                                      )}
+                                      for step in (job.get("steps") or [])
+                                  ],
+                              }
+                              for job in listing.get("jobs", [])
+                          ],
+                      }
               pages = paged(f"/repos/{repo}/actions/runs/{run_id}/artifacts", per_page="100")
               artifacts = [artifact for page in pages for artifact in page.get("artifacts", [])]
               discovery = []

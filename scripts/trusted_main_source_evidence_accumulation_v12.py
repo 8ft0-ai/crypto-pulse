@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import trusted_main_source_evidence_accumulation as _v11
+import trusted_main_source_temporal_bound as _temporal
 
 # Re-export the proven v1.1 verification/recovery primitives for candidate code.
 for _name, _value in vars(_v11).items():
@@ -151,6 +152,8 @@ def build_accumulation_manifest(
             "window": None,
             "hours": [],
             "verified_source_inputs": [],
+            "temporal_admissibility_proofs": [],
+            "historical_ineligible_source_inputs": [],
             "supersession_records": [],
             "operational_diagnostics": [],
             "input_level_blockers": [finding],
@@ -258,10 +261,47 @@ def build_accumulation_manifest(
 
     verified_all: list[dict[str, Any]] = []
     verified_after_anchor: list[dict[str, Any]] = []
+    temporal_proofs: list[dict[str, Any]] = []
+    historical_ineligible: list[dict[str, Any]] = []
     for source in sorted(winners, key=_v11._input_sort_key):
         identity = _source_identity(source)
+        temporal_bound = None
+        temporal_error = None
+        if source.get("event") == "schedule":
+            try:
+                temporal_bound = _temporal.prove_bound(repository_root, source)
+            except (_v11.AccumulationError, TypeError, ValueError) as exc:
+                temporal_error = str(exc)
+            # No observation hour is assigned. Only missing/unavailable
+            # exact-byte inputs that cannot be eligible *under the amended
+            # candidate timestamp contract* are nonblocking diagnostics.
+            absent_bytes = not all(
+                isinstance(source.get(field), (bytes, bytearray))
+                for field in ("publication_intent_bytes", "snapshot_bytes")
+            )
+            if (
+                temporal_bound is not None
+                and absent_bytes
+                and temporal_bound["latest_admissible_observation_hour_utc"] <= anchor
+            ):
+                historical_ineligible.append({
+                    "disposition": "proven-ineligible-for-prospective-candidate",
+                    "input_identity": identity,
+                    "canonical_observation_hour_utc": None,
+                    "anchor_observation_hour_utc": anchor,
+                    "temporal_proof": temporal_bound,
+                })
+                continue
         try:
             candidate = _verify_candidate_source(repository_root, base_sha, config, source)
+            if source.get("event") == "schedule":
+                if temporal_bound is None:
+                    raise ValueError(f"missing candidate temporal admission proof: {temporal_error}")
+                _temporal.verify_exact_snapshot_timestamp(source, temporal_bound)
+                temporal_proofs.append({
+                    "input_identity": identity,
+                    "temporal_proof": temporal_bound,
+                })
         except (_v11.AccumulationError, TypeError, ValueError) as exc:
             input_blockers.append(
                 _v11._blocker(
@@ -489,6 +529,14 @@ def build_accumulation_manifest(
         "verified_source_inputs": sorted(
             [_v11._source_public(item) for item in verified_all],
             key=_source_order,
+        ),
+        # Decision-critical: both collections contribute to candidate_id.
+        # No historical proof provides a Phase-12 canonical observation hour.
+        "temporal_admissibility_proofs": sorted(
+            temporal_proofs, key=_v11.canonical_json_bytes
+        ),
+        "historical_ineligible_source_inputs": sorted(
+            historical_ineligible, key=_v11.canonical_json_bytes
         ),
         "supersession_records": sorted(
             supersession,
