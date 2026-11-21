@@ -13,7 +13,8 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Any
+
+import yaml
 
 REPORT_SCHEMA_VERSION = "deterministic-crypto-report/v1"
 VALID_QUALITY_STATUSES = {"valid-ok", "valid-degraded"}
@@ -80,13 +81,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def strip_quotes(value: str) -> str:
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        return value[1:-1]
-    return value
-
-
 def parse_front_matter(text: str) -> tuple[dict[str, str], str]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
@@ -100,17 +94,25 @@ def parse_front_matter(text: str) -> tuple[dict[str, str], str]:
     if end_index is None:
         raise ReportValidationError("front matter is missing a closing --- delimiter")
 
+    try:
+        parsed = yaml.safe_load("\n".join(lines[1:end_index]))
+    except yaml.YAMLError as exc:
+        raise ReportValidationError(f"invalid YAML front matter: {exc}") from exc
+    if not isinstance(parsed, dict) or any(not isinstance(key, str) for key in parsed):
+        raise ReportValidationError("front matter must be a mapping with string keys")
+
     fields: dict[str, str] = {}
-    for raw_line in lines[1:end_index]:
-        line = raw_line.rstrip()
-        if not line or line.startswith("  - "):
+    for key, value in parsed.items():
+        if isinstance(value, (list, dict)):
+            if key in REQUIRED_FRONT_MATTER:
+                raise ReportValidationError(f"{key} must be a scalar")
             continue
-        if ":" not in line:
-            raise ReportValidationError(f"front matter line is not a key/value pair: {line}")
-        key, value = line.split(":", 1)
-        key = key.strip()
-        if key:
-            fields[key] = strip_quotes(value)
+        if isinstance(value, bool):
+            fields[key] = "true" if value else "false"
+        elif value is None:
+            fields[key] = "null"
+        else:
+            fields[key] = str(value).strip()
 
     body = "\n".join(lines[end_index + 1 :])
     return fields, body

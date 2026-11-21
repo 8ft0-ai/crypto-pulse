@@ -6,10 +6,13 @@ import textwrap
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from validate_crypto_report import ReportValidationError, validate_report
+from generate_crypto_report import generate_report
 
 FIXTURES = ROOT / "tests" / "fixtures"
 
@@ -126,6 +129,58 @@ class DeterministicCryptoReportValidationTests(unittest.TestCase):
             (fixtures / "valid_ok_snapshot.json").write_text("{}", encoding="utf-8")
             report_path = self.write_report(body, root)
             validate_report(report_path, root)
+
+
+    def test_generator_yaml_aliases_validate(self) -> None:
+        shared = {"path": "tests/fixtures/valid_ok_snapshot.json", "sha256": "a" * 64}
+        editorial = {"source": shared, "claims": [{"sources": [shared]}]}
+        yaml_block = yaml.safe_dump({"editorial_article": editorial}, sort_keys=False)
+        self.assertIn("    - *id001", yaml_block)
+        body = VALID_REPORT_TEMPLATE.replace(
+            "llm_generated: false\n---",
+            "llm_generated: false\n" + yaml_block + "---",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixtures = root / "tests" / "fixtures"
+            fixtures.mkdir(parents=True)
+            (fixtures / "valid_ok_snapshot.json").write_text("{}", encoding="utf-8")
+            validate_report(self.write_report(body, root), root)
+
+    def test_invalid_yaml_alias_is_rejected(self) -> None:
+        shared = {"path": "tests/fixtures/valid_ok_snapshot.json"}
+        editorial = {"source": shared, "claims": [{"sources": [shared]}]}
+        yaml_block = yaml.safe_dump({"editorial_article": editorial}, sort_keys=False)
+        self.assertIn("*id001", yaml_block)
+        body = VALID_REPORT_TEMPLATE.replace(
+            "llm_generated: false\n---",
+            "llm_generated: false\n" + yaml_block.replace("*id001", "*missing") + "---",
+            1,
+        )
+        self.assert_report_rejected(body, "invalid YAML front matter")
+
+    def test_structured_required_field_is_rejected(self) -> None:
+        body = VALID_REPORT_TEMPLATE.replace(
+            'source_snapshot: "tests/fixtures/valid_ok_snapshot.json"',
+            "source_snapshot:\n  path: tests/fixtures/valid_ok_snapshot.json",
+            1,
+        )
+        self.assert_report_rejected(body, "source_snapshot must be a scalar")
+
+    def test_false_non_advice_flag_is_rejected(self) -> None:
+        body = VALID_REPORT_TEMPLATE.replace(
+            "no_investment_advice: true", "no_investment_advice: false", 1,
+        )
+        self.assert_report_rejected(body, "no_investment_advice must be true")
+
+    def test_generated_report_with_editorial_front_matter_validates(self) -> None:
+        source = ROOT / "data/crypto/hourly/2026/07/08/1742_AEST_source_snapshot.json"
+        config = ROOT / "config/crypto_sources.yml"
+        with tempfile.TemporaryDirectory() as tmp:
+            report = generate_report(source, Path(tmp) / "reports" / "crypto", config)
+            self.assertIn("editorial_article:", report.read_text(encoding="utf-8"))
+            validate_report(report, ROOT)
 
 
 if __name__ == "__main__":
