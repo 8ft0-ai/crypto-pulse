@@ -25,15 +25,27 @@ REAL_SOURCE = ROOT / "data/crypto/hourly/2026/11/09/2107_AEDT_source_snapshot.js
 class SitewideEditorialG3Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.reports = pages.collect_reports()
-        cls.archived = next(r for r in cls.reports if r.source_path == REAL_REPORT)
+        cls.archived = next(r for r in pages.collect_reports() if r.source_path == REAL_REPORT)
+        cls.legacy = replace(
+            cls.archived,
+            metadata={key: value for key, value in cls.archived.metadata.items()
+                      if key != "editorial_article"},
+        )
+        cls.newer_untyped = replace(
+            cls.legacy,
+            title="Controlled newer untyped report",
+            timestamp="2026-11-21 16:07 AEDT",
+            sort_key="2026-11-21T05:07:00Z",
+            url="archive/2026/11/21/1607_AEDT.html",
+        )
         source = json.loads(REAL_SOURCE.read_text(encoding="utf-8"))
         metadata, _ = pages.split_front_matter(render_report(source, REAL_SOURCE, source["quality"]))
-        cls.typed = replace(cls.archived, metadata=metadata)
+        cls.typed = replace(cls.legacy, metadata=metadata)
         cls.article = pages.validated_editorial_article(cls.typed)
 
     def test_qualifying_typed_finding_leads_over_newer_untyped_archive(self):
-        homepage = archive_cards.homepage_lead([self.reports[0], self.typed], pages)
+        self.assertGreater(self.newer_untyped.sort_key, self.typed.sort_key)
+        homepage = archive_cards.homepage_lead([self.newer_untyped, self.typed], pages)
         self.assertIn(archive_cards.EDITORIAL_STATES["finding"], homepage)
         self.assertIn(self.article["headline"], unescape(homepage))
         self.assertIn(self.article["summary"], unescape(homepage))
@@ -44,19 +56,19 @@ class SitewideEditorialG3Tests(unittest.TestCase):
         self.assertIn(f'href="{self.typed.url}#technical-record"', homepage)
         self.assertIn(self.typed.timestamp, homepage)
         self.assertIn("static archive, not live or continuously updated", homepage)
-        self.assertNotIn(self.reports[0].title, homepage)
+        self.assertNotIn(self.newer_untyped.title, homepage)
 
-    def test_actual_archive_has_no_typed_projection_and_explicitly_qualified_lead(self):
-        self.assertFalse(any("editorial_article" in report.metadata for report in self.reports))
-        homepage = pages.homepage_editorial_lead(self.reports)
+    def test_legacy_only_archive_has_explicitly_qualified_lead(self):
+        self.assertNotIn("editorial_article", self.legacy.metadata)
+        homepage = pages.homepage_editorial_lead([self.legacy])
         self.assertIn("Original archival observation", homepage)
-        self.assertIn(self.reports[0].title, homepage)
-        self.assertIn(self.reports[0].url, homepage)
+        self.assertIn(self.legacy.title, homepage)
+        self.assertIn(self.legacy.url, homepage)
         self.assertIn("not a new validated editorial finding", homepage)
         self.assertIn("No retained report has a qualifying typed", homepage)
         self.assertLess(homepage.index("homepage-lead-heading"), homepage.index("homepage-lead-actions"))
         # Existing report wording is quoted without a new deterministic assessment.
-        excerpt = archive_cards.original_observation_excerpt(self.reports[0])
+        excerpt = archive_cards.original_observation_excerpt(self.legacy)
         self.assertTrue(excerpt)
         self.assertIn(excerpt, unescape(homepage))
 
@@ -92,7 +104,7 @@ class SitewideEditorialG3Tests(unittest.TestCase):
     def test_older_typed_finding_does_not_claim_to_be_newest_typed_report(self):
         # Synthetic precedence case: separate canonical-validator tests cover
         # actual source admission, while this case checks truthful copy.
-        newer = self.reports[0]
+        newer = self.newer_untyped
         self.assertNotEqual(newer.url, self.typed.url)
         factual = deepcopy(self.article)
         factual["article_state"] = "factual_update"
@@ -120,7 +132,7 @@ class SitewideEditorialG3Tests(unittest.TestCase):
         self.assertNotIn("<script>", cards)
 
     def test_legacy_archive_keeps_original_title_and_no_retrospective_summary(self):
-        item = self.reports[0]
+        item = self.legacy
         cards = archive_cards.recent_report_cards([item], pages)
         self.assertIn(item.title, unescape(cards))
         self.assertIn("Original deterministic publication", cards)
@@ -128,6 +140,42 @@ class SitewideEditorialG3Tests(unittest.TestCase):
         self.assertIn("Validated source evidence", cards)
         self.assertNotIn("Source-bounded finding", cards)
         self.assertNotIn("Fresh analysis", cards)
+
+    def test_freshly_generated_typed_report_coexists_with_legacy_in_archive(self):
+        # Exercise the actual report parser and Pages builder with a generated
+        # typed report alongside an unchanged earlier archival report. The
+        # disposable archive is isolated from the checked-in production files.
+        source = json.loads(REAL_SOURCE.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
+            archive = Path(tmp) / "reports/crypto/hourly"
+            legacy_path = archive / "2026/11/09/2007_AEDT.md"
+            typed_path = archive / "2026/11/09/2107_AEDT.md"
+            legacy_path.parent.mkdir(parents=True)
+            legacy_path.write_bytes(REAL_REPORT.with_name("2007_AEDT.md").read_bytes())
+            typed_path.write_text(
+                render_report(source, REAL_SOURCE, source["quality"]), encoding="utf-8"
+            )
+            with patch.object(pages, "REPORTS_DIR", archive), patch.object(
+                pages, "OUT", Path(tmp) / "_site"
+            ):
+                reports = pages.collect_reports()
+                self.assertEqual(len(reports), 2)
+                typed, legacy = reports
+                self.assertIn("editorial_article", typed.metadata)
+                self.assertNotIn("editorial_article", legacy.metadata)
+                self.assertEqual(pages.validated_editorial_article(typed)["headline"],
+                                 self.article["headline"])
+                pages.build()
+                home = (pages.OUT / "index.html").read_text(encoding="utf-8")
+                self.assertIn(self.article["headline"], unescape(home))
+                cards = archive_cards.recent_report_cards(reports, pages)
+                self.assertIn("Source-bounded finding", cards)
+                self.assertIn("Original deterministic publication", cards)
+                self.assertIn(legacy.title, unescape(cards))
+                self.assertIn("editorial_article", pages.report_to_manifest(typed)["metadata"])
+                self.assertNotIn("editorial_article", pages.report_to_manifest(legacy)["metadata"])
+                self.assertTrue((pages.OUT / "manifest.json").is_file())
+                self.assertTrue((pages.OUT / "archive/index.html").is_file())
 
     def test_material_quality_limitation_and_no_finding_states_are_visible(self):
         altered = deepcopy(self.article)
@@ -181,12 +229,12 @@ class SitewideEditorialG3Tests(unittest.TestCase):
             self.assertIn(href, nav)
         self.assertEqual(nav.count('aria-label="Primary navigation"'), 1)
         self.assertIn('aria-current="page"', archive_reader._reader_nav(pages, "", "archive", True))
-        feed = pages.rss_feed([self.reports[0]])
-        manifest = pages.report_to_manifest(self.reports[0])
+        feed = pages.rss_feed([self.legacy])
+        manifest = pages.report_to_manifest(self.legacy)
         self.assertIn("Not financial advice", feed)
         self.assertIn("not be used for trading", manifest["disclaimer"])
-        self.assertEqual(manifest["source"], self.reports[0].source_rel)
-        self.assertEqual(manifest["url"], self.reports[0].url)
+        self.assertEqual(manifest["source"], self.legacy.source_rel)
+        self.assertEqual(manifest["url"], self.legacy.url)
         self.assertNotIn("editorial_article", manifest["metadata"])
 
     def test_styles_scope_mobile_focus_and_wide_tables_without_new_framework(self):
