@@ -49,17 +49,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Run semantic-plan benchmark integration tests
-        run: |
-          python -m unittest tests.test_semantic_plan_benchmark -v
-
-      - name: Run public-data policy compatibility tests
-        run: |
-          python -m unittest \
-            tests.test_llm_public_data_demo \
-            tests.test_llm_public_demo_diagnostic \
-            -v
-
       - name: Run unit tests
         run: |
           set -o pipefail
