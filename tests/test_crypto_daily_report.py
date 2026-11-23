@@ -145,6 +145,36 @@ class DailyReportProofs(unittest.TestCase):
                 asset["last_updated"] = "2026-11-22T23:59:59Z"
         self.assertNotIn("BTC", daily.asset_prices(payload, capture))
 
+    def test_daily_and_hourly_at_exact_same_cutoff_preserve_both(self) -> None:
+        from types import SimpleNamespace
+        from site_generator.report_chronology import canonicalise_reports
+
+        daily_report = SimpleNamespace(
+            source_rel="reports/crypto/daily/2026/11/22/2026-11-22_UTC.md",
+            metadata={
+                "schema_version": "deterministic-crypto-daily-report/v1",
+                "report_type": "crypto_daily_consolidation",
+                "reporting_date_utc": "2026-11-22",
+                "evidence_cutoff_utc": "2026-11-23T01:00:00Z",
+                "report_reference_time_utc": "2026-11-23T01:00:00Z",
+                "cadence": "daily",
+                "trusted_main_sha": "a" * 40,
+            },
+        )
+        hourly_report = SimpleNamespace(
+            source_rel="reports/crypto/hourly/2026/11/23/0100_UTC.md",
+            metadata={
+                "schema_version": "deterministic-crypto-report/v1",
+                "generated_at_utc": "2026-11-23T01:00:00Z",
+                "generated_at_local": "2026-11-23T01:00:00+00:00",
+                "timezone": "UTC",
+                "timezone_abbreviation": "UTC",
+            },
+        )
+        ordered = canonicalise_reports([hourly_report, daily_report])
+        self.assertEqual(ordered, [daily_report, hourly_report])
+        self.assertEqual(daily_report.report_time_utc, hourly_report.report_time_utc)
+
     def test_site_archive_latest_search_feed_and_hourly_path(self) -> None:
         path, _ = self.generate()
         hourly_source = ROOT / "reports/crypto/hourly/2026/11/22/1107_AEDT.md"

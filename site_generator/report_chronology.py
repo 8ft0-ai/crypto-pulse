@@ -296,7 +296,10 @@ def _legacy_alias_representative(
 
 def canonicalise_reports(reports: Iterable[Any]) -> list[Any]:
     """Return retained reports in one fail-closed reverse UTC chronology."""
-    grouped: dict[datetime, list[tuple[Any, str]]] = {}
+    # A daily cut-off may coincide exactly with an archived hourly observation.
+    # Preserve both, while keeping original same-instant hourly/legacy alias
+    # collision rules unchanged. At a tied instant prefer daily in the reader.
+    grouped: dict[tuple[datetime, bool], list[tuple[Any, str]]] = {}
 
     for report in reports:
         metadata = _metadata(report)
@@ -317,18 +320,18 @@ def canonicalise_reports(reports: Iterable[Any]) -> list[Any]:
         report.report_time_utc = _canonical_text(canonical_utc)
         report.chronology_kind = kind
         report.chronology_aliases = ()
-        grouped.setdefault(canonical_utc, []).append((report, kind))
+        grouped.setdefault((canonical_utc, kind == "daily"), []).append((report, kind))
 
-    resolved: list[tuple[datetime, Any]] = []
-    for canonical_utc, entries in grouped.items():
+    resolved: list[tuple[datetime, int, Any]] = []
+    for (canonical_utc, is_daily), entries in grouped.items():
         if len(entries) == 1:
             representative = entries[0][0]
         else:
             representative = _legacy_alias_representative(canonical_utc, entries)
-        resolved.append((canonical_utc, representative))
+        resolved.append((canonical_utc, int(is_daily), representative))
 
-    resolved.sort(key=lambda item: item[0], reverse=True)
-    return [report for _, report in resolved]
+    resolved.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [report for _, _, report in resolved]
 
 
 __all__ = ["ReportChronologyError", "canonicalise_reports"]
