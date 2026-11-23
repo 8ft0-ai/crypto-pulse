@@ -28,6 +28,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "reports" / "crypto" / "hourly"
+DAILY_REPORTS_DIR_NAME = ("reports", "crypto", "daily")
 SITE_SRC = ROOT / "site"
 OUT = ROOT / "_site"
 SITE_URL = "https://8ft0-ai.github.io/crypto-pulse/"
@@ -197,6 +198,12 @@ def add_heading_ids_and_toc(body: str) -> tuple[str, str]:
 
 
 def path_parts(path: Path) -> tuple[str, str, str, str, str]:
+    daily_root = ROOT.joinpath(*DAILY_REPORTS_DIR_NAME)
+    if path.is_relative_to(daily_root):
+        rel = path.relative_to(daily_root)
+        if len(rel.parts) == 4:
+            year, month, day, _name = rel.parts
+            return year, month, day, "01:00", "UTC"
     try:
         rel = path.relative_to(REPORTS_DIR)
         year, month, day = rel.parts[0], rel.parts[1], rel.parts[2]
@@ -242,6 +249,9 @@ def extract_headline(body: str) -> str:
 
 
 def output_path_for(path: Path) -> Path:
+    daily_root = ROOT.joinpath(*DAILY_REPORTS_DIR_NAME)
+    if path.is_relative_to(daily_root):
+        return OUT / "archive" / "daily" / path.relative_to(daily_root).with_suffix(".html")
     return OUT / "archive" / path.relative_to(REPORTS_DIR).with_suffix(".html")
 
 
@@ -308,7 +318,10 @@ def archive_range(reports: list[Report]) -> str:
 
 
 def reporting_cadence(reports: list[Report]) -> str:
-    return "Hourly archive cadence" if len(reports) > 1 else ("Single report" if reports else "No reports yet")
+    has_daily = any(row.metadata.get("schema_version") == "deterministic-crypto-daily-report/v1" for row in reports)
+    return "Daily reports + retained hourly archive" if has_daily else (
+        "Hourly archive cadence" if len(reports) > 1 else ("Single report" if reports else "No reports yet")
+    )
 
 
 def dashboard_cards(reports: list[Report]) -> str:
@@ -923,9 +936,9 @@ def copy_assets() -> None:
 
 def collect_reports() -> list[Report]:
     reports: list[Report] = []
-    if not REPORTS_DIR.exists():
-        return reports
-    for source_path in sorted(REPORTS_DIR.glob("**/*.md")):
+    daily_root = ROOT.joinpath(*DAILY_REPORTS_DIR_NAME)
+    source_paths = [*REPORTS_DIR.glob("**/*.md"), *daily_root.glob("**/*.md")]
+    for source_path in sorted(source_paths):
         raw = source_path.read_text(encoding="utf-8")
         metadata, body = split_front_matter(raw)
         source_items = extract_source_items(body)

@@ -9,6 +9,7 @@ from typing import Any, Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DETERMINISTIC_SCHEMA = "deterministic-crypto-report/v1"
+DAILY_SCHEMA = "deterministic-crypto-daily-report/v1"
 DETERMINISTIC_NAME_RE = re.compile(r"^(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})\.md$")
 LEGACY_NAME_RE = re.compile(
     r"^(?P<hhmm>\d{4})_(?P<tz>AEDT|AEST|UTC|[A-Z]{2,5})_crypto_market_intelligence\.md$"
@@ -172,6 +173,42 @@ def _deterministic_identity(report: Any) -> tuple[datetime, str, str, str]:
     return canonical_utc, display, display_local.strftime("%H:%M"), display_abbreviation
 
 
+def _daily_identity(report: Any) -> tuple[datetime, str, str, str]:
+    """Do not infer the reporting date or cut-off from an untrusted filename."""
+    from datetime import date
+
+    path = PurePosixPath(_source_rel(report))
+    parts = path.parts
+    if len(parts) != 7 or parts[:3] != ("reports", "crypto", "daily"):
+        raise ReportChronologyError("daily report has unexpected archive path")
+    year, month, day, filename = parts[3:]
+    path_day = f"{year}-{month}-{day}"
+    if filename != f"{path_day}_UTC.md":
+        raise ReportChronologyError("daily report filename does not match UTC date")
+    try:
+        reporting_day = date.fromisoformat(path_day)
+    except ValueError as exc:
+        raise ReportChronologyError("daily report date is invalid") from exc
+    if reporting_day.isoformat() != path_day:
+        raise ReportChronologyError("daily report date must be canonical")
+
+    metadata = _metadata(report)
+    if metadata.get("report_type") != "crypto_daily_consolidation":
+        raise ReportChronologyError("daily report type mismatch")
+    if metadata.get("reporting_date_utc") != path_day:
+        raise ReportChronologyError("daily report metadata contradicts path")
+    instant = datetime(reporting_day.year, reporting_day.month, reporting_day.day,
+                       tzinfo=timezone.utc) + timedelta(days=1, hours=1)
+    for key in ("evidence_cutoff_utc", "report_reference_time_utc"):
+        if _parse_aware_iso(metadata.get(key), key) != instant:
+            raise ReportChronologyError(f"daily report {key} must equal fixed cut-off")
+    if metadata.get("cadence") != "daily":
+        raise ReportChronologyError("daily report cadence mismatch")
+    if re.fullmatch(r"[0-9a-f]{40}", str(metadata.get("trusted_main_sha", ""))) is None:
+        raise ReportChronologyError("daily report source commit identity invalid")
+    return instant, f"{path_day} UTC (daily, cut-off 01:00 UTC next day)", "01:00", "UTC"
+
+
 def _legacy_identity(report: Any) -> tuple[datetime, str, str, str]:
     metadata = _metadata(report)
     path_date, path_hhmm, path_tz = _path_identity(report, LEGACY_NAME_RE)
@@ -266,6 +303,9 @@ def canonicalise_reports(reports: Iterable[Any]) -> list[Any]:
         if metadata.get("schema_version") == DETERMINISTIC_SCHEMA:
             canonical_utc, display, time_label, abbreviation = _deterministic_identity(report)
             kind = "deterministic"
+        elif metadata.get("schema_version") == DAILY_SCHEMA:
+            canonical_utc, display, time_label, abbreviation = _daily_identity(report)
+            kind = "daily"
         else:
             canonical_utc, display, time_label, abbreviation = _legacy_identity(report)
             kind = "legacy"
