@@ -1,11 +1,6 @@
 name: Verify CryptoPulse Live Pages
 
 on:
-  workflow_run:
-    workflows:
-      - Publish CryptoPulse Pages
-    types:
-      - completed
   workflow_dispatch:
 
 permissions:
