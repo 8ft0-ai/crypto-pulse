@@ -329,6 +329,7 @@ class ProofTests(unittest.TestCase):
         patterns = CONFIG["pages_trigger_paths"]
         self.assertTrue(path_triggers_pages("site_generator/foo.py", patterns))
         self.assertTrue(path_triggers_pages("reports/crypto/hourly/2026/08/25/a.md", patterns))
+        self.assertTrue(path_triggers_pages("reports/crypto/daily/2026/11/22/2026-11-22_UTC.md", patterns))
         self.assertFalse(path_triggers_pages("tools/operator/README.md", patterns))
         self.assertFalse(path_triggers_pages("tests/test_operator_project_proof.py", patterns))
 

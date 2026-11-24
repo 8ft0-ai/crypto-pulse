@@ -23,6 +23,7 @@ pages_build_job = "build"
 pages_deploy_job = "deploy"
 pages_trigger_paths = [
   "reports/crypto/hourly/**/*.md",
+  "reports/crypto/daily/**/*.md",
   "site/**",
   "site_generator/**",
   "scripts/build_pages_site.py",
