@@ -1,0 +1,158 @@
+name: Generate CryptoPulse Daily Demo Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: UTC reporting date after its fixed D+1 01:00 UTC cut-off
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: cryptopulse-daily-publication-${{ inputs.report_date }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install validation dependencies
+        run: python -m pip install pyyaml markdown
+      - name: Freeze current protected-main base and refuse duplicate date
+        id: source
+        env:
+          REPORT_DATE: ${{ inputs.report_date }}
+        run: |
+          set -euo pipefail
+          [[ "$REPORT_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
+          day="$(date -u -d "$REPORT_DATE" +%F)"
+          test "$day" = "$REPORT_DATE"
+          cutoff="$(date -u -d "$REPORT_DATE + 1 day 01:00" +%s)"
+          test "$(date -u +%s)" -ge "$cutoff"
+          path="reports/crypto/daily/${REPORT_DATE:0:4}/${REPORT_DATE:5:2}/${REPORT_DATE:8:2}/${REPORT_DATE}_UTC.md"
+          if git cat-file -e "HEAD:$path" 2>/dev/null; then
+            echo "A daily report for this UTC date is already on main." >&2
+            exit 1
+          fi
+          base="$(git rev-parse HEAD)"
+          trusted="$(git rev-list --first-parent -n 1 --before="$(date -u -d "@$cutoff" +%Y-%m-%dT%H:%M:%SZ)" "$base")"
+          test -n "$trusted"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+      - name: Generate from exact pinned main bytes and replay validate
+        env:
+          REPORT_DATE: ${{ inputs.report_date }}
+          TRUSTED_SHA: ${{ steps.source.outputs.trusted }}
+        run: |
+          set -euo pipefail
+          python scripts/generate_crypto_daily_report.py --report-date "$REPORT_DATE" \
+            --trusted-main-sha "$TRUSTED_SHA" --records-output "$RUNNER_TEMP/daily-hours.json"
+          python scripts/validate_crypto_daily_report.py "${{ steps.source.outputs.path }}" --root .
+          python scripts/build_pages_site.py
+          rm -rf _site
+      - name: Check duplicate candidate and prepare exact one-file commit
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_DATE: ${{ inputs.report_date }}
+          REPORT_PATH: ${{ steps.source.outputs.path }}
+        run: |
+          set -euo pipefail
+          candidates="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName --limit 500 | jq --arg day "$REPORT_DATE" '[.[] | select(.headRefName | startswith("automation/daily-publication-") and endswith("-" + $day))] | length')"
+          test "$candidates" = "0"
+          branch="automation/daily-publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${REPORT_DATE}"
+          git checkout -b "$branch"
+          git config user.name "cryptopulse-deterministic-publication[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$REPORT_PATH"
+          test "$(git diff --cached --name-only)" = "$REPORT_PATH"
+          git commit -m "Publish daily crypto demo report $REPORT_DATE"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Mint existing publication App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          private-key: ${{ secrets.DETERMINISTIC_PUBLICATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+      - name: Open App-authored review PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BRANCH: ${{ steps.candidate.outputs.branch }}
+          EXPECTED_HEAD: ${{ steps.candidate.outputs.head }}
+          EXPECTED_BASE: ${{ steps.source.outputs.base }}
+          REPORT_DATE: ${{ inputs.report_date }}
+        run: |
+          set -euo pipefail
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            push "https://github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$BRANCH"
+          body="$RUNNER_TEMP/daily-pr.md"
+          cat > "$body" <<EOF
+          ## CryptoPulse daily demo report candidate
+
+          Reporting date: $REPORT_DATE UTC. This is AI-generated demonstration content and may be inaccurate, incomplete, stale or misleading. It is not financial advice, investment research, a recommendation or a trading signal.
+
+          This candidate is a reviewable daily report only. Daily merging remains disabled pending separate Stage4C authorisation.
+          EOF
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "Publish daily CryptoPulse demo report $REPORT_DATE" --body-file "$body" --draft
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --json number --jq '.[0].number')"
+          pr="$RUNNER_TEMP/daily-pr.json"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$number" > "$pr"
+          jq -e --arg head "$EXPECTED_HEAD" --arg branch "$BRANCH" --arg base "$EXPECTED_BASE" \
+            '.state == "open" and .head.sha == $head and .head.ref == $branch and .base.ref == "main" and .base.sha == $base and .head.repo.id == .base.repo.id' \
+            "$pr" >/dev/null
+          actor_id="$(jq -r '.user.id' "$pr")"
+          actor_login="$(jq -r '.user.login' "$pr")"
+          test "$actor_login" = "${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}[bot]"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "actor_id=$actor_id" >> "$GITHUB_OUTPUT"
+      - name: Build immutable daily candidate attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_DATE: ${{ inputs.report_date }}
+          TRUSTED_SHA: ${{ steps.source.outputs.trusted }}
+          BASE_SHA: ${{ steps.source.outputs.base }}
+          REPORT_PATH: ${{ steps.source.outputs.path }}
+          BRANCH: ${{ steps.candidate.outputs.branch }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          APP_ACTOR_ID: ${{ steps.pr.outputs.actor_id }}
+          APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
+        run: |
+          set -euo pipefail
+          workflow_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.workflow_id')"
+          mkdir -p "$RUNNER_TEMP/daily-attestation"
+          python scripts/build_daily_publication_attestation.py \
+            --date "$REPORT_DATE" --trusted-main-sha "$TRUSTED_SHA" --main-base-sha "$BASE_SHA" \
+            --records "$RUNNER_TEMP/daily-hours.json" --report "$REPORT_PATH" \
+            --candidate-head-sha "$HEAD_SHA" --candidate-branch "$BRANCH" \
+            --pr-number "$PR_NUMBER" --workflow-id "$workflow_id" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --app-actor-id "$APP_ACTOR_ID" --app-slug "$APP_SLUG" \
+            --output "$RUNNER_TEMP/daily-attestation/cryptopulse-daily-attestation.json"
+      - name: Upload immutable daily attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptopulse-daily-attestation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/daily-attestation/cryptopulse-daily-attestation.json
+          if-no-files-found: error
+          retention-days: 14

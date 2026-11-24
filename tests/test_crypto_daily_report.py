@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import yaml
 from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
@@ -15,6 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_pages_site
 import generate_crypto_daily_report as daily
+import daily_publication as daily_pub
 from validate_crypto_daily_report import validate_daily
 
 DAY = date(2026, 11, 22)
@@ -205,6 +207,102 @@ class DailyReportProofs(unittest.TestCase):
         self.assertEqual(manifest["latest"]["url"], reports[0].url)
         self.assertTrue((self.root / "_site/archive/2026/11/22/1107_AEDT.html").exists())
         self.assertTrue((self.root / "_site/archive/daily/2026/11/22/2026-11-22_UTC.html").exists())
+
+    def test_daily_publication_attestation_and_independent_preflight(self) -> None:
+        _, slots = self.generate()
+        # The attestation preserves all slot dispositions and exact source bytes.
+        hours = [{"hour": row["hour"], "status": row["status"],
+                  "path": row.get("path"), "sha256": row.get("sha256")}
+                 for row in slots]
+        path = daily.output_path(DAY, self.root / "reports/crypto/daily")
+        branch = "automation/daily-publication-9001-1-2026-11-22"
+        att = daily_pub.build_attestation(
+            reporting_date_utc=DAY.isoformat(), trusted_main_sha=self.sha,
+            expected_main_base_sha=self.sha,
+            source_config_sha256=__import__("hashlib").sha256(self.config.read_bytes()).hexdigest(),
+            hours=hours,
+            report_path="reports/crypto/daily/2026/11/22/2026-11-22_UTC.md",
+            report_bytes=path.read_bytes(), candidate_head_sha="b"*40,
+            candidate_branch=branch, pull_request_number=4,
+            generation_workflow_id=55, generation_run_id=9001,
+            generation_run_attempt=1, publication_app_actor_id=77,
+            publication_app_slug="cryptopulse-publication")
+        facts = {
+            "source_ancestor_at_cutoff": True, "source_replay_valid": True,
+            "source_population_valid": True, "report_replay_valid": True,
+            "changed_files": [att["report_path"]], "duplicate_date_count": 0,
+            "duplicate_candidate_count": 0, "pr_number": 4, "same_repository": True, "pr_open": True,
+            "pr_author_id": 77, "pr_author_login": "cryptopulse-publication[bot]",
+            "pr_head_sha": "b"*40, "pr_head_ref": branch, "pr_base": "main",
+            "current_main_sha": self.sha, "validation_head_sha": "b"*40,
+            "validation_status": "success",
+            "validation_check": "Build site and check generated output",
+            "validation_app_slug": "github-actions",
+            "attestation_count": 1, "attestation_expired": False,
+            "artifact_name": "cryptopulse-daily-attestation-9001-1",
+            "generation_run_id": 9001, "generation_workflow_id": 55,
+            "generation_workflow_path": daily_pub.GENERATION_WORKFLOW_PATH,
+            "trusted_generation_run": True,
+            "generation_head_sha": self.sha, "report_path": att["report_path"],
+            "report_sha256": att["report_sha256"],
+        }
+        self.assertTrue(daily_pub.evaluate_daily_gate(att, facts)["eligible"])
+        self.assertTrue(daily_pub.evaluate_daily_gate(att, facts)["eligible"])
+        daily_pub.independently_validate_candidate(self.root, att, path.read_bytes(),
+                                                   [att["report_path"]])
+
+        for key, value in (("source_ancestor_at_cutoff", False),
+                           ("source_replay_valid", False),
+                           ("source_population_valid", False),
+                           ("report_replay_valid", False),
+                           ("pr_head_sha", "c"*40), ("pr_base", "other"),
+                           ("duplicate_date_count", 1),
+                           ("pr_author_id", 78), ("attestation_count", 2),
+                           ("trusted_generation_run", False)):
+            changed = dict(facts, **{key: value})
+            self.assertFalse(daily_pub.evaluate_daily_gate(att, changed)["eligible"], key)
+
+        tampered = dict(att, source_population_sha256="0"*64)
+        self.assertFalse(daily_pub.evaluate_daily_gate(tampered, facts)["eligible"])
+        self.assertFalse(daily_pub.evaluate_daily_gate(att, dict(facts, changed_files=[att["report_path"], "README.md"]))["eligible"])
+
+    def test_daily_population_distinguishes_missing_and_rejected_and_duplicate_hours(self) -> None:
+        _, slots = self.generate()
+        hours = [{"hour": row["hour"], "status": row["status"],
+                  "path": row.get("path"), "sha256": row.get("sha256")}
+                 for row in slots]
+        daily_pub.validate_hours(DAY.isoformat(), hours)
+        self.assertEqual(sum(row["status"] == "missing" for row in hours), 22)
+        hours[2] = dict(hours[2], status="rejected", path=hours[0]["path"], sha256=hours[0]["sha256"])
+        with self.assertRaisesRegex(daily_pub.DailyPublicationError, "duplicate"):
+            daily_pub.validate_hours(DAY.isoformat(), hours)
+
+    def test_daily_workflow_wiring_is_manual_read_only_at_preflight_and_pages_aware(self) -> None:
+        generate = yaml.safe_load((ROOT / ".github/workflows/generate-daily-crypto-report.yml").read_text())
+        gate = yaml.safe_load((ROOT / ".github/workflows/deterministic-site-publication-gate.yml").read_text())
+        pages = yaml.safe_load((ROOT / ".github/workflows/pages.yml").read_text())
+        # PyYAML's YAML 1.1 parser treats `on` as boolean true.
+        trigger = generate.get("on", generate.get(True, {}))
+        self.assertEqual(set(trigger), {"workflow_dispatch"})
+        self.assertNotIn("schedule", trigger)
+        generate_text = (ROOT / ".github/workflows/generate-daily-crypto-report.yml").read_text()
+        self.assertIn("automation/daily-publication-", generate_text)
+        self.assertIn("actions/create-github-app-token@v3", generate_text)
+        self.assertIn("cryptopulse-daily-attestation-${{ github.run_id }}-${{ github.run_attempt }}", generate_text)
+        self.assertIn(".head.sha == $head", generate_text)
+        gate_trigger = gate.get("on", gate.get(True, {}))
+        self.assertIn("workflow_run", gate_trigger)
+        self.assertNotIn("schedule", gate_trigger)
+        self.assertEqual(gate["permissions"]["contents"], "read")
+        self.assertEqual(gate["permissions"]["pull-requests"], "read")
+        pages_trigger = pages.get("on", pages.get(True, {}))
+        paths = pages_trigger["push"]["paths"]
+        self.assertIn("reports/crypto/daily/**/*.md", paths)
+        self.assertIn("reports/crypto/hourly/**/*.md", paths)
+        self.assertIn("preflight", gate["jobs"])
+        self.assertIn("merge", gate["jobs"])
+        self.assertIn("daily-preflight", gate["jobs"])
+        self.assertNotIn("create-github-app-token", str(gate["jobs"]["daily-preflight"]))
 
 
 if __name__ == "__main__":

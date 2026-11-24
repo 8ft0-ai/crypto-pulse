@@ -291,6 +291,7 @@ def main() -> int:
     parser.add_argument("--root", default=str(ROOT))
     parser.add_argument("--output-root", default="reports/crypto/daily")
     parser.add_argument("--config", default="config/crypto_sources.yml")
+    parser.add_argument("--records-output", help="Write the exact 24-slot source population as JSON")
     args = parser.parse_args()
     try:
         day = date.fromisoformat(args.report_date)
@@ -305,6 +306,10 @@ def main() -> int:
             config = root / config
         now = datetime.now(timezone.utc)
         path, records = generate(root, args.trusted_main_sha, day, output, config, now)
+        if args.records_output:
+            Path(args.records_output).write_text(
+                json.dumps([{"hour": r["hour"], "status": r["status"], "path": r.get("path"), "sha256": r.get("sha256")} for r in records], sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8")
         print(json.dumps({"path": str(path), "accepted": sum(
             r["status"] in ("valid-ok", "valid-degraded") for r in records),
             "missing": sum(r["status"] == "missing" for r in records),
