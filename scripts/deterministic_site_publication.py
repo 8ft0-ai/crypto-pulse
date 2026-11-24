@@ -12,6 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
+# Daily candidates have a distinct contract and never enter the hourly gate.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from daily_publication import DailyPublicationError, evaluate_daily_gate, validate_attestation as validate_daily_attestation
+
 CONTRACT = "deterministic-site-publication/v3"
 EXPECTED_SOURCE_WORKFLOW_PATH = ".github/workflows/ingest-crypto-sources.yml"
 EXPECTED_GENERATION_WORKFLOW_PATH = ".github/workflows/generate-deterministic-site-publication.yml"
@@ -1186,6 +1190,24 @@ def command_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_validate_daily_attestation(args: argparse.Namespace) -> int:
+    validate_daily_attestation(load_json(Path(args.attestation)))
+    print("DAILY_ATTESTATION_VALIDATION_PASS")
+    return 0
+
+
+def command_daily_gate(args: argparse.Namespace) -> int:
+    attestation = load_json(Path(args.attestation))
+    validate_daily_attestation(attestation)
+    facts = load_json(Path(args.facts))
+    decision = evaluate_daily_gate(attestation, facts)
+    if args.output:
+        write_json(Path(args.output), decision)
+    github_output(args.github_output, {"eligible": decision["eligible"]})
+    print(json.dumps(decision, indent=2, sort_keys=True))
+    return 0 if decision["eligible"] else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1289,6 +1311,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output")
     p.add_argument("--github-output")
     p.set_defaults(func=command_gate)
+
+    p = sub.add_parser("validate-daily-attestation")
+    p.add_argument("--attestation", required=True)
+    p.set_defaults(func=command_validate_daily_attestation)
+
+    p = sub.add_parser("daily-gate-preflight")
+    p.add_argument("--attestation", required=True)
+    p.add_argument("--facts", required=True)
+    p.add_argument("--output")
+    p.add_argument("--github-output")
+    p.set_defaults(func=command_daily_gate)
 
     return parser
 

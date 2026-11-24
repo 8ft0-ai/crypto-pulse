@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "reports/crypto/hourly/**/*.md"
+      - "reports/crypto/daily/**/*.md"
       - "site/**"
       - "site_generator/**"
       - "scripts/build_pages_site.py"

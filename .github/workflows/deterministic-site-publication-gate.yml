@@ -312,3 +312,142 @@ jobs:
             "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
             -f sha="$CANDIDATE_HEAD_SHA" \
             -f merge_method=merge
+
+  daily-preflight:
+    name: Independently verify daily publication candidate (no merge)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'automation/daily-publication-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install report validation dependencies
+        run: python -m pip install pyyaml markdown
+      - name: Fetch exact PR, generation run and immutable attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION_RUN: ${{ github.event.workflow_run.id }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          run_id="${BRANCH#automation/daily-publication-}"
+          run_id="${run_id%%-*}"
+          attempt_date="${BRANCH#automation/daily-publication-${run_id}-}"
+          attempt="${attempt_date%%-*}"
+          date_part="${attempt_date#${attempt}-}"
+          artifact="cryptopulse-daily-attestation-${run_id}-${attempt}"
+          mkdir -p "$RUNNER_TEMP/daily-gate/artifact"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$VALIDATION_RUN" > "$RUNNER_TEMP/daily-gate/validation.json"
+          test "$(jq -r '.head_sha' "$RUNNER_TEMP/daily-gate/validation.json")" = "$HEAD_SHA"
+          test "$(jq -r '.name' "$RUNNER_TEMP/daily-gate/validation.json")" = "Validate CryptoPulse PR"
+          pr_count="$(jq '.pull_requests | length' "$RUNNER_TEMP/daily-gate/validation.json")"
+          test "$pr_count" = "1"
+          pr_number="$(jq -r '.pull_requests[0].number' "$RUNNER_TEMP/daily-gate/validation.json")"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" > "$RUNNER_TEMP/daily-gate/pr.json"
+          # Validation may finish before the generator uploads its final attestation.
+          # Wait only for the exact generation attempt and exact artifact name.
+          ready=false
+          for poll in $(seq 1 12); do
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > "$RUNNER_TEMP/daily-gate/generation.json"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?per_page=100" > "$RUNNER_TEMP/daily-gate/artifacts.json"
+            count="$(jq --arg n "$artifact" '[.artifacts[] | select(.name == $n)] | length' "$RUNNER_TEMP/daily-gate/artifacts.json")"
+            test "$count" -le 1
+            state="$(jq -r '.status' "$RUNNER_TEMP/daily-gate/generation.json")"
+            result="$(jq -r '.conclusion // ""' "$RUNNER_TEMP/daily-gate/generation.json")"
+            if [[ "$state" == "completed" && "$result" != "success" ]]; then
+              echo "Daily generation failed: $result" >&2
+              exit 1
+            fi
+            if [[ "$state" == "completed" && "$result" == "success" && "$count" == "1" ]]; then
+              ready=true
+              break
+            fi
+            test "$poll" != "12" || break
+            sleep 5
+          done
+          test "$ready" = true
+          expired="$(jq --arg n "$artifact" '.artifacts[] | select(.name == $n) | .expired' "$RUNNER_TEMP/daily-gate/artifacts.json")"
+          test "$expired" = "false"
+          id="$(jq --arg n "$artifact" '.artifacts[] | select(.name == $n) | .id' "$RUNNER_TEMP/daily-gate/artifacts.json")"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/daily-gate/attestation.zip"
+          unzip -q "$RUNNER_TEMP/daily-gate/attestation.zip" -d "$RUNNER_TEMP/daily-gate/artifact"
+          attestation="$RUNNER_TEMP/daily-gate/artifact/cryptopulse-daily-attestation.json"
+          test -f "$attestation"
+          cp "$attestation" "$RUNNER_TEMP/daily-gate/attestation.json"
+          echo "pr_number=$pr_number" >> "$GITHUB_ENV"
+          echo "daily_run_id=$run_id" >> "$GITHUB_ENV"
+          echo "daily_run_attempt=$attempt" >> "$GITHUB_ENV"
+          echo "candidate_branch=$BRANCH" >> "$GITHUB_ENV"
+          echo "candidate_head=$HEAD_SHA" >> "$GITHUB_ENV"
+      - name: Re-read source bytes and independently replay the daily candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          att="$RUNNER_TEMP/daily-gate/attestation.json"
+          python scripts/deterministic_site_publication.py validate-daily-attestation --attestation "$att"
+          report_path="$(jq -er '.report_path' "$att")"
+          git fetch --no-tags origin "refs/pull/$pr_number/head:refs/remotes/origin/daily-candidate"
+          test "$(git rev-parse refs/remotes/origin/daily-candidate)" = "$candidate_head"
+          git show "$candidate_head:$report_path" > "$RUNNER_TEMP/daily-gate/report.md"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number/files?per_page=100" > "$RUNNER_TEMP/daily-gate/files.json"
+          python - "$RUNNER_TEMP/daily-gate/files.json" "$RUNNER_TEMP/daily-gate/paths.json" <<'PY'
+          import json,sys
+          rows=json.load(open(sys.argv[1],encoding="utf-8"))
+          json.dump([r["filename"] for r in rows],open(sys.argv[2],"w",encoding="utf-8"))
+          PY
+          python - "$att" "$RUNNER_TEMP/daily-gate/report.md" "$RUNNER_TEMP/daily-gate/paths.json" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path.cwd() / "scripts"))
+          from daily_publication import independently_validate_candidate
+          att=json.load(open(sys.argv[1],encoding="utf-8"))
+          paths=json.load(open(sys.argv[3],encoding="utf-8"))
+          independently_validate_candidate(Path.cwd(),att,Path(sys.argv[2]).read_bytes(),paths)
+          PY
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$daily_run_id" > "$RUNNER_TEMP/daily-gate/generation.json"
+          gh api "/repos/$GITHUB_REPOSITORY/commits/$candidate_head/check-runs" > "$RUNNER_TEMP/daily-gate/checks.json"
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 500 --json number,headRefName > "$RUNNER_TEMP/daily-gate/open-prs.json"
+          gh api "/repos/$GITHUB_REPOSITORY/commits/main" > "$RUNNER_TEMP/daily-gate/main.json"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number" > "$RUNNER_TEMP/daily-gate/pr.json"
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$pr_number/files?per_page=100" > "$RUNNER_TEMP/daily-gate/files-api.json"
+          export DAILY_GATE_DIR="$RUNNER_TEMP/daily-gate"
+          python - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          d=Path(os.environ["DAILY_GATE_DIR"])
+          read=lambda n: json.load(open(d/n,encoding="utf-8"))
+          a=read("attestation.json"); p=read("pr.json"); g=read("generation.json")
+          v=read("validation.json"); c=read("checks.json"); files=read("files-api.json")
+          main=read("main.json"); opens=read("open-prs.json"); artifacts=read("artifacts.json")
+          expected_name=f"cryptopulse-daily-attestation-{a['generation_run_id']}-{a['generation_run_attempt']}"
+          artifact_rows=[x for x in artifacts.get("artifacts",[]) if x.get("name")==expected_name]
+          check_rows=[x for x in c.get("check_runs",[]) if x.get("name")=="Build site and check generated output"]
+          check=max(check_rows,key=lambda x:x.get("completed_at") or "") if check_rows else {}
+          date_path=a["report_path"]
+          try: subprocess.run(["git","cat-file","-e",f"{main['sha']}:{date_path}"],check=True,capture_output=True); duplicate=1
+          except Exception: duplicate=0
+          cutoff_tip=subprocess.run(["git","rev-list","--first-parent","-n","1","--before="+a["cutoff_utc"],"refs/remotes/origin/main"],check=True,capture_output=True,text=True).stdout.strip()
+          facts={"source_ancestor_at_cutoff":cutoff_tip == a["trusted_main_sha"],"source_replay_valid":True,"source_population_valid":True,"report_replay_valid":True,
+            "changed_files":[x.get("filename","") for x in files],"duplicate_date_count":duplicate,
+            "duplicate_candidate_count":sum(x.get("number")!=p.get("number") and str(x.get("headRefName","")).startswith("automation/daily-publication-") and str(x.get("headRefName","")).endswith("-"+a["reporting_date_utc"]) for x in opens),
+            "pr_number":p.get("number"),"same_repository":(p.get("head",{}).get("repo") or {}).get("id")==((p.get("base",{}).get("repo") or {}).get("id")),"pr_open":p.get("state")=="open","pr_author_id":(p.get("user") or {}).get("id"),"pr_author_login":(p.get("user") or {}).get("login"),
+            "pr_head_sha":(p.get("head") or {}).get("sha"),"pr_head_ref":(p.get("head") or {}).get("ref"),"pr_base":(p.get("base") or {}).get("ref"),
+            "current_main_sha":main.get("sha"),"validation_head_sha":v.get("head_sha"),"validation_status":check.get("conclusion"),"validation_check":check.get("name"),"validation_app_slug":(check.get("app") or {}).get("slug"),
+            "attestation_count":len(artifact_rows),"attestation_expired":artifact_rows[0].get("expired") if artifact_rows else True,"artifact_name":expected_name,
+            "generation_run_id":g.get("id"),"generation_workflow_id":g.get("workflow_id"),"generation_workflow_path":g.get("path"),"generation_head_sha":g.get("head_sha"),"trusted_generation_run":g.get("event")=="workflow_dispatch" and g.get("head_branch")=="main" and g.get("conclusion")=="success",
+            "report_path":a.get("report_path"),"report_sha256":hashlib.sha256((d/"report.md").read_bytes()).hexdigest()}
+          json.dump(facts,open(d/"facts.json","w",encoding="utf-8"),sort_keys=True)
+          PY
+          python scripts/deterministic_site_publication.py daily-gate-preflight --attestation "$RUNNER_TEMP/daily-gate/attestation.json" --facts "$RUNNER_TEMP/daily-gate/facts.json"
+      - name: Record read-only preflight result
+        if: always()
+        run: echo "Daily publication preflight has no merge or write capability."
