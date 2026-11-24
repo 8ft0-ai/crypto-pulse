@@ -1,0 +1,207 @@
+{
+  "contract": "cryptopulse-retrospective-source-set/v1",
+  "original_candidate_commit_sha": "4d7562d443c2164b01d63bb70e7f338c76a4ee41",
+  "original_candidate_id": "73c8792ff19bfec87023523d2aa3619645040075d830bc0d9b1da56c42b521ec",
+  "records": [
+    {
+      "canonical_observation_hour_utc": "2026-11-13T06:00:00Z",
+      "git_blob_sha": "daa1272370d2f1a355bfb9740297ea77c8b8c7db",
+      "path": "data/crypto/hourly/2026/11/13/1707_AEDT_source_snapshot.json",
+      "sha256": "a133ede7bdc7d058c4902cc18e396f06d6bbe86acb1717b6383efba88bbac1c6",
+      "source_run_attempt": 1,
+      "source_run_id": 43376455004
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T07:00:00Z",
+      "git_blob_sha": "58fa7fc1d264835386a854c533d7b7c6b6976a4d",
+      "path": "data/crypto/hourly/2026/11/13/1807_AEDT_source_snapshot.json",
+      "sha256": "70b3cce1a92126e43f50176d72c8079f1a4104bd9208327390cf965c5f7241ff",
+      "source_run_attempt": 1,
+      "source_run_id": 43383423604
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T08:00:00Z",
+      "git_blob_sha": "81b9235d18c41d2cd739257b90866f924ea619c0",
+      "path": "data/crypto/hourly/2026/11/13/1907_AEDT_source_snapshot.json",
+      "sha256": "d9408daab1d904773538a91c299060e520e8532a51f30e9a3afb2da99d3a5184",
+      "source_run_attempt": 1,
+      "source_run_id": 43390697905
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T09:00:00Z",
+      "git_blob_sha": "5884e70cde09db8b204ab17ed68b24277b7cdda5",
+      "path": "data/crypto/hourly/2026/11/13/2007_AEDT_source_snapshot.json",
+      "sha256": "bedb9b2a4dfb54a4f34827b5c0e5d4f761820d77cbbaa3f59092471c6105542e",
+      "source_run_attempt": 1,
+      "source_run_id": 43398626828
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T10:00:00Z",
+      "git_blob_sha": "8d2a22f822d4246c063b631e5448fe56b0565c12",
+      "path": "data/crypto/hourly/2026/11/13/2107_AEDT_source_snapshot.json",
+      "sha256": "902b6811e4b6c0b39584f7c8f70ade9c931af70c57f6fb32a3116d83233d31df",
+      "source_run_attempt": 1,
+      "source_run_id": 43406651755
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T11:00:00Z",
+      "git_blob_sha": "504e717477e68b4f9e27d5d74027014926cdde91",
+      "path": "data/crypto/hourly/2026/11/13/2207_AEDT_source_snapshot.json",
+      "sha256": "4e5adefa6f0423ae5e7ab5b9bb885aeeb7f9349fde3966f3f041e0c28d86fb77",
+      "source_run_attempt": 1,
+      "source_run_id": 43414435752
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T12:00:00Z",
+      "git_blob_sha": "e5c7ebfddc6ad79e55e3d6b38899c08502570d95",
+      "path": "data/crypto/hourly/2026/11/13/2307_AEDT_source_snapshot.json",
+      "sha256": "5047224d8085c4c3fedd6bd1937c942265cda4d7a36f361cea06caa7ba7bf19a",
+      "source_run_attempt": 1,
+      "source_run_id": 43422466110
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T13:00:00Z",
+      "git_blob_sha": "ae06ab76d7b72b2ba99264a529ac12b5a354eceb",
+      "path": "data/crypto/hourly/2026/11/14/0007_AEDT_source_snapshot.json",
+      "sha256": "74399ffd5f3c0493eeaf1f19f947a695ff7526da09ed77e3deb2f44084328667",
+      "source_run_attempt": 1,
+      "source_run_id": 43430871678
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T14:00:00Z",
+      "git_blob_sha": "388a761f1318875e6b9029815b777fb122bba398",
+      "path": "data/crypto/hourly/2026/11/14/0107_AEDT_source_snapshot.json",
+      "sha256": "57b0d24fac7db46d1f956234cb9f27fe29993eade3c7169b72be3a56eb80bec5",
+      "source_run_attempt": 1,
+      "source_run_id": 43439690023
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T15:00:00Z",
+      "git_blob_sha": "6b7076a4e6412bbb67aef72ac3149d9259fa08f9",
+      "path": "data/crypto/hourly/2026/11/14/0207_AEDT_source_snapshot.json",
+      "sha256": "47ab755574b3183ec44a7e2bf0ec2fdc523e745882c58df4f1086741c60358c8",
+      "source_run_attempt": 1,
+      "source_run_id": 43449322077
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T16:00:00Z",
+      "git_blob_sha": "725507414821fd9b610c028433d764303e6783f7",
+      "path": "data/crypto/hourly/2026/11/14/0307_AEDT_source_snapshot.json",
+      "sha256": "c87790c4a094aaf955d41bdc3b69524bcc2dca23bd52d92b36cffbc7860c0e21",
+      "source_run_attempt": 1,
+      "source_run_id": 43459432834
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T17:00:00Z",
+      "git_blob_sha": "be5ba5379460d413cb0e6a985352d5dff5152275",
+      "path": "data/crypto/hourly/2026/11/14/0407_AEDT_source_snapshot.json",
+      "sha256": "41c61cf0b2f8a70f0d6c8daf897856cab86080c87d1b66852d7d22cf0c6be515",
+      "source_run_attempt": 1,
+      "source_run_id": 43469547497
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T18:00:00Z",
+      "git_blob_sha": "517c325c93dba288192ec154b5f7c69a29d61435",
+      "path": "data/crypto/hourly/2026/11/14/0507_AEDT_source_snapshot.json",
+      "sha256": "4097a7b6a2b875135cbf23819f51d043f3852b92c9e9117388db6a211af52c85",
+      "source_run_attempt": 1,
+      "source_run_id": 43479450474
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T19:00:00Z",
+      "git_blob_sha": "ecc39a4881a9453cebe56a0775d1e4830d023740",
+      "path": "data/crypto/hourly/2026/11/14/0607_AEDT_source_snapshot.json",
+      "sha256": "0d60cb1d239154bef4f66bfa7c7e6c9d79f6c6727a118daf27acd27e81b8fc46",
+      "source_run_attempt": 1,
+      "source_run_id": 43489120087
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T20:00:00Z",
+      "git_blob_sha": "a134f1bdca70c03fcdabfb7f232b5a4cb1dfbcd0",
+      "path": "data/crypto/hourly/2026/11/14/0707_AEDT_source_snapshot.json",
+      "sha256": "33966dec567e87378bb37bcc7f59b8e4ec1c85fe3cc89b4f216fe62e316819c2",
+      "source_run_attempt": 1,
+      "source_run_id": 43498540060
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T21:00:00Z",
+      "git_blob_sha": "a93b3f545b178e133bf8d3507b55e448834f94ee",
+      "path": "data/crypto/hourly/2026/11/14/0807_AEDT_source_snapshot.json",
+      "sha256": "3ab53749b758f32789569f6e57af6b8dc2075b55df34c62cfb3acac082be566b",
+      "source_run_attempt": 1,
+      "source_run_id": 43507763940
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T22:00:00Z",
+      "git_blob_sha": "32f5540c15efd826ff40eeb4710002422ec35be6",
+      "path": "data/crypto/hourly/2026/11/14/0907_AEDT_source_snapshot.json",
+      "sha256": "4777d96a3426551ac49468a394469b110ca140eb0d47416f66503eee23a719df",
+      "source_run_attempt": 1,
+      "source_run_id": 43516574773
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-13T23:00:00Z",
+      "git_blob_sha": "d81af419500908a34c380893e8ae3578259340ba",
+      "path": "data/crypto/hourly/2026/11/14/1007_AEDT_source_snapshot.json",
+      "sha256": "bd908ded3da5a68a504e9176595667ea7b822f30a9a828c72d3c41586e4bd8f8",
+      "source_run_attempt": 1,
+      "source_run_id": 43524646063
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T00:00:00Z",
+      "git_blob_sha": "b5c20d388fbd7cc055a08d03704a9df384d89e92",
+      "path": "data/crypto/hourly/2026/11/14/1107_AEDT_source_snapshot.json",
+      "sha256": "8bc05bc097809ebe6afbba769514b4a9acfcd0ce9e6f25ab99cc8017116b97a5",
+      "source_run_attempt": 1,
+      "source_run_id": 43531964049
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T01:00:00Z",
+      "git_blob_sha": "ef7436f0dd72649847a6f17ebf4b565a819a47e6",
+      "path": "data/crypto/hourly/2026/11/14/1207_AEDT_source_snapshot.json",
+      "sha256": "316becb97266467cd3d861596671319533a3f88908b2b1e340585d0ce49a72be",
+      "source_run_attempt": 1,
+      "source_run_id": 43538597665
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T02:00:00Z",
+      "git_blob_sha": "4f0201842ef9cfb38986c5b136c735492ec91fb5",
+      "path": "data/crypto/hourly/2026/11/14/1307_AEDT_source_snapshot.json",
+      "sha256": "60a13cc1757f9a4524cdd054e66ffded23d29cb6da2462ca236763cc378301ee",
+      "source_run_attempt": 1,
+      "source_run_id": 43544477787
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T03:00:00Z",
+      "git_blob_sha": "83f1ced929351d7cf9b0ea0650952b2f8cca3a44",
+      "path": "data/crypto/hourly/2026/11/14/1407_AEDT_source_snapshot.json",
+      "sha256": "144c3c7c2b7f051fb00cf7176e860374e5928ee0e4421dc9ce5cc724c9c3abd4",
+      "source_run_attempt": 1,
+      "source_run_id": 43549920316
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T04:00:00Z",
+      "git_blob_sha": "65183251f574375822ddf86e45f1cb567891be37",
+      "path": "data/crypto/hourly/2026/11/14/1507_AEDT_source_snapshot.json",
+      "sha256": "3e3f725f7d3cf938b947f07ff5993aa280a13ba2ad047905066504fcdf3aee6b",
+      "source_run_attempt": 1,
+      "source_run_id": 43555016163
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T05:00:00Z",
+      "git_blob_sha": "0d1c76022c41c27d9ae6d094355221c8db0edb11",
+      "path": "data/crypto/hourly/2026/11/14/1607_AEDT_source_snapshot.json",
+      "sha256": "460f778451381953a8d55cb48e3e3f8efcadc664e746b80e86bc5949b03e2886",
+      "source_run_attempt": 1,
+      "source_run_id": 43559945649
+    },
+    {
+      "canonical_observation_hour_utc": "2026-11-14T06:00:00Z",
+      "git_blob_sha": "4cdbd4cb77a547e1172fb69e03fcbfe30d2bd8c9",
+      "path": "data/crypto/hourly/2026/11/14/1707_AEDT_source_snapshot.json",
+      "sha256": "37e577929af76b05ce9282df8ba3659bf3680c2a48c524d949dee9f6ef5a65e6",
+      "source_run_attempt": 1,
+      "source_run_id": 43564744470
+    }
+  ]
+}
