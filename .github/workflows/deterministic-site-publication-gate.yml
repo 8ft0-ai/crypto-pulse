@@ -6,6 +6,10 @@ on:
       - Validate CryptoPulse PR
     types:
       - completed
+    # The opt-in ingestion job checks exact-head CI and merges only source bytes.
+    # Do not start an unrelated hourly/daily publication gate for its PRs.
+    branches-ignore:
+      - 'automation/source-only-*'
 
 permissions:
   actions: read

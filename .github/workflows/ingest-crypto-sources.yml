@@ -26,6 +26,9 @@ jobs:
   ingest:
     name: Fetch source snapshot and open PR
     runs-on: ubuntu-latest
+    outputs:
+      accepted_hour_artifact: ${{ steps.slot.outputs.artifact_name }}
+      publication_intent_artifact: ${{ steps.publication_intent.outputs.artifact_name }}
 
     steps:
       - name: Check out repository
@@ -359,7 +362,7 @@ jobs:
           retention-days: 35
 
       - name: Push rolling automation branch
-        if: steps.publish_context.outputs.should_publish == 'true'
+        if: steps.publish_context.outputs.should_publish == 'true' && vars.CRYPTO_SOURCE_PROMOTION_MODE != 'enabled'
         env:
           PUBLISH_BRANCH: ${{ steps.publish_context.outputs.branch }}
         run: |
@@ -370,7 +373,7 @@ jobs:
       - name: Create or update rolling snapshot PR
         id: rolling_pr
         continue-on-error: true  # Rolling inspection PR is not source-publication authority.
-        if: steps.publish_context.outputs.should_publish == 'true'
+        if: steps.publish_context.outputs.should_publish == 'true' && vars.CRYPTO_SOURCE_PROMOTION_MODE != 'enabled'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_TITLE: ${{ steps.evidence.outputs.pr_title }}
@@ -456,4 +459,96 @@ jobs:
           name: ${{ steps.slot.outputs.artifact_name }}
           path: ${{ runner.temp }}/crypto-hour-accepted/receipt.json
           if-no-files-found: error
+          retention-days: 35
+
+  # Accepted-hour source evidence continues after hourly report publication ends.
+  # This job is disabled unless the owner activates the source-only cutover.
+  source-only-promotion:
+    name: Promote accepted hourly source only (opt-in)
+    needs: ingest
+    if: >-
+      needs.ingest.result == 'success' &&
+      github.ref == 'refs/heads/main' &&
+      vars.CRYPTO_SOURCE_PROMOTION_MODE == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: deterministic-publication-control
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out exact ingestion source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install snapshot validation dependencies
+        run: python -m pip install pyyaml
+
+      - name: Download immutable source intent
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.ingest.outputs.publication_intent_artifact }}
+          path: ${{ runner.temp }}/source-intent
+
+      - name: Download unique accepted-hour receipt
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.ingest.outputs.accepted_hour_artifact }}
+          path: ${{ runner.temp }}/accepted-hour
+
+      - name: Independently validate intent, receipt, source bytes and workflow identity
+        id: evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          python scripts/trusted_hourly_source.py \
+            --intent "$RUNNER_TEMP/source-intent/deterministic-publication-intent.json" \
+            --receipt "$RUNNER_TEMP/accepted-hour/receipt.json" \
+            --source-run "$RUNNER_TEMP/source-run.json" \
+            --snapshot "$RUNNER_TEMP/source-intent/payload/snapshot.json" \
+            --config config/crypto_sources.yml \
+            --output "$RUNNER_TEMP/verified-source.json"
+          echo "path=$(jq -er '.source_path' "$RUNNER_TEMP/verified-source.json")" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(jq -er '.snapshot_sha256' "$RUNNER_TEMP/verified-source.json")" >> "$GITHUB_OUTPUT"
+          echo "hour=$(jq -er '.source_hour' "$RUNNER_TEMP/verified-source.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Mint existing publication App token after source verification
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DETERMINISTIC_PUBLICATION_APP_ID }}
+          private-key: ${{ secrets.DETERMINISTIC_PUBLICATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Create and independently validate exact source-only candidate before merging
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+          GH_APP_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
+          SOURCE_PATH: ${{ steps.evidence.outputs.path }}
+          SOURCE_HOUR: ${{ steps.evidence.outputs.hour }}
+          SOURCE_SHA256: ${{ steps.evidence.outputs.sha256 }}
+          SOURCE_FILE: ${{ runner.temp }}/source-intent/payload/snapshot.json
+        run: bash scripts/promote_trusted_hourly_source.sh
+
+      - name: Retain source-only promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptopulse-source-only-promotion-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/source-promotion-proof.json
+          if-no-files-found: warn
           retention-days: 35
