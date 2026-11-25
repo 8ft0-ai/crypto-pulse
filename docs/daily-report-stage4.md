@@ -1,7 +1,10 @@
-# Stage 4B daily evidence candidate (dormant)
+# Stage 4B daily evidence and Stage 4C cutover preparation
 
-This is a dormant, deterministic daily reporting feature. It does not schedule,
-publish, merge, or change production ingestion. Hourly reports remain unchanged.
+Stage 4B's manual daily generation, immutable attestation and independent
+read-only gate were accepted in November 2026. The Stage 4C integration
+prepares a scheduled generator and independently authorised merge route,
+but **neither is activated by merging this code**. Hourly source ingestion
+and hourly publication remain unchanged until separately authorised cutover.
 
 ## Frozen UTC-day contract
 
@@ -40,13 +43,22 @@ push filter now includes daily Markdown paths.
 
 ## Daily publication interfaces
 
-The manual-only workflow is
-`.github/workflows/generate-daily-crypto-report.yml`. It accepts a UTC date,
-checks the fixed cut-off and duplicate date, replays the deterministic report,
-creates a one-file `automation/daily-publication-<run>-<attempt>-<date>` review
-PR using the existing publication App, and uploads one immutable
-`cryptopulse-daily-attestation-<run>-<attempt>` artifact. It has no schedule.
-Daily candidate PRs use a separate read-only daily-preflight job inside the existing deterministic publication gate; they cannot enter the hourly privileged merge job.
+The workflow `.github/workflows/generate-daily-crypto-report.yml`
+accepts a manually selected UTC reporting date, or, once Stage 4C recurring
+activation is separately authorised, selects the previous UTC day at the
+prepared 01:17 UTC schedule (after the immutable D+1 01:00 UTC cut-off).
+The scheduled job is **skipped** unless repository variable
+`CRYPTO_DAILY_PROMOTION_MODE` is explicitly set to `enabled`.
+The workflow validates source eligibility and duplicates, replays the
+deterministic report, creates one App-authored draft review PR named
+`automation/daily-publication-<run>-<attempt>-<date>` and uploads an
+immutable `cryptopulse-daily-attestation-<run>-<attempt>` artefact.
+Manual generation remains available with the promotion mode unset.
+
+Daily candidate PRs use a separate read-only `daily-preflight` job in the
+existing publication gate. Its independent GO output is required for the
+separately gated `daily-merge` job. The hourly `preflight` and `merge`
+jobs, their provenance rules and their permissions are unchanged.
 
 `scripts/daily_publication.py` owns the separate
 `cryptopulse-daily-publication/v1` / `daily-review-pr/v1` contract. Its
@@ -57,17 +69,36 @@ path/digest, branch/head, PR, generation run and publication App identity.
 daily facts independently. The existing hourly validation and merge contract
 is unchanged.
 
-After separately authorised Stage4C work, run the manual workflow from `main`
-after D+1 01:00 UTC with the exact date; review the single-file PR and require
-the independent daily-preflight job to pass before any separately authorised
-promotion. Do not enable a schedule or merge path as part of Stage4B.
+The daily merge job is fail-closed by default because
+`CRYPTO_DAILY_PROMOTION_MODE` is unset. It has two separately authorised modes:
 
-## Dormant and unverified boundaries
+- `pilot`: permit only one explicitly pre-armed, already independently
+  eligible **manual** candidate, matching all four repository variables:
+  `CRYPTO_DAILY_PROMOTION_PILOT_PR_NUMBER`,
+  `CRYPTO_DAILY_PROMOTION_PILOT_HEAD_SHA`,
+  `CRYPTO_DAILY_PROMOTION_PILOT_BASE_SHA` and
+  `CRYPTO_DAILY_PROMOTION_PILOT_RUN_ID`.
+  This permits one SHA-bound live promotion only after owner authorisation.
+- `enabled`: permit separately authorised **scheduled** candidates only.
+  No manually dispatched candidate may be automatically merged in this mode.
 
-There has been no workflow dispatch, App-backed daily PR creation, immutable
-artifact retrieval, or live daily gate execution as part of Stage 4B. Workflow
-dispatch cannot execute the new manual workflow until its definition is merged
-onto protected main during separately authorised integration acceptance.
+The daily merge job rechecks the exact candidate head and the current
+protected-main SHA before App-token minting, marks the draft candidate ready
+and rechecks both identities before the SHA-bound merge. Any missing pin,
+changed base/head, duplicate, failed CI or independent gate failure stops the
+promotion. It reuses the existing GitHub App and
+`deterministic-publication-control` environment; no additional secret,
+scheduler service or deploy path is introduced.
+
+## Stage 4B live acceptance and Stage 4C production boundary
+
+Stage 4B's non-publishing live pilot produced App-authored draft PR #773 for
+22 November 2026 UTC (generation run #45523027956, candidate validation
+#45523100564 and independent read-only gate #45523649167). The gate returned
+GO, while its privileged merge jobs were correctly skipped. The report digest
+was `44c042545b82c146284ba481f5c72abce464a778e7242178e9d8a9be1b744ab4`.
+No daily report was promoted to protected main. Its original base is stale;
+do not treat the older accepted attestation as current merge authority.
 
 Daily eligibility uses the previously accepted first-parent protected-main
 commit as-of the fixed D+1 01:00 UTC cut-off, independently recomputed by the
@@ -91,11 +122,12 @@ that original daily report. This does not qualify a 30-day scientific
 baseline. Keep hourly ingestion, hourly publication and rolling source
 PR mechanisms in place until separately authorised controlled cutover.
 
-Before daily cadence activation, the authorised production implementation
-must provide an equivalent, independently verified route from accepted-hour
-receipts to durable hourly evidence and exactly one daily report candidate
-through the existing privileged protected-main gate. All existing archived
-hourly URLs must remain intact. No automatic cutover is part of this feature.
+The Stage 4C code prepares a route through the existing gate, but this
+code-only PR does not authorise or perform a live publication. A fresh,
+current-main-bound candidate and independently successful read-only gate,
+explicit pilot-mode promotion authorisation, protected-main readback and
+external Pages verification are required before the first live report is
+accepted. The source ingestion pipeline and archived hourly URLs remain intact.
 
 For an authorised future cutover: keep the existing hourly workflow definition
 revertible; verify the first daily protected-main merge and integrated Pages
