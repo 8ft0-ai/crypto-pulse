@@ -134,3 +134,52 @@ revertible; verify the first daily protected-main merge and integrated Pages
 delivery; confirm subsequent ingestion and durable source recovery; roll back
 by re-enabling the previous hourly publication trigger and disabling daily
 publication. Never rewind protected main or rewrite historical report files.
+
+## Stage 4C source-continuity prerequisite for retiring hourly reports
+
+The earlier hourly publication gate merges **both** the validated source JSON
+and its hourly Markdown report. Simply disabling that workflow stops updates
+to trusted-main source evidence; the accepted-hour receipts and rolling source
+PR are not themselves on protected main. A daily report would then eventually
+disclose 24 missing hours, despite successful external ingestion.
+
+Stage 4C therefore adds an opt-in, source-only job to the **existing hourly
+ingestion workflow**, with no extra scheduler:
+
+- `CRYPTO_SOURCE_PROMOTION_MODE` is **unset/disabled by default**. When set to
+  `enabled`, successful hourly ingestion still uploads its accepted-hour
+  receipt and immutable source intent but skips updating the rolling inspection
+  PR. An isolated job receives the existing protected publication environment.
+- The job independently validates the original source-run identity, receipt,
+  intent, exact snapshot SHA-256, UTC hour, source quality and pinned config
+  before minting the existing publication App token. This is not a replacement
+  market-data source.
+- It creates one **App-authored, one-JSON-file** draft PR from the current main,
+  requires separate exact-head GitHub CI success from `github-actions`,
+  rechecks exact main/head/PR scope and uses the existing App for a protected
+  SHA-bound merge. Immutable output proof is retained as an Actions artefact.
+  If main advances, CI fails or source bytes disagree, the promotion stops
+  without rewriting evidence. Duplicate identical source bytes are idempotent.
+- The existing hourly and daily publication gate workflows still verify their
+  original candidate types. A source-only PR is excluded from the irrelevant
+  publication gate trigger; it uses its own immutable receipt validation and
+  separately executed GitHub PR CI.
+- Neither the hourly ingestion job nor the source-only job generates hourly
+  Markdown when source-only mode is enabled. Existing published hourly archive
+  files and URLs remain untouched.
+
+**Protected cutover order:** merge and independently review this dormant code;
+activate source-only mode; verify a genuine ingestion-run source-only PR,
+CI, source digest and protected-main commit. Only after that acceptance may the
+old hourly generator be disabled (reversible GitHub workflow state) and
+`DETERMINISTIC_PUBLICATION_ACTIVATION` set to `disabled`. Keep the independently
+activated daily generator. Verify the next scheduled daily report has continued
+trusted-main source coverage and passes its read-only gate and public Pages
+check. Never infer 30-day coverage or workflow savings from configuration alone.
+
+**Rollback:** Set `CRYPTO_SOURCE_PROMOTION_MODE` back to `disabled`, re-enable
+the unchanged hourly generator and restore
+`DETERMINISTIC_PUBLICATION_ACTIVATION=recurring` after rechecking main and
+avoiding an overlapping source-only/legacy merge. Do not rewind main or delete
+archived reports. Measure a full post-cutover 24-hour window before claiming
+workflow-run savings.
