@@ -156,8 +156,8 @@ class SitewideEditorialG3Tests(unittest.TestCase):
                 render_report(source, REAL_SOURCE, source["quality"]), encoding="utf-8"
             )
             with patch.object(pages, "REPORTS_DIR", archive), patch.object(
-                pages, "OUT", Path(tmp) / "_site"
-            ):
+                pages, "DAILY_REPORTS_DIR_NAME", (Path(tmp).name, "reports", "crypto", "daily")
+            ), patch.object(pages, "OUT", Path(tmp) / "_site"):
                 reports = pages.collect_reports()
                 self.assertEqual(len(reports), 2)
                 typed, legacy = reports
