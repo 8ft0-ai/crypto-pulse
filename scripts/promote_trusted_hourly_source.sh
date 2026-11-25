@@ -51,6 +51,10 @@ if git cat-file -e "$current_main:$SOURCE_PATH" 2>/dev/null; then
   exit 0
 fi
 [[ "$(sha256sum "$SOURCE_FILE" | awk '{print $1}')" == "$SOURCE_SHA256" ]]
+# The duplicate-hour census must read the same freshly fetched protected-main
+# tree as the candidate, not the ingestion-run's older checkout.
+branch="automation/source-only-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+git checkout -b "$branch" "$current_main"
 # No second trusted-main source file may claim the same UTC observation hour.
 # The source path check above handles identical pre-existing files idempotently.
 existing_hour_count="$(SOURCE_HOUR="$SOURCE_HOUR" python - <<'PYCODE'
@@ -65,8 +69,6 @@ PYCODE
   echo "Different protected-main source already claims the same UTC hour." >&2
   exit 1
 }
-branch="automation/source-only-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-git checkout -b "$branch" "$current_main"
 mkdir -p "$(dirname "$SOURCE_PATH")"
 cp "$SOURCE_FILE" "$SOURCE_PATH"
 git add -- "$SOURCE_PATH"
