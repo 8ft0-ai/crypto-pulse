@@ -112,7 +112,7 @@ class TrustedHourlySourceTests(unittest.TestCase):
         script = (ROOT / "scripts/promote_trusted_hourly_source.sh").read_text()
         self.assertIn("Build site and check generated output", script)
         self.assertIn("SOURCE_ONLY_PROTECTED_MAIN_ACCEPTANCE_PASS", script)
-        self.assertIn("count_observation_hour(Path.cwd(), os.environ["SOURCE_HOUR"])", script)
+        self.assertIn('count_observation_hour(Path.cwd(), os.environ["SOURCE_HOUR"])', script)
         self.assertIn('[[ "$(git diff --name-only "$current_main" "$candidate_head")" == "$SOURCE_PATH" ]]', script)
         self.assertIn('-f "sha=$candidate_head" -f merge_method=merge', script)
         self.assertNotIn("reports/crypto/hourly/", script)
