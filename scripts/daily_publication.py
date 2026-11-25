@@ -157,7 +157,8 @@ def evaluate_daily_gate(attestation: Mapping[str, Any], facts: Mapping[str, Any]
         "validation check application identity": facts.get("validation_app_slug") == "github-actions",
         "unique immutable attestation artifact": facts.get("attestation_count") == 1 and facts.get("attestation_expired") is False and facts.get("artifact_name") == f"cryptopulse-daily-attestation-{attestation['generation_run_id']}-{attestation['generation_run_attempt']}",
         "generation run identity": facts.get("generation_run_id") == attestation["generation_run_id"] and facts.get("generation_workflow_id") == attestation["generation_workflow_id"] and facts.get("generation_workflow_path") == GENERATION_WORKFLOW_PATH and facts.get("generation_head_sha") == attestation["expected_main_base_sha"],
-        "trusted generation event": facts.get("trusted_generation_run") is True,
+        "trusted generation event": facts.get("trusted_generation_run") is True
+            and facts.get("generation_event") in ("workflow_dispatch", "schedule"),
         "exact report bytes": facts.get("report_path") == attestation["report_path"] and facts.get("report_sha256") == attestation["report_sha256"],
     }
     reasons.extend(label for label, ok in checks.items() if not ok)

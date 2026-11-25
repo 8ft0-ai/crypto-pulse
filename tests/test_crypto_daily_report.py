@@ -242,12 +242,12 @@ class DailyReportProofs(unittest.TestCase):
             "artifact_name": "cryptopulse-daily-attestation-9001-1",
             "generation_run_id": 9001, "generation_workflow_id": 55,
             "generation_workflow_path": daily_pub.GENERATION_WORKFLOW_PATH,
-            "trusted_generation_run": True,
+            "trusted_generation_run": True, "generation_event": "workflow_dispatch",
             "generation_head_sha": self.sha, "report_path": att["report_path"],
             "report_sha256": att["report_sha256"],
         }
         self.assertTrue(daily_pub.evaluate_daily_gate(att, facts)["eligible"])
-        self.assertTrue(daily_pub.evaluate_daily_gate(att, facts)["eligible"])
+        self.assertTrue(daily_pub.evaluate_daily_gate(att, dict(facts, generation_event="schedule"))["eligible"])
         daily_pub.independently_validate_candidate(self.root, att, path.read_bytes(),
                                                    [att["report_path"]])
 
@@ -258,7 +258,9 @@ class DailyReportProofs(unittest.TestCase):
                            ("pr_head_sha", "c"*40), ("pr_base", "other"),
                            ("duplicate_date_count", 1),
                            ("pr_author_id", 78), ("attestation_count", 2),
-                           ("trusted_generation_run", False)):
+                           ("trusted_generation_run", False),
+                           ("generation_event", "push"),
+                           ("generation_event", None)):
             changed = dict(facts, **{key: value})
             self.assertFalse(daily_pub.evaluate_daily_gate(att, changed)["eligible"], key)
 
@@ -277,14 +279,20 @@ class DailyReportProofs(unittest.TestCase):
         with self.assertRaisesRegex(daily_pub.DailyPublicationError, "duplicate"):
             daily_pub.validate_hours(DAY.isoformat(), hours)
 
-    def test_daily_workflow_wiring_is_manual_read_only_at_preflight_and_pages_aware(self) -> None:
+    def test_daily_workflow_wiring_prepared_but_promotion_disabled_by_default(self) -> None:
         generate = yaml.safe_load((ROOT / ".github/workflows/generate-daily-crypto-report.yml").read_text())
         gate = yaml.safe_load((ROOT / ".github/workflows/deterministic-site-publication-gate.yml").read_text())
         pages = yaml.safe_load((ROOT / ".github/workflows/pages.yml").read_text())
         # PyYAML's YAML 1.1 parser treats `on` as boolean true.
         trigger = generate.get("on", generate.get(True, {}))
-        self.assertEqual(set(trigger), {"workflow_dispatch"})
-        self.assertNotIn("schedule", trigger)
+        self.assertEqual(set(trigger), {"workflow_dispatch", "schedule"})
+        self.assertEqual(trigger["schedule"], [{"cron": "17 1 * * *"}])
+        candidate = generate["jobs"]["candidate"]
+        self.assertIn("vars.CRYPTO_DAILY_PROMOTION_MODE == 'enabled'", candidate["if"])
+        self.assertIn("github.event_name == 'workflow_dispatch'", candidate["if"])
+        self.assertEqual(candidate["environment"], "deterministic-publication-control")
+        self.assertIn("report_date || ''", str(candidate))
+        self.assertIn("steps.source.outputs.date", str(candidate))
         generate_text = (ROOT / ".github/workflows/generate-daily-crypto-report.yml").read_text()
         self.assertIn("automation/daily-publication-", generate_text)
         self.assertIn("actions/create-github-app-token@v3", generate_text)
@@ -303,6 +311,25 @@ class DailyReportProofs(unittest.TestCase):
         self.assertIn("merge", gate["jobs"])
         self.assertIn("daily-preflight", gate["jobs"])
         self.assertNotIn("create-github-app-token", str(gate["jobs"]["daily-preflight"]))
+        self.assertEqual(gate["jobs"]["daily-preflight"]["permissions"]
+                         if "permissions" in gate["jobs"]["daily-preflight"] else {}, {})
+        self.assertEqual(gate["jobs"]["daily-preflight"]["outputs"]["eligible"],
+                         "${{ steps.policy.outputs.eligible }}")
+        self.assertIn("daily-merge", gate["jobs"])
+        promotion = gate["jobs"]["daily-merge"]
+        self.assertEqual(promotion["needs"], "daily-preflight")
+        self.assertEqual(promotion["environment"], "deterministic-publication-control")
+        self.assertIn("outputs.eligible == 'true'", promotion["if"])
+        self.assertIn("vars.CRYPTO_DAILY_PROMOTION_MODE == 'pilot'", promotion["if"])
+        self.assertIn("vars.CRYPTO_DAILY_PROMOTION_MODE == 'enabled'", promotion["if"])
+        self.assertIn('test "$GENERATION_EVENT" = "schedule"', str(promotion))
+        self.assertIn('test "$GENERATION_EVENT" = "workflow_dispatch"', str(promotion))
+        self.assertIn('test "$CANDIDATE_HEAD_SHA" = "$PILOT_HEAD_SHA"', str(promotion))
+        self.assertIn('test "$MAIN_BASE_SHA" = "$PILOT_BASE_SHA"', str(promotion))
+        self.assertIn('gh pr ready "$PR_NUMBER"', str(promotion))
+        self.assertIn('test "$current_main" = "$MAIN_BASE_SHA"', str(promotion))
+        self.assertIn('-f sha="$CANDIDATE_HEAD_SHA" -f merge_method=merge', str(promotion))
+        self.assertEqual(gate["jobs"]["merge"]["needs"], "preflight")
 
 
 if __name__ == "__main__":
