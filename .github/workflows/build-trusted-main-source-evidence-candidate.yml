@@ -278,26 +278,25 @@ jobs:
                           )
                       with zipfile.ZipFile(archive) as zipped:
                           zipped.extractall(target)
-                      if attempt["event"] == "workflow_dispatch":
-                          accepted = attempt.get("accepted_hour_artifact")
-                          if accepted is not None and not accepted["expired"]:
-                              receipt_zip = target / "accepted-hour.zip"
-                              receipt_file = target / "accepted-hour/receipt.json"
-                              try:
-                                  with receipt_zip.open("wb") as stream:
-                                      subprocess.run(
-                                          ["gh", "api", f"/repos/{repo}/actions/artifacts/{accepted['id']}/zip"],
-                                          check=True, stdout=stream, stderr=subprocess.PIPE,
-                                      )
-                                  with zipfile.ZipFile(receipt_zip) as zipped:
-                                      if zipped.namelist() != ["receipt.json"]:
-                                          raise ValueError("accepted-hour carrier is not a single receipt")
-                                      receipt_file.parent.mkdir(parents=True, exist_ok=True)
-                                      receipt_file.write_bytes(zipped.read("receipt.json"))
-                              except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile, ValueError):
-                                  receipt_file.unlink(missing_ok=True)
-                              finally:
-                                  receipt_zip.unlink(missing_ok=True)
+                      accepted = attempt.get("accepted_hour_artifact")
+                      if accepted is not None and not accepted["expired"]:
+                          receipt_zip = target / "accepted-hour.zip"
+                          receipt_file = target / "accepted-hour/receipt.json"
+                          try:
+                              with receipt_zip.open("wb") as stream:
+                                  subprocess.run(
+                                      ["gh", "api", f"/repos/{repo}/actions/artifacts/{accepted['id']}/zip"],
+                                      check=True, stdout=stream, stderr=subprocess.PIPE,
+                                  )
+                              with zipfile.ZipFile(receipt_zip) as zipped:
+                                  if zipped.namelist() != ["receipt.json"]:
+                                      raise ValueError("accepted-hour carrier is not a single receipt")
+                                  receipt_file.parent.mkdir(parents=True, exist_ok=True)
+                                  receipt_file.write_bytes(zipped.read("receipt.json"))
+                          except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile, ValueError):
+                              receipt_file.unlink(missing_ok=True)
+                          finally:
+                              receipt_zip.unlink(missing_ok=True)
                   except (subprocess.CalledProcessError, OSError, zipfile.BadZipFile):
                       # Metadata can race retention/deletion. Missing exact bytes remain
                       # a Slice A unavailable-input blocker rather than being dropped.
@@ -307,9 +306,11 @@ jobs:
                       archive.unlink(missing_ok=True)
           PY
 
-      - name: Materialise and prove exact recorded Git objects
+      - name: Materialise and prove legacy Git objects or Stage 4C source-only lineage
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
+          SOURCE_PROMOTION_APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -325,6 +326,7 @@ jobs:
 
           sys.path.insert(0, str(Path.cwd() / "scripts"))
           from trusted_main_source_evidence_candidate import publication_intent_git_reference
+          from trusted_main_source_only_promotion_proof import verify_source_only_promotion
 
           runner = Path(os.environ["RUNNER_TEMP"])
           artifact_root = runner / "source-artifacts"
@@ -351,6 +353,18 @@ jobs:
                   "bytes_match": False,
               }
               if reference["intent_reference_valid"]:
+                  receipt_file = intent_path.parent / "accepted-hour/receipt.json"
+                  if receipt_file.is_file():
+                      promoted = verify_source_only_promotion(
+                          run_id, run_attempt, intent_bytes, snapshot_bytes,
+                          receipt_file.read_bytes(), snapshot_file, Path.cwd(),
+                          os.environ["EXPECTED_MAIN_SHA"],
+                          os.environ["SOURCE_PROMOTION_APP_SLUG"],
+                      )
+                      if promoted is not None:
+                          row["source_only_promotion"] = promoted
+                          proof.append(row)
+                          continue
                   commit_sha = str(reference["snapshot_commit_sha"])
                   snapshot_path = str(reference["snapshot_path"])
                   fetched = subprocess.run(
@@ -572,10 +586,11 @@ jobs:
             --base-sha "$EXPECTED_MAIN_SHA" \
             --bundle-root "$RUNNER_TEMP/prepared-bundle"
 
-      - name: Freshly reclassify exact Git objects before publication
+      - name: Freshly revalidate Git objects and Stage 4C lineage before publication
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_MAIN_SHA: ${{ env.EXPECTED_MAIN_SHA }}
+          SOURCE_PROMOTION_APP_SLUG: ${{ vars.DETERMINISTIC_PUBLICATION_APP_SLUG }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -591,6 +606,7 @@ jobs:
 
           sys.path.insert(0, str(Path.cwd() / "scripts"))
           import trusted_main_source_evidence_candidate as candidate
+          from trusted_main_source_only_promotion_proof import verify_source_only_promotion
 
           runner = Path(os.environ["RUNNER_TEMP"])
           bundle = runner / "prepared-bundle"
@@ -656,6 +672,24 @@ jobs:
                   path_present=False,
                   bytes_match=False,
               )
+              if prepared.get("source_only_promotion") is not None:
+                  receipt_rel = source.get("accepted_hour_receipt_path")
+                  expected_receipt = (
+                      f"raw-inputs/sources/{key[0]}/{key[1]}/accepted-hour/receipt.json"
+                  )
+                  if receipt_rel != expected_receipt:
+                      raise RuntimeError("Stage 4C source receipt is missing or noncanonical")
+                  receipt_bytes = (bundle / expected_receipt).read_bytes()
+                  promotion = verify_source_only_promotion(
+                      key[0], key[1], intent_bytes, snapshot_bytes, receipt_bytes,
+                      bundle / snapshot_rel, Path.cwd(), os.environ["EXPECTED_MAIN_SHA"],
+                      os.environ["SOURCE_PROMOTION_APP_SLUG"],
+                  )
+                  if promotion != prepared["source_only_promotion"]:
+                      raise RuntimeError("Stage 4C live promotion lineage differs from prepared proof")
+                  row["source_only_promotion"] = promotion
+                  fresh_proof.append(row)
+                  continue
               if reference["intent_reference_valid"]:
                   commit_sha = str(reference["snapshot_commit_sha"])
                   snapshot_path = str(reference["snapshot_path"])

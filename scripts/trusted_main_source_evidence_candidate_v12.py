@@ -223,8 +223,8 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
                 # Preserve exact read-only GitHub job evidence in the closed
                 # census; its absence remains a hard blocker for candidates.
                 attempt["temporal_job_proof"] = raw_attempt.get("temporal_job_proof")
+            raw_attempt = raw_by_attempt[attempt["run_attempt"]]
             if attempt["event"] == "workflow_dispatch":
-                raw_attempt = raw_by_attempt[attempt["run_attempt"]]
                 fields = (
                     "id", "run_attempt", "workflow_id", "path", "head_sha",
                     "head_branch", "status", "conclusion", "event", "actor",
@@ -233,26 +233,29 @@ def build_source_population_closure(capture: Mapping[str, Any]) -> dict[str, Any
                 attempt["dispatch_source_run"] = {
                     key: raw_attempt.get(key) for key in fields
                 }
-                receipts = [
-                    artifact for artifact in raw["artifacts"]
-                    if isinstance(artifact, dict)
-                    and re.fullmatch(r"crypto-hour-accepted-\d{8}T\d{2}",
-                                     str(artifact.get("name", ""))) is not None
-                ]
-                if len(receipts) > 1:
-                    raise CandidateError("ambiguous accepted-hour artifact for dispatched run")
-                carrier = receipts[0] if receipts else None
-                if carrier is not None:
-                    if carrier.get("expired") is not False:
-                        raise CandidateError("accepted-hour artifact must explicitly be unexpired")
-                    carrier_run = carrier.get("workflow_run")
-                    if not isinstance(carrier_run, dict) or (
-                        type(carrier_run.get("id")) is not int
-                        or carrier_run["id"] != run["run_id"]
-                    ):
-                        raise CandidateError("accepted-hour artifact belongs to another run")
-                    if carrier_run.get("head_sha") != attempt["head_sha"]:
-                        raise CandidateError("accepted-hour artifact head SHA differs from source attempt")
+            # Stage 4C uploads the same immutable accepted-hour carrier for
+            # scheduled and dispatched ingestion. Legacy schedules have none.
+            receipts = [
+                artifact for artifact in raw["artifacts"]
+                if isinstance(artifact, dict)
+                and re.fullmatch(r"crypto-hour-accepted-\d{8}T\d{2}",
+                                 str(artifact.get("name", ""))) is not None
+            ]
+            if len(receipts) > 1:
+                raise CandidateError("ambiguous accepted-hour artifact for source run")
+            carrier = receipts[0] if receipts else None
+            if carrier is not None:
+                if carrier.get("expired") is not False:
+                    raise CandidateError("accepted-hour artifact must explicitly be unexpired")
+                carrier_run = carrier.get("workflow_run")
+                if not isinstance(carrier_run, dict) or (
+                    type(carrier_run.get("id")) is not int
+                    or carrier_run["id"] != run["run_id"]
+                ):
+                    raise CandidateError("accepted-hour artifact belongs to another run")
+                if carrier_run.get("head_sha") != attempt["head_sha"]:
+                    raise CandidateError("accepted-hour artifact head SHA differs from source attempt")
+            if carrier is not None or attempt["event"] == "workflow_dispatch":
                 attempt["accepted_hour_artifact"] = (
                     {
                         "id": _positive_int(carrier["id"], "accepted-hour artifact.id"),
@@ -296,13 +299,12 @@ def source_inputs_from_capture(capture: Mapping[str, Any], artifact_root: Path) 
     }
     for source in sources:
         attempt = metadata[(source["run_id"], source["run_attempt"])]
-        if source["event"] == "schedule":
-            if source["conclusion"] == "success":
-                source["temporal_job_proof"] = attempt.get("temporal_job_proof")
+        if source["event"] == "schedule" and source["conclusion"] == "success":
+            source["temporal_job_proof"] = attempt.get("temporal_job_proof")
+        if source["event"] == "workflow_dispatch":
+            source["dispatch_source_run"] = attempt["dispatch_source_run"]
+        if "accepted_hour_artifact" not in attempt:
             continue
-        if source["event"] != "workflow_dispatch":
-            continue
-        source["dispatch_source_run"] = attempt["dispatch_source_run"]
         source["accepted_hour_artifact"] = attempt["accepted_hour_artifact"]
         receipt_path = (
             Path(artifact_root) / str(source["run_id"]) /
@@ -316,7 +318,7 @@ def source_inputs_from_capture(capture: Mapping[str, Any], artifact_root: Path) 
 
 def _serialisable_source_input(source: Mapping[str, Any], bundle_root: Path) -> dict[str, Any]:
     row = _ORIGINAL_SERIALISABLE_SOURCE_INPUT(source, bundle_root)
-    if source.get("event") != "workflow_dispatch":
+    if "accepted_hour_artifact" not in source:
         return row
     receipt = source.get("accepted_hour_receipt_bytes")
     if isinstance(receipt, (bytes, bytearray)):
@@ -336,7 +338,7 @@ def _serialisable_source_input(source: Mapping[str, Any], bundle_root: Path) -> 
 def source_inputs_from_bundle(bundle_root: Path) -> list[dict[str, Any]]:
     sources = _ORIGINAL_SOURCE_INPUTS_FROM_BUNDLE(bundle_root)
     for source in sources:
-        if source.get("event") != "workflow_dispatch":
+        if "accepted_hour_artifact" not in source:
             continue
         rel = source.pop("accepted_hour_receipt_path", None)
         digest = source.pop("accepted_hour_receipt_sha256", None)

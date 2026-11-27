@@ -497,7 +497,7 @@ def prepare_bundle(
     if closure["expected_main_sha"] != _sha1(base_sha, "base_sha"):
         raise CandidateError("capture expected_main_sha differs from requested base")
     sources = source_inputs_from_capture(capture, artifact_root)
-    effective_sources = _apply_git_object_proof(sources, git_object_proof)
+    effective_sources = _apply_git_object_proof(sources, git_object_proof, base_sha)
     recoveries = decode_recovery_capture(recovery_capture)
     manifest = accumulation.build_accumulation_manifest(
         Path(repository_root),
@@ -625,7 +625,7 @@ def replay_bundle(repository_root: Path, base_sha: str, bundle_root: Path) -> di
     sources = source_inputs_from_bundle(bundle_root)
     evidence = _read_json(Path(bundle_root) / "candidate-evidence.json")
     proof = evidence.get("exact_git_object_retrieval", []) if isinstance(evidence, dict) else []
-    effective_sources = _apply_git_object_proof(sources, proof)
+    effective_sources = _apply_git_object_proof(sources, proof, base_sha)
     recoveries = recovery_inputs_from_bundle(bundle_root)
     actual = accumulation.build_accumulation_manifest(
         Path(repository_root),
@@ -1017,9 +1017,120 @@ def publication_intent_git_reference(intent_bytes: bytes) -> dict[str, Any]:
     return result
 
 
+def _validate_source_only_promotion_binding(
+    source: Mapping[str, Any],
+    item: Mapping[str, Any],
+    reference: Mapping[str, Any],
+    snapshot: bytes,
+    expected_main_sha: str | None,
+) -> None:
+    """Check captured Stage 4C proof is bound to these exact replay bytes.
+
+    This is an offline integrity check, NOT GitHub authority. The workflow
+    independently reacquires and validates the entire PR/CI/merge chain
+    immediately before candidate publication.
+    """
+    from crypto_ingestion_slot import canonical_hour, receipt_name
+    from trusted_main_source_only_promotion_proof import CONTRACT
+
+    proof = item.get("source_only_promotion")
+    if not isinstance(proof, dict) or proof.get("verified") is not True:
+        raise CandidateError("Stage 4C source-only provenance proof is malformed")
+    if expected_main_sha is None or proof.get("protected_main_sha") != _sha1(
+        expected_main_sha, "expected_main_sha"
+    ):
+        raise CandidateError("Stage 4C promotion does not bind pinned protected main")
+    if any(item.get(field) is True for field in (
+        "fetch_succeeded", "commit_present", "path_present", "bytes_match"
+    )):
+        raise CandidateError("Stage 4C proof conflicts with legacy Git-object proof")
+    receipt_bytes = source.get("accepted_hour_receipt_bytes")
+    if not isinstance(receipt_bytes, (bytes, bytearray)):
+        raise CandidateError("Stage 4C promotion has no exact accepted-hour receipt")
+    receipt_bytes = bytes(receipt_bytes)
+    intent_bytes = bytes(source["publication_intent_bytes"])
+    try:
+        receipt = json.loads(receipt_bytes)
+        intent = json.loads(intent_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CandidateError("Stage 4C receipt or intent is invalid JSON") from exc
+    if not isinstance(receipt, dict) or not isinstance(intent, dict):
+        raise CandidateError("Stage 4C receipt or intent is not an object")
+    hour = receipt.get("intended_hour_utc")
+    try:
+        accepted_name = receipt_name(canonical_hour(hour))
+    except (ValueError, TypeError) as exc:
+        raise CandidateError("Stage 4C accepted-hour identity is malformed") from exc
+    run_id = int(source["run_id"])
+    attempt = int(source["run_attempt"])
+    carrier = source.get("accepted_hour_artifact")
+    if (
+        not isinstance(carrier, dict) or carrier.get("name") != accepted_name
+        or carrier.get("expired") is not False
+        or not isinstance(carrier.get("workflow_run"), dict)
+        or carrier["workflow_run"].get("id") != run_id
+        or carrier["workflow_run"].get("head_sha") != source["workflow_head_sha"]
+        or receipt.get("contract_version") != "crypto-hour-ingestion/v1"
+        or receipt.get("status") != "accepted-on-artifact-upload"
+        or receipt.get("run_id") != run_id or receipt.get("run_attempt") != attempt
+        or receipt.get("source_event") != source["event"]
+        or receipt.get("quality_status") != "valid-ok"
+        or receipt.get("source_intent_artifact") != source["artifact_name"]
+        or receipt.get("accepted_hour_artifact") != accepted_name
+        or receipt.get("snapshot_sha256") != sha256_bytes(snapshot)
+        or receipt.get("snapshot_commit_sha") != reference["snapshot_commit_sha"]
+        or intent.get("snapshot_sha256") != sha256_bytes(snapshot)
+        or intent.get("snapshot_path") != reference["snapshot_path"]
+        or intent.get("snapshot_commit_sha") != reference["snapshot_commit_sha"]
+        or intent.get("observation_hour_utc") != hour
+        or intent.get("generated_at_utc") != receipt.get("generated_at_utc")
+        or intent.get("source_workflow_id") != source["workflow_id"]
+        or intent.get("source_workflow_run_id") != run_id
+        or intent.get("source_workflow_run_attempt") != attempt
+        or intent.get("source_workflow_head_sha") != source["workflow_head_sha"]
+        or intent.get("source_workflow_path") != EXPECTED_WORKFLOW_PATH
+        or intent.get("automatic_eligible") is not True
+        or intent.get("refusal_reasons") != []
+    ):
+        raise CandidateError("Stage 4C accepted receipt, immutable intent or source identity conflicts")
+    if source["event"] == "workflow_dispatch":
+        if receipt.get("dispatch_correlation_id") != "cp-" + hour[:13].replace("-", "").replace("T", ""):
+            raise CandidateError("Stage 4C dispatch correlation does not match accepted hour")
+    elif source["event"] == "schedule":
+        if receipt.get("dispatch_correlation_id") is not None:
+            raise CandidateError("Stage 4C scheduled source has a dispatch correlation")
+    else:
+        raise CandidateError("Stage 4C source event is not authorised")
+
+    expected = {
+        "contract": CONTRACT,
+        "run_id": run_id,
+        "run_attempt": attempt,
+        "source_workflow_id": source["workflow_id"],
+        "source_workflow_head_sha": source["workflow_head_sha"],
+        "source_event": source["event"],
+        "publication_intent_sha256": sha256_bytes(intent_bytes),
+        "accepted_hour_receipt_sha256": sha256_bytes(receipt_bytes),
+        "snapshot_sha256": sha256_bytes(snapshot),
+        "source_path": reference["snapshot_path"],
+        "source_hour": hour,
+        "original_snapshot_commit_sha": reference["snapshot_commit_sha"],
+        "protected_main_sha": expected_main_sha,
+        "verified": True,
+    }
+    if any(proof.get(k) != v for k, v in expected.items()):
+        raise CandidateError("Stage 4C promotion evidence does not bind exact retained source")
+    for field in ("candidate_head_sha", "expected_main_base_sha", "merge_commit_sha"):
+        _sha1(proof.get(field), f"Stage 4C {field}")
+    for field in ("promotion_artifact_id", "promotion_pr_number", "independent_ci_run_id"):
+        _positive_int(proof.get(field), f"Stage 4C {field}")
+    _sha256(proof.get("promotion_artifact_sha256"), "Stage 4C promotion artefact SHA")
+
+
 def _apply_git_object_proof(
     sources: Sequence[Mapping[str, Any]],
     proof: Any,
+    expected_main_sha: str | None = None,
 ) -> list[dict[str, Any]]:
     """Apply exact-object proof while preserving malformed retained bytes for Slice A."""
     if proof is None:
@@ -1072,7 +1183,13 @@ def _apply_git_object_proof(
         if _sha256(item.get("snapshot_sha256"), "git-object-proof.snapshot_sha256") != sha256_bytes(snapshot):
             raise CandidateError("Git-object proof snapshot SHA-256 differs from exact retained bytes")
 
-        if reference["intent_reference_valid"]:
+        if item.get("source_only_promotion") is not None:
+            if not reference["intent_reference_valid"]:
+                raise CandidateError("Stage 4C provenance requires a valid immutable intent")
+            _validate_source_only_promotion_binding(
+                row, item, reference, snapshot, expected_main_sha
+            )
+        elif reference["intent_reference_valid"]:
             verified = all(
                 item.get(field) is True
                 for field in ("fetch_succeeded", "commit_present", "path_present", "bytes_match")
