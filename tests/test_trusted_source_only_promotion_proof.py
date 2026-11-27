@@ -11,8 +11,11 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+from crypto_ingestion_slot import canonical_hour, receipt_name
+import trusted_hourly_source as hourly
 import trusted_main_source_only_promotion_proof as proof
 import trusted_main_source_evidence_candidate as candidate
 
@@ -56,7 +59,7 @@ class Stage4CLineageTests(unittest.TestCase):
                 {"artifacts": [{
                     "id": self.artifact_id, "name": f"cryptopulse-source-only-promotion-{self.run_id}-1",
                     "expired": False, "workflow_run": {"id": self.run_id, "head_sha": self.source_sha},
-                }]},
+                }], "total_count": 1},
             f"{REPO}/actions/runs/{self.run_id}": {
                 "id": self.run_id, "run_attempt": 1,
                 "workflow_id": 309042287, "status": "completed", "conclusion": "success",
@@ -89,13 +92,23 @@ class Stage4CLineageTests(unittest.TestCase):
                 "head_branch": self.branch, "status": "completed",
                 "conclusion": "success", "check_suite_id": self.check_suite,
                 "repository": {"full_name": "8ft0-ai/crypto-pulse"},
+                "pull_requests": [{
+                    "number": self.pr,
+                    "head": {"sha": self.head, "ref": self.branch, "repo": {"id": 1}},
+                    "base": {"ref": "main", "repo": {"id": 1}},
+                }],
             },
+            f"{REPO}/commits/{self.head}/pulls?per_page=100": [{
+                "number": self.pr,
+                "head": {"sha": self.head, "ref": self.branch, "repo": {"id": 1}},
+                "base": {"ref": "main", "repo": {"id": 1}},
+            }],
             f"{REPO}/actions/runs/{self.ci_id}/jobs?per_page=100": {"jobs": [{
                 "name": "Build site and check generated output",
                 "run_id": self.ci_id,
                 "status": "completed", "conclusion": "success",
                 "head_sha": self.head,
-            }]},
+            }], "total_count": 1},
             f"{REPO}/commits/{self.merge}": {
                 "sha": self.merge, "parents": [{"sha": self.base}, {"sha": self.head}],
             },
@@ -105,6 +118,7 @@ class Stage4CLineageTests(unittest.TestCase):
         self.raw = {
             f"{REPO}/actions/artifacts/{self.artifact_id}/zip": self.zip,
             f"{REPO}/contents/{self.path}?ref={self.merge}": self.snapshot,
+            f"{REPO}/contents/{self.path}?ref={self.main}": self.snapshot,
         }
 
     @staticmethod
@@ -138,7 +152,9 @@ class Stage4CLineageTests(unittest.TestCase):
 
     def test_no_promotion_artifact_uses_legacy_fallback(self):
         data = copy.deepcopy(self.json)
-        data[f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"]["artifacts"] = []
+        endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"
+        data[endpoint]["artifacts"] = []
+        data[endpoint]["total_count"] = 0
         self.assertIsNone(self.run_proof(json_data=data))
 
     def test_missing_or_conflicting_proof_fails_closed(self):
@@ -180,6 +196,7 @@ class Stage4CLineageTests(unittest.TestCase):
         data = copy.deepcopy(self.json)
         endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"
         data[endpoint]["artifacts"].append(dict(data[endpoint]["artifacts"][0]))
+        data[endpoint]["total_count"] = 2
         with self.assertRaisesRegex(proof.PromotionProofError, "ambiguous"):
             self.run_proof(json_data=data)
 
@@ -192,6 +209,137 @@ class Stage4CLineageTests(unittest.TestCase):
         raw[f"{REPO}/actions/artifacts/{self.artifact_id}/zip"] = output.getvalue()
         with self.assertRaisesRegex(proof.PromotionProofError, "promotion claim"):
             self.run_proof(raw_data=raw)
+
+    def test_artifact_listing_requires_complete_pagination(self):
+        endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"
+        page2 = endpoint + "&page=2"
+        data = copy.deepcopy(self.json)
+        data[endpoint]["total_count"] = 101
+        filler = [{"id": i + 2000, "name": f"unrelated-{i}"} for i in range(99)]
+        data[endpoint]["artifacts"].extend(filler)
+        data[page2] = {"total_count": 101, "artifacts": [
+            {**data[endpoint]["artifacts"][0], "id": 7890},
+        ]}
+        with self.assertRaisesRegex(proof.PromotionProofError, "ambiguous"):
+            self.run_proof(json_data=data)  # duplicate outside page one is detected
+        data[page2]["artifacts"] = []
+        with self.assertRaisesRegex(proof.PromotionProofError, "incomplete"):
+            self.run_proof(json_data=data)
+        data = copy.deepcopy(self.json)
+        data[endpoint]["total_count"] = 2
+        with self.assertRaisesRegex(proof.PromotionProofError, "incomplete"):
+            self.run_proof(json_data=data)
+
+    def test_ci_jobs_require_complete_pagination(self):
+        endpoint = f"{REPO}/actions/runs/{self.ci_id}/jobs?per_page=100"
+        page2 = endpoint + "&page=2"
+        data = copy.deepcopy(self.json)
+        required = data[endpoint]["jobs"].pop()
+        data[endpoint]["jobs"] = [
+            {"name": f"unrelated-{i}", "status": "completed", "conclusion": "success"}
+            for i in range(100)
+        ]
+        data[endpoint]["total_count"] = 101
+        data[page2] = {"total_count": 101, "jobs": [required]}
+        self.assertTrue(self.run_proof(json_data=data)["verified"])
+        data[page2]["jobs"] = []
+        with self.assertRaisesRegex(proof.PromotionProofError, "incomplete"):
+            self.run_proof(json_data=data)
+        data = copy.deepcopy(self.json)
+        data[endpoint]["total_count"] = 2
+        with self.assertRaisesRegex(proof.PromotionProofError, "incomplete"):
+            self.run_proof(json_data=data)
+
+    def test_ci_must_link_unique_exact_promotion_pr(self):
+        endpoint = f"{REPO}/actions/runs/{self.ci_id}"
+        for description, change in (
+            ("other PR", lambda a: a.update(number=999)),
+            ("other repository", lambda a: a["base"]["repo"].update(id=999)),
+            ("other branch", lambda a: a["base"].update(ref="other")),
+        ):
+            with self.subTest(description=description):
+                data = copy.deepcopy(self.json)
+                change(data[endpoint]["pull_requests"][0])
+                with self.assertRaisesRegex(proof.PromotionProofError, "different PR"):
+                    self.run_proof(json_data=data)
+        data = copy.deepcopy(self.json)
+        data[endpoint]["pull_requests"].append(
+            copy.deepcopy(data[endpoint]["pull_requests"][0]))
+        with self.assertRaisesRegex(proof.PromotionProofError, "unique"):
+            self.run_proof(json_data=data)
+
+    def test_merged_pr_empty_ci_links_require_unique_commit_association(self):
+        endpoint = f"{REPO}/actions/runs/{self.ci_id}"
+        association = f"{REPO}/commits/{self.head}/pulls?per_page=100"
+        data = copy.deepcopy(self.json)
+        data[endpoint]["pull_requests"] = []  # GitHub clears after some merges
+        self.assertTrue(self.run_proof(json_data=data)["verified"])
+        data[association].append(copy.deepcopy(data[association][0]))
+        with self.assertRaisesRegex(proof.PromotionProofError, "unique"):
+            self.run_proof(json_data=data)
+        data[association] = []
+        with self.assertRaisesRegex(proof.PromotionProofError, "unique"):
+            self.run_proof(json_data=data)
+        data[endpoint].pop("pull_requests")
+        with self.assertRaisesRegex(proof.PromotionProofError, "missing"):
+            self.run_proof(json_data=data)
+
+    def test_modified_bytes_at_pinned_main_fail_closed(self):
+        raw = dict(self.raw)
+        raw[f"{REPO}/contents/{self.path}?ref={self.main}"] = b"changed after promotion"
+        with self.assertRaisesRegex(proof.PromotionProofError, "pinned protected-main"):
+            self.run_proof(raw_data=raw)
+
+    def test_scheduled_accepted_hour_receipt_verifies_with_real_receipt_checks(self):
+        data = copy.deepcopy(self.json)
+        run = data[f"{REPO}/actions/runs/{self.run_id}"]
+        run.update(event="schedule", head_branch="main", path=hourly.INGEST_WORKFLOW)
+        generated = "2026-11-26T00:07:10Z"
+        intent = {
+            "automatic_eligible": True, "refusal_reasons": [],
+            "snapshot_path": self.path, "snapshot_commit_sha": self.original,
+            "observation_hour_utc": self.hour, "generated_at_utc": generated,
+        }
+        receipt = {
+            "contract_version": "crypto-hour-ingestion/v1",
+            "status": "accepted-on-artifact-upload", "run_id": self.run_id,
+            "run_attempt": 1, "source_event": "schedule",
+            "quality_status": "valid-ok",
+            "source_intent_artifact": f"deterministic-publication-intent-{self.run_id}-1",
+            "accepted_hour_artifact": receipt_name(canonical_hour(self.hour)),
+            "snapshot_sha256": self.digest, "snapshot_commit_sha": self.original,
+            "intended_hour_utc": self.hour, "generated_at_utc": generated,
+        }
+        def gh_json(endpoint):
+            return copy.deepcopy(data[endpoint])
+        def gh_bytes(endpoint, accept=None):
+            return self.raw[endpoint]
+        def real_receipt(intent_value, receipt_value, run_value, snapshot_value, file_value, config_value):
+            return hourly.verify_bundle(
+                intent_value, receipt_value, run_value, snapshot_value,
+                file_value, config_value)
+        with (patch.object(proof, "verify_bundle", side_effect=real_receipt),
+             patch.object(hourly, "verify_publication_intent"),
+             patch.object(hourly, "load_config", return_value={}),
+             patch.object(hourly, "classify_snapshot_quality", return_value={}),
+             patch.object(hourly, "quality_reasons", return_value=[]),
+             patch.object(hourly, "validate_observation_hour", return_value={
+                 "observation_hour_utc": self.hour,
+                 "generated_at_utc": generated, "quality_status": "valid-ok",
+             }),
+             patch.object(Path, "read_bytes", return_value=self.snapshot)):
+            result = proof.verify_source_only_promotion(
+                self.run_id, 1, json.dumps(intent).encode(), self.snapshot,
+                json.dumps(receipt).encode(), Path("/tmp/source.json"), ROOT,
+                self.main, "cryptopulse-deterministic-pub", gh_json, gh_bytes)
+            self.assertTrue(result["verified"])
+            self.assertEqual(result["source_event"], "schedule")
+            receipt["dispatch_correlation_id"] = "cp-2026112600"
+            with self.assertRaisesRegex(proof.PromotionProofError, "receipt"):
+                proof.verify_source_only_promotion(
+                    self.run_id, 1, json.dumps(intent).encode(), self.snapshot,
+                    json.dumps(receipt).encode(), Path("/tmp/source.json"), ROOT,
+                    self.main, "cryptopulse-deterministic-pub", gh_json, gh_bytes)
 
     def test_candidate_replay_accepts_exact_bound_stage4c_and_rejects_tampering(self):
         """Prepared replay must work without original ingestion Git object."""

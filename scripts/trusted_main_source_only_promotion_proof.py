@@ -62,6 +62,73 @@ def _github_json(endpoint: str) -> Any:
         raise PromotionProofError(f"invalid trusted GitHub JSON: {endpoint}") from exc
 
 
+
+def _complete_run_listing(
+    github_json: Callable[[str], Any], endpoint: str, field: str,
+) -> list[dict[str, Any]]:
+    """Require complete, stable GitHub Actions pagination or refuse the proof.
+
+    All pages use the same 100-item page size. No truncated first page,
+    changing total_count, malformed item or unbounded listing is accepted.
+    """
+    result: list[dict[str, Any]] = []
+    total: int | None = None
+    for page in range(1, 21):
+        suffix = "?per_page=100" + (f"&page={page}" if page > 1 else "")
+        response = github_json(endpoint + suffix)
+        _require(isinstance(response, dict), f"{field} listing is invalid")
+        count = response.get("total_count")
+        items = response.get(field)
+        _require(type(count) is int and 0 <= count <= 2000
+                 and isinstance(items, list) and len(items) <= 100
+                 and all(isinstance(item, dict) for item in items),
+                 f"{field} listing is invalid or exceeds the bounded limit")
+        if total is None:
+            total = count
+        _require(count == total, f"{field} listing changed during pagination")
+        _require(len(items) == min(100, total - len(result)),
+                 f"{field} listing is incomplete or inconsistent")
+        result.extend(items)
+        if len(result) == total:
+            return result
+    raise PromotionProofError(f"{field} listing exceeds bounded pagination")
+
+
+def _ci_pr_link(
+    ci: Mapping[str, Any], pr: Mapping[str, Any], pr_number: int,
+    head: str, branch: str, github_json: Callable[[str], Any], root: str,
+) -> None:
+    """Bind exact-head CI to a unique PR even after GitHub clears run links.
+
+    GitHub clears workflow_run.pull_requests on some merged/deleted PR
+    branches. When that authoritative field is empty, consult the commit's
+    independently reported, unique associated PR. Both paths fail closed
+    on absent or ambiguous PR identity.
+    """
+    linked = ci.get("pull_requests")
+    _require(isinstance(linked, list), "CI run PR association metadata is missing")
+    if not linked:
+        linked = github_json(f"{root}/commits/{head}/pulls?per_page=100")
+        _require(isinstance(linked, list) and len(linked) < 100,
+                 "CI commit PR association is missing, truncated or ambiguous")
+    _require(len(linked) == 1 and isinstance(linked[0], dict),
+             "CI run does not have a unique promotion PR association")
+    association = linked[0]
+    assoc_head = association.get("head")
+    assoc_base = association.get("base")
+    pr_head, pr_base = pr["head"], pr["base"]
+    _require(
+        association.get("number") == pr_number
+        and isinstance(assoc_head, dict) and isinstance(assoc_base, dict)
+        and assoc_head.get("sha") == head and assoc_head.get("ref") == branch
+        and assoc_base.get("ref") == "main"
+        and isinstance(assoc_head.get("repo"), dict)
+        and isinstance(assoc_base.get("repo"), dict)
+        and assoc_head["repo"].get("id") == pr_head["repo"].get("id")
+        and assoc_base["repo"].get("id") == pr_base["repo"].get("id"),
+        "CI evidence is associated with a different PR, branch or repository",
+    )
+
 def _artifact_json(raw: bytes) -> tuple[dict[str, Any], str]:
     _require(len(raw) <= 2_000_000, "promotion artefact ZIP exceeds bounded size")
     try:
@@ -104,11 +171,9 @@ def verify_source_only_promotion(
              "trusted promotion App identity is not configured")
     root = f"/repos/{REPOSITORY}"
     artifact_name = f"cryptopulse-source-only-promotion-{run_id}-{run_attempt}"
-    listing = github_json(f"{root}/actions/runs/{run_id}/artifacts?per_page=100")
-    _require(isinstance(listing, dict) and isinstance(listing.get("artifacts"), list),
-             "promotion artefact listing is invalid")
-    matches = [x for x in listing["artifacts"]
-               if isinstance(x, dict) and x.get("name") == artifact_name]
+    artifacts = _complete_run_listing(
+        github_json, f"{root}/actions/runs/{run_id}/artifacts", "artifacts")
+    matches = [x for x in artifacts if x.get("name") == artifact_name]
     if not matches:
         return None
     _require(len(matches) == 1, "ambiguous source-only promotion artefact")
@@ -214,12 +279,12 @@ def verify_source_only_promotion(
              and ci.get("repository", {}).get("full_name") == REPOSITORY
              and type(ci.get("check_suite_id")) is int,
              "required independent exact-head PR CI did not succeed")
+    _ci_pr_link(ci, pr, pr_number, head, branch, github_json, root)
     # Use the run-owned jobs endpoint (actions:read already granted), rather
     # than expanding workflow permissions merely to read the Checks API.
-    jobs = github_json(f"{root}/actions/runs/{ci_id}/jobs?per_page=100")
-    _require(isinstance(jobs, dict) and isinstance(jobs.get("jobs"), list)
-             and len(jobs["jobs"]) <= 100, "exact-head CI jobs missing or truncated")
-    matching = [j for j in jobs["jobs"] if isinstance(j, dict)
+    jobs = _complete_run_listing(
+        github_json, f"{root}/actions/runs/{ci_id}/jobs", "jobs")
+    matching = [j for j in jobs if isinstance(j, dict)
                 and j.get("name") == "Build site and check generated output"
                 and j.get("run_id") == ci_id
                 and j.get("status") == "completed"
@@ -243,6 +308,11 @@ def verify_source_only_promotion(
         f"{root}/contents/{path}?ref={merge}", "application/vnd.github.raw+json")
     _require(published == snapshot_bytes and _sha256(published) == digest,
              "promoted protected-main JSON does not match original retained bytes")
+    pinned = github_bytes(
+        f"{root}/contents/{path}?ref={expected_main_sha}",
+        "application/vnd.github.raw+json")
+    _require(pinned == snapshot_bytes and _sha256(pinned) == digest,
+             "pinned protected-main JSON does not match original retained bytes")
     return {
         "contract": CONTRACT,
         "run_id": run_id, "run_attempt": run_attempt,
