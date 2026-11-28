@@ -528,7 +528,7 @@ class TrustedMainSourceEvidenceCandidateTests(unittest.TestCase):
         workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
         steps = workflow["jobs"]["publish"]["steps"]
         names = [step.get("name") for step in steps]
-        fresh_name = "Freshly reclassify exact Git objects before publication"
+        fresh_name = "Freshly revalidate Git objects and Stage 4C lineage before publication"
         fresh_index = names.index(fresh_name)
         self.assertLess(fresh_index, names.index("Build local disposable candidate commit from exact base"))
         run = steps[fresh_index]["run"]
