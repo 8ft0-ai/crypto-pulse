@@ -70,10 +70,12 @@ class Stage4CLineageTests(unittest.TestCase):
                 self.ancestry(self.source_sha, "ahead"),
             f"{REPO}/pulls/{self.pr}": {
                 "number": self.pr, "state": "closed", "merged": True,
+                "created_at": "2026-11-26T00:07:49Z",
                 "merged_at": "2026-11-26T00:12:55Z", "merge_commit_sha": self.merge,
                 "user": {"login": "cryptopulse-deterministic-pub[bot]"},
                 "merged_by": {"login": "cryptopulse-deterministic-pub[bot]"},
-                "head": {"sha": self.head, "ref": self.branch, "repo": {"id": 1}},
+                "head": {"sha": self.head, "ref": self.branch, "repo": {
+                    "id": 1, "full_name": "8ft0-ai/crypto-pulse"}},
                 "base": {"sha": self.base, "ref": "main",
                          "repo": {"id": 1, "full_name": "8ft0-ai/crypto-pulse"}},
                 "body": (
@@ -91,7 +93,10 @@ class Stage4CLineageTests(unittest.TestCase):
                 "event": "pull_request", "head_sha": self.head,
                 "head_branch": self.branch, "status": "completed",
                 "conclusion": "success", "check_suite_id": self.check_suite,
-                "repository": {"full_name": "8ft0-ai/crypto-pulse"},
+                "created_at": "2026-11-26T00:07:53Z",
+                "run_started_at": "2026-11-26T00:07:53Z",
+                "repository": {"id": 1, "full_name": "8ft0-ai/crypto-pulse"},
+                "head_repository": {"id": 1, "full_name": "8ft0-ai/crypto-pulse"},
                 "pull_requests": [{
                     "number": self.pr,
                     "head": {"sha": self.head, "ref": self.branch, "repo": {"id": 1}},
@@ -104,7 +109,7 @@ class Stage4CLineageTests(unittest.TestCase):
                 "base": {"ref": "main", "repo": {"id": 1}},
             }],
             f"{REPO}/actions/runs/{self.ci_id}/jobs?per_page=100": {"jobs": [{
-                "name": "Build site and check generated output",
+                "id": 8000, "name": "Build site and check generated output",
                 "run_id": self.ci_id,
                 "status": "completed", "conclusion": "success",
                 "head_sha": self.head,
@@ -195,7 +200,9 @@ class Stage4CLineageTests(unittest.TestCase):
             self.run_proof(receipt=False)
         data = copy.deepcopy(self.json)
         endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"
-        data[endpoint]["artifacts"].append(dict(data[endpoint]["artifacts"][0]))
+        data[endpoint]["artifacts"].append({
+            **data[endpoint]["artifacts"][0], "id": 2345,
+        })
         data[endpoint]["total_count"] = 2
         with self.assertRaisesRegex(proof.PromotionProofError, "ambiguous"):
             self.run_proof(json_data=data)
@@ -236,7 +243,8 @@ class Stage4CLineageTests(unittest.TestCase):
         data = copy.deepcopy(self.json)
         required = data[endpoint]["jobs"].pop()
         data[endpoint]["jobs"] = [
-            {"name": f"unrelated-{i}", "status": "completed", "conclusion": "success"}
+            {"id": 9000 + i, "name": f"unrelated-{i}",
+             "status": "completed", "conclusion": "success"}
             for i in range(100)
         ]
         data[endpoint]["total_count"] = 101
@@ -249,6 +257,85 @@ class Stage4CLineageTests(unittest.TestCase):
         data[endpoint]["total_count"] = 2
         with self.assertRaisesRegex(proof.PromotionProofError, "incomplete"):
             self.run_proof(json_data=data)
+
+    def test_pagination_rejects_overlapping_ids_across_pages(self):
+        endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts?per_page=100"
+        data = copy.deepcopy(self.json)
+        first = data[endpoint]["artifacts"][0]
+        data[endpoint] = {"total_count": 101, "artifacts": [
+            first, *({"id": 3000 + i, "name": f"unrelated-{i}"}
+                     for i in range(99)),
+        ]}
+        data[endpoint + "&page=2"] = {"total_count": 101, "artifacts": [
+            {"id": first["id"], "name": "concealing-second-promotion"},
+        ]}
+        with self.assertRaisesRegex(proof.PromotionProofError, "repeated record IDs"):
+            self.run_proof(json_data=data)
+        # CI jobs are independently subject to the same stable-id rule.
+        endpoint = f"{REPO}/actions/runs/{self.ci_id}/jobs?per_page=100"
+        data = copy.deepcopy(self.json)
+        first = data[endpoint]["jobs"][0]
+        data[endpoint] = {"total_count": 101, "jobs": [
+            first, *({"id": 9000 + i, "name": f"other-{i}"}
+                     for i in range(99)),
+        ]}
+        data[endpoint + "&page=2"] = {"total_count": 101, "jobs": [
+            {"id": first["id"], "name": "another-required-CI-job"},
+        ]}
+        with self.assertRaisesRegex(proof.PromotionProofError, "repeated record IDs"):
+            self.run_proof(json_data=data)
+
+    def test_multi_page_consistency_reread_detects_drift(self):
+        endpoint = f"{REPO}/actions/runs/{self.run_id}/artifacts"
+        first = f"{endpoint}?per_page=100"
+        second = first + "&page=2"
+        data = copy.deepcopy(self.json)
+        original = data[first]["artifacts"][0]
+        data[first] = {"total_count": 101, "artifacts": [
+            original, *({"id": 4000 + i, "name": f"other-{i}"}
+                        for i in range(99)),
+        ]}
+        data[second] = {"total_count": 101, "artifacts": [
+            {"id": 5000, "name": "final-unrelated"},
+        ]}
+        count = [0]
+        def changing(endpoint_name):
+            response = copy.deepcopy(data[endpoint_name])
+            if endpoint_name == second:
+                count[0] += 1
+                if count[0] == 2:
+                    response["artifacts"][0]["name"] = "changed-on-reread"
+            return response
+        with self.assertRaisesRegex(proof.PromotionProofError, "consistency re-read"):
+            proof._complete_run_listing(changing, endpoint, "artifacts")
+        self.assertEqual(count[0], 2)
+
+    def test_ci_head_repository_and_pr_lifecycle_are_mandatory(self):
+        endpoint = f"{REPO}/actions/runs/{self.ci_id}"
+        for label, change in (
+            ("foreign fork id", lambda d: d["head_repository"].update(id=99)),
+            ("foreign fork name", lambda d: d["head_repository"].update(
+                full_name="other/fork")),
+            ("missing head repository", lambda d: d.pop("head_repository")),
+        ):
+            with self.subTest(label=label):
+                data = copy.deepcopy(self.json)
+                # The association fallback must not paper over a foreign head.
+                data[endpoint]["pull_requests"] = []
+                change(data[endpoint])
+                with self.assertRaisesRegex(proof.PromotionProofError, "CI head repository"):
+                    self.run_proof(json_data=data)
+        for label, changes in (
+            ("CI before PR creation", {"created_at": "2026-11-26T00:07:45Z",
+                                       "run_started_at": "2026-11-26T00:07:45Z"}),
+            ("CI started after PR merger", {"run_started_at": "2026-11-26T00:13:00Z"}),
+        ):
+            with self.subTest(label=label):
+                data = copy.deepcopy(self.json)
+                data[endpoint]["pull_requests"] = []
+                data[endpoint].update(changes)
+                with self.assertRaisesRegex(proof.PromotionProofError, "lifecycle"):
+                    self.run_proof(json_data=data)
 
     def test_ci_must_link_unique_exact_promotion_pr(self):
         endpoint = f"{REPO}/actions/runs/{self.ci_id}"

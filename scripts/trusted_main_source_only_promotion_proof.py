@@ -13,6 +13,7 @@ import io
 import json
 import re
 import subprocess
+from datetime import datetime
 import zipfile
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -66,32 +67,57 @@ def _github_json(endpoint: str) -> Any:
 def _complete_run_listing(
     github_json: Callable[[str], Any], endpoint: str, field: str,
 ) -> list[dict[str, Any]]:
-    """Require complete, stable GitHub Actions pagination or refuse the proof.
+    """Require stable, unique records across complete bounded Actions pages.
 
-    All pages use the same 100-item page size. No truncated first page,
-    changing total_count, malformed item or unbounded listing is accepted.
+    For multi-page results, re-read each page and require byte-for-byte
+    equivalent decoded records. This rejects observed pagination drift, not
+    claims that GitHub provides an atomic snapshot of a changing collection.
     """
-    result: list[dict[str, Any]] = []
-    total: int | None = None
-    for page in range(1, 21):
-        suffix = "?per_page=100" + (f"&page={page}" if page > 1 else "")
-        response = github_json(endpoint + suffix)
-        _require(isinstance(response, dict), f"{field} listing is invalid")
-        count = response.get("total_count")
-        items = response.get(field)
-        _require(type(count) is int and 0 <= count <= 2000
-                 and isinstance(items, list) and len(items) <= 100
-                 and all(isinstance(item, dict) for item in items),
-                 f"{field} listing is invalid or exceeds the bounded limit")
-        if total is None:
-            total = count
-        _require(count == total, f"{field} listing changed during pagination")
-        _require(len(items) == min(100, total - len(result)),
-                 f"{field} listing is incomplete or inconsistent")
-        result.extend(items)
-        if len(result) == total:
-            return result
-    raise PromotionProofError(f"{field} listing exceeds bounded pagination")
+    def read_pages() -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        total: int | None = None
+        for page in range(1, 21):
+            suffix = "?per_page=100" + (f"&page={page}" if page > 1 else "")
+            response = github_json(endpoint + suffix)
+            _require(isinstance(response, dict), f"{field} listing is invalid")
+            count = response.get("total_count")
+            items = response.get(field)
+            _require(type(count) is int and 0 <= count <= 2000
+                     and isinstance(items, list) and len(items) <= 100
+                     and all(isinstance(item, dict) for item in items),
+                     f"{field} listing is invalid or exceeds the bounded limit")
+            if total is None:
+                total = count
+            _require(count == total, f"{field} listing changed during pagination")
+            _require(len(items) == min(100, total - len(result)),
+                     f"{field} listing is incomplete or inconsistent")
+            for item in items:
+                record_id = item.get("id")
+                _require(type(record_id) is int and record_id > 0
+                         and record_id not in seen,
+                         f"{field} listing has invalid or repeated record IDs")
+                seen.add(record_id)
+            result.extend(items)
+            if len(result) == total:
+                return result
+        raise PromotionProofError(f"{field} listing exceeds bounded pagination")
+
+    first = read_pages()
+    if len(first) > 100:
+        _require(read_pages() == first,
+                 f"{field} listing changed across bounded consistency re-read")
+    return first
+
+
+def _github_time(value: Any, label: str) -> datetime:
+    _require(isinstance(value, str)
+             and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value)
+             is not None, f"{label} is missing or invalid")
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise PromotionProofError(f"{label} is invalid") from exc
 
 
 def _ci_pr_link(
@@ -105,6 +131,30 @@ def _ci_pr_link(
     independently reported, unique associated PR. Both paths fail closed
     on absent or ambiguous PR identity.
     """
+    # The workflow base repository does not identify the source that supplied
+    # the code. Require the actual CI head repository to be the same trusted,
+    # in-repository promotion PR head (not merely a matching fork commit).
+    repo = pr["head"]["repo"]
+    base_repo = pr["base"]["repo"]
+    ci_head = ci.get("head_repository")
+    ci_base = ci.get("repository")
+    _require(isinstance(ci_head, dict) and isinstance(ci_base, dict)
+             and type(repo.get("id")) is int and type(base_repo.get("id")) is int
+             and repo["id"] == base_repo["id"]
+             and repo.get("full_name") == REPOSITORY
+             and ci_head.get("id") == repo["id"]
+             and ci_head.get("full_name") == REPOSITORY
+             and ci_base.get("id") == base_repo["id"]
+             and ci_base.get("full_name") == REPOSITORY,
+             "CI head repository does not match trusted promotion PR")
+
+    created = _github_time(pr.get("created_at"), "promotion PR creation time")
+    merged = _github_time(pr.get("merged_at"), "promotion PR merge time")
+    ci_created = _github_time(ci.get("created_at"), "CI creation time")
+    ci_started = _github_time(ci.get("run_started_at"), "CI start time")
+    _require(created <= ci_created <= ci_started <= merged,
+             "CI run occurred outside the promotion PR lifecycle")
+
     linked = ci.get("pull_requests")
     _require(isinstance(linked, list), "CI run PR association metadata is missing")
     if not linked:
